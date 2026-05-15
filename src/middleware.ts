@@ -17,6 +17,11 @@ import { createServerClient } from '@supabase/ssr'
  *
  * Public routes (no login required): /, /login, /signup, /auth/*,
  *   /about, /privacy, /terms, /contact
+ *
+ * Fine-grained routing (done at the page level, not here):
+ *   No handle          → /onboarding  (handle-collection step only)
+ *   Has handle, not onboarded → /lobby  (welcome overlay shows)
+ *   Has handle, onboarded     → /lobby  (normal)
  */
 
 const PUBLIC_ROUTES = ['/', '/login', '/signup', '/about', '/privacy', '/terms', '/contact']

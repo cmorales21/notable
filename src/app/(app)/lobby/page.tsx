@@ -1,4 +1,8 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import WelcomeOverlay from './WelcomeOverlay'
+import Whisper from '@/app/components/Whisper'
 
 // ─── Tile config ──────────────────────────────────────────────────────────────
 
@@ -53,50 +57,71 @@ function TileInner({ name, color, iconSrc, iconWidth }: { name: string; color: s
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default function LobbyPage() {
+export default async function LobbyPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) redirect('/login')
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('handle, is_onboarded')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  // No handle → must complete handle step first
+  if (!profile?.handle) redirect('/onboarding')
+
+  const showWelcome = !profile?.is_onboarded
+
   return (
-    <div
-      className="min-h-screen px-5 md:px-8 lg:px-12"
-      style={{
-        background: '#f5f0e8',
-        paddingTop: '1rem',
-        paddingBottom: '3rem',
-      }}
-    >
+    <>
+      {showWelcome && <WelcomeOverlay userId={user.id} />}
 
-      {/* ── Tile grid ─────────────────────────────────────────────── */}
-      {/*
-        Mobile: single column
-        Desktop (md+): 6-column grid, all tiles col-span-2 (equal thirds)
-          Row 1 — Books (cols 1-2), Movies (cols 3-4), Music (cols 5-6)
-          Row 2 — Restaurants (cols 2-3), Podcasts (cols 4-5) → centered
-      */}
-      <div className="grid grid-cols-1 md:grid-cols-6 gap-x-4 gap-y-3 md:gap-x-6 md:gap-y-3 max-w-5xl mx-auto">
+      <div
+        className="min-h-screen px-5 md:px-8 lg:px-12"
+        style={{
+          background: '#f5f0e8',
+          paddingTop: '1rem',
+          paddingBottom: '3rem',
+        }}
+      >
+        {/*
+          Mobile: single column
+          Desktop (md+): 6-column grid, all tiles col-span-2 (equal thirds)
+            Row 1 — Books (cols 1-2), Movies (cols 3-4), Music (cols 5-6)
+            Row 2 — Restaurants (cols 2-3), Podcasts (cols 4-5) → centered
+        */}
+        <div className="max-w-5xl mx-auto mb-3">
+          <Whisper id="lobby-categories" message="What are you in the mood for? Pick a category and dive in." />
+        </div>
 
-        {TILES.slice(0, 3).map(({ name, href, color, iconSrc, iconWidth }) => (
-          <Link
-            key={href}
-            href={href}
-            className="col-span-1 md:col-span-2 select-none"
-            style={{ textDecoration: 'none' }}
-          >
-            <TileInner name={name} color={color} iconSrc={iconSrc} iconWidth={iconWidth} />
-          </Link>
-        ))}
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-x-4 gap-y-3 md:gap-x-6 md:gap-y-3 max-w-5xl mx-auto">
 
-        {/* Restaurants and Podcasts: col-span-2 each, col-start-2 on Restaurants to center the pair */}
-        {TILES.slice(3).map(({ name, href, color, iconSrc, iconWidth }, i) => (
-          <Link
-            key={href}
-            href={href}
-            className={`col-span-1 md:col-span-2${i === 0 ? ' md:col-start-2' : ''} select-none`}
-            style={{ textDecoration: 'none' }}
-          >
-            <TileInner name={name} color={color} iconSrc={iconSrc} iconWidth={iconWidth} />
-          </Link>
-        ))}
+          {TILES.slice(0, 3).map(({ name, href, color, iconSrc, iconWidth }) => (
+            <Link
+              key={href}
+              href={href}
+              className="col-span-1 md:col-span-2 select-none"
+              style={{ textDecoration: 'none' }}
+            >
+              <TileInner name={name} color={color} iconSrc={iconSrc} iconWidth={iconWidth} />
+            </Link>
+          ))}
 
+          {TILES.slice(3).map(({ name, href, color, iconSrc, iconWidth }, i) => (
+            <Link
+              key={href}
+              href={href}
+              className={`col-span-1 md:col-span-2${i === 0 ? ' md:col-start-2' : ''} select-none`}
+              style={{ textDecoration: 'none' }}
+            >
+              <TileInner name={name} color={color} iconSrc={iconSrc} iconWidth={iconWidth} />
+            </Link>
+          ))}
+
+        </div>
       </div>
-    </div>
+    </>
   )
 }

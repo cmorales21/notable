@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar, RecModal, Recommendation, RecComment, RecProfile, sortComments } from '@/app/components/CategoryFeed'
+import Whisper from '@/app/components/Whisper'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1147,6 +1148,13 @@ export default function ProfilePage() {
           </div>
         ) : (
           <>
+            {/* ── Profile identity whisper (own profile only) ─────────── */}
+            {isOwnProfile && (
+              <div style={{ position: 'relative', height: 0, overflow: 'visible', zIndex: 40, marginBottom: 0 }}>
+                <Whisper id="profile-identity" message="This is your taste identity. Only you can see your Bookmarks tab." />
+              </div>
+            )}
+
             {/* ── Tab bar ─────────────────────────────────────────────── */}
             <div style={{
               display: 'flex',

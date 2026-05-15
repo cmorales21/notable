@@ -14,9 +14,10 @@ export default async function OnboardingPage() {
     .eq('id', user.id)
     .maybeSingle()
 
+  // Already fully onboarded → lobby
   if (profile?.is_onboarded) redirect('/lobby')
 
-  // Use || not ?? so that empty strings are treated the same as null.
+  // Use || not ?? so empty strings are treated the same as null.
   // An empty-string handle can exist if the client-side INSERT raced and
   // wrote handle:'' before the auth cookie was ready.
   const profileHandle = profile?.handle || null
@@ -24,14 +25,12 @@ export default async function OnboardingPage() {
   const metaName      = (user.user_metadata?.full_name as string | undefined) || null
 
   let resolvedHandle = profileHandle
-  const resolvedName   = profile?.name || metaName || ''
+  const resolvedName = profile?.name || metaName || ''
 
-  // Recovery: profile row has no handle (or doesn't exist yet) but we have
-  // the handle in user_metadata (stored during signUp). This covers:
-  //  a) No profile row — client INSERT lost a race with the auth-cookie write
-  //  b) Profile row exists but handle is null/'' — same root cause
-  // In both cases we fix the row here on the server where the session is
-  // always available via request cookies, so RLS passes reliably.
+  // Recovery: profile row has no handle but user_metadata has one.
+  // Covers (a) missing profile row or (b) row with null/empty handle —
+  // both happen when the client-side INSERT loses the race with the
+  // auth-cookie write during signup.
   if (!resolvedHandle && metaHandle) {
     if (!profile) {
       const { error } = await supabase.from('profiles').insert({
@@ -42,7 +41,6 @@ export default async function OnboardingPage() {
       })
       if (!error) resolvedHandle = metaHandle
     } else {
-      // Row exists but handle is missing — patch it
       const { error } = await supabase
         .from('profiles')
         .update({ handle: metaHandle })
@@ -51,12 +49,15 @@ export default async function OnboardingPage() {
     }
   }
 
+  // User has a handle — send to lobby where the welcome overlay will show
+  if (resolvedHandle) redirect('/lobby')
+
+  // No handle yet (Google OAuth users) — show handle-collection UI
   return (
     <OnboardingClient
       userId={user.id}
       userEmail={user.email ?? ''}
       initialName={resolvedName}
-      hasHandle={!!resolvedHandle}
     />
   )
 }

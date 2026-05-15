@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import Whisper from '@/app/components/Whisper'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -905,6 +906,11 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
                   overflowWrap: 'break-word',
                 }}
               />
+            </div>
+
+            {/* Whisper hint */}
+            <div style={{ marginTop: '6px' }}>
+              <Whisper id="post-modal-search" message="Start typing to find what you want to share..." />
             </div>
 
             {/* @ mention dropdown — immediately below textarea */}
