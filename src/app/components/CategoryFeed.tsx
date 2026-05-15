@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { groupRecommendations, normalizeTitle, type GroupedRecommendation } from '@/lib/groupRecommendations'
 import { CATEGORY_CONFIG, type Category } from './feed/categoryConfig'
 import { SkeletonCard, EmptyStateIcon } from './feed/helpers'
+import EmptyState from '@/app/components/EmptyState'
 import { GroupedCard } from './feed/GroupedCard'
 import { GroupedModal } from './feed/GroupedModal'
 import { theme } from '@/app/lib/theme'
@@ -40,6 +41,7 @@ export default function CategoryFeed({ category }: { category: string }) {
   const [activeTab, setActiveTab] = useState<'discovery' | 'following'>('discovery')
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [followCount, setFollowCount] = useState<number | null>(null)
 
   const [selectedGroup, setSelectedGroup] = useState<GroupedRecommendation | null>(null)
   const [focusOnOpen, setFocusOnOpen] = useState(false)
@@ -51,6 +53,7 @@ export default function CategoryFeed({ category }: { category: string }) {
     setLoading(true)
     setRecs([])
     setHasMore(false)
+    setFollowCount(null)
     try {
       const { data: { user } } = await supabase.auth.getUser()
       const uid = user?.id ?? null
@@ -68,6 +71,7 @@ export default function CategoryFeed({ category }: { category: string }) {
         const { data: followData } = await supabase
           .from('follows').select('following_id').eq('follower_id', uid)
         followedUserIds = (followData ?? []).map((f: { following_id: string }) => f.following_id)
+        setFollowCount(followedUserIds.length)
         if (followedUserIds.length === 0) return
       }
 
@@ -340,6 +344,14 @@ export default function CategoryFeed({ category }: { category: string }) {
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
+  const DISCOVERY_DESCRIPTIONS: Record<string, string> = {
+    books:       "Be the first to recommend a book. What's worth reading?",
+    movies:      "Be the first to recommend something to watch. What's unmissable?",
+    music:       "Be the first to recommend music. What's worth hearing?",
+    restaurants: "Be the first to recommend a restaurant. Where's worth going?",
+    podcasts:    "Be the first to recommend a podcast. What's worth listening to?",
+  }
+
   const accentColor = config.color
 
   return (
@@ -381,23 +393,25 @@ export default function CategoryFeed({ category }: { category: string }) {
           </div>
         ) : groupedRecs.length === 0 ? (
           activeTab === 'following' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: '80px', gap: '12px', textAlign: 'center' }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke={theme.colors.textMuted} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="36" height="36">
-                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
-              </svg>
-              <p className="font-display" style={{ fontSize: '20px', fontWeight: 600, color: theme.colors.textPrimary, marginTop: '4px' }}>Nothing here yet</p>
-              <p className="font-body" style={{ color: theme.colors.textMuted, fontSize: '14px', maxWidth: '260px', lineHeight: '1.5' }}>
-                Follow people to see their recommendations here. Switch to Discovery to find people to follow.
-              </p>
-            </div>
+            followCount === 0 ? (
+              <EmptyState
+                icon={<EmptyStateIcon category={cat} />}
+                title="You're not following anyone yet"
+                description="Follow people whose taste you trust. Their recommendations will show up here."
+              />
+            ) : (
+              <EmptyState
+                icon={<EmptyStateIcon category={cat} />}
+                title="Nothing from your people yet"
+                description="The people you follow haven't recommended anything here yet. Check Discovery to find something worth your time."
+              />
+            )
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: '80px', gap: '16px', textAlign: 'center' }}>
-              <EmptyStateIcon category={cat} />
-              <p className="font-display" style={{ fontSize: '22px', fontWeight: 600, color: theme.colors.textPrimary, marginTop: '8px' }}>No recommendations yet</p>
-              <p className="font-body" style={{ color: theme.colors.textMuted, fontSize: '14px' }}>Be the first to share something you love</p>
-            </div>
+            <EmptyState
+              icon={<EmptyStateIcon category={cat} />}
+              title="Nothing here yet"
+              description={DISCOVERY_DESCRIPTIONS[cat] ?? "Be the first to share something you love."}
+            />
           )
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>

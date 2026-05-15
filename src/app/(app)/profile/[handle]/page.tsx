@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar, RecModal, Recommendation, RecComment, RecProfile, sortComments } from '@/app/components/CategoryFeed'
+import EmptyState from '@/app/components/EmptyState'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -157,23 +158,6 @@ function GridTile({ rec, onClick }: { rec: Recommendation; onClick: () => void }
           </p>
         </>
       )}
-    </div>
-  )
-}
-
-// ─── Empty tab state ──────────────────────────────────────────────────────────
-
-function EmptyTab({ tab }: { tab: TabId }) {
-  const messages: Record<TabId, string> = {
-    posted: 'Nothing posted yet.',
-    liked: 'No likes yet — explore the feeds and give your first 👌',
-    bookmarked: 'No bookmarks yet.',
-  }
-  return (
-    <div style={{ paddingTop: '60px', textAlign: 'center' }}>
-      <p className="font-body" style={{ color: '#6b5d4f', fontSize: '15px', lineHeight: 1.6 }}>
-        {messages[tab]}
-      </p>
     </div>
   )
 }
@@ -1210,7 +1194,41 @@ export default function ProfilePage() {
                 ))}
               </div>
             ) : filteredRecs.length === 0 ? (
-              <EmptyTab tab={activeTab} />
+              activeTab === 'posted' ? (
+                isOwnProfile ? (
+                  <EmptyState
+                    title="No recommendations yet"
+                    description="When you recommend something you love, it'll live here. Tap the + to get started."
+                  />
+                ) : (
+                  <EmptyState
+                    title="No recommendations yet"
+                    description={`${profile?.name ?? 'This person'} hasn't recommended anything yet.`}
+                  />
+                )
+              ) : activeTab === 'bookmarked' ? (
+                isOwnProfile ? (
+                  <EmptyState
+                    title="Nothing bookmarked yet"
+                    description="When you find something worth saving, bookmark it and it'll appear here."
+                  />
+                ) : (
+                  <EmptyState
+                    title="Nothing bookmarked yet"
+                    description={`${profile?.name ?? 'This person'} hasn't bookmarked anything yet.`}
+                  />
+                )
+              ) : isOwnProfile ? (
+                <EmptyState
+                  title="No likes yet"
+                  description="Recommendations you ❤️ will collect here."
+                />
+              ) : (
+                <EmptyState
+                  title="No likes yet"
+                  description={`${profile?.name ?? 'This person'} hasn't liked anything yet.`}
+                />
+              )
             ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}
                 className="profile-grid">
