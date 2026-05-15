@@ -15,7 +15,7 @@ export const CATEGORY_CONFIG: Record<Category, { label: string; color: string; I
     ),
   },
   movies: {
-    label: 'Movies',
+    label: 'Movies & TV',
     color: '#dc4f5c',
     Icon: () => (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">

@@ -19,8 +19,8 @@ import { createServerClient } from '@supabase/ssr'
  *   /about, /privacy, /terms, /contact
  *
  * Fine-grained routing (done at the page level, not here):
- *   No handle          → /onboarding  (handle-collection step only)
- *   Has handle, not onboarded → /lobby  (welcome overlay shows)
+ *   No handle, not onboarded  → /lobby  (welcome overlay shows handle step)
+ *   Has handle, not onboarded → /lobby  (welcome overlay shows welcome message)
  *   Has handle, onboarded     → /lobby  (normal)
  */
 

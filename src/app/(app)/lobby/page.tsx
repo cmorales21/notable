@@ -8,7 +8,7 @@ import Whisper from '@/app/components/Whisper'
 
 const TILES = [
   { name: 'Books',       href: '/books',       color: '#5271FF', iconSrc: '/icons/books-large.svg',       iconWidth: '80%' },
-  { name: 'Movies',      href: '/movies',      color: '#dc4f5c', iconSrc: '/icons/movies-large.svg',      iconWidth: '44%' },
+  { name: 'Movies & TV', href: '/movies',      color: '#dc4f5c', iconSrc: '/icons/movies-large.svg',      iconWidth: '44%' },
   { name: 'Music',       href: '/music',       color: '#4aad4e', iconSrc: '/icons/music-large.svg',       iconWidth: '44%' },
   { name: 'Restaurants', href: '/restaurants', color: '#9055d0', iconSrc: '/icons/restaurants-ramen.svg',  iconWidth: '52%' },
   { name: 'Podcasts',    href: '/podcasts',    color: '#d4920a', iconSrc: '/icons/podcasts-large.svg',    iconWidth: '44%' },
@@ -69,14 +69,12 @@ export default async function LobbyPage() {
     .eq('id', user.id)
     .maybeSingle()
 
-  // No handle → must complete handle step first
-  if (!profile?.handle) redirect('/onboarding')
-
   const showWelcome = !profile?.is_onboarded
+  const hasHandle = !!profile?.handle
 
   return (
     <>
-      {showWelcome && <WelcomeOverlay userId={user.id} />}
+      {showWelcome && <WelcomeOverlay userId={user.id} hasHandle={hasHandle} />}
 
       <div
         className="min-h-screen px-5 md:px-8 lg:px-12"
@@ -92,9 +90,11 @@ export default async function LobbyPage() {
             Row 1 — Books (cols 1-2), Movies (cols 3-4), Music (cols 5-6)
             Row 2 — Restaurants (cols 2-3), Podcasts (cols 4-5) → centered
         */}
-        <div className="max-w-5xl mx-auto mb-3">
-          <Whisper id="lobby-categories" message="What are you in the mood for? Pick a category and dive in." />
-        </div>
+        {!showWelcome && (
+          <div className="max-w-5xl mx-auto mb-3">
+            <Whisper id="lobby-categories" message="What are you in the mood for? Pick a category and dive in." />
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-6 gap-x-4 gap-y-3 md:gap-x-6 md:gap-y-3 max-w-5xl mx-auto">
 

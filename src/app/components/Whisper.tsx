@@ -46,19 +46,24 @@ export default function Whisper({ id, message }: WhisperProps) {
         opacity,
         transition: 'opacity 0.3s ease',
         cursor: 'pointer',
-        display: 'inline-block',
+        display: 'block',
+        width: 'fit-content',
+        maxWidth: '320px',
+        margin: '0 auto',
+        zIndex: 10,
       }}
     >
       <div
         className="font-body"
         style={{
-          background: '#33261a',
-          color: '#f5f0e8',
+          background: 'rgba(250, 248, 244, 0.95)',
+          border: '1px solid rgba(0,0,0,0.06)',
           borderRadius: '10px',
-          padding: '9px 14px',
-          fontSize: '0.8rem',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+          padding: '12px 18px',
+          fontSize: '14px',
+          color: '#33261a',
           lineHeight: 1.5,
-          boxShadow: '0 8px 24px rgba(58,42,26,0.2)',
           userSelect: 'none',
         }}
       >

@@ -101,7 +101,7 @@ function notifHref(n: DropdownNotif): string | null {
 
 const CATEGORIES = [
   { name: 'Books',       href: '/books',       color: '#5271FF', iconSrc: '/icons/books-small.svg',       sidebarPadding: '6px'  },
-  { name: 'Movies',      href: '/movies',      color: '#dc4f5c', iconSrc: '/icons/movies-small.svg',      sidebarPadding: '10px' },
+  { name: 'Movies & TV', href: '/movies',      color: '#dc4f5c', iconSrc: '/icons/movies-small.svg',      sidebarPadding: '10px' },
   { name: 'Music',       href: '/music',       color: '#4aad4e', iconSrc: '/icons/music-small.svg',       sidebarPadding: '8px'  },
   { name: 'Restaurants', href: '/restaurants', color: '#9055d0', iconSrc: '/icons/restaurants-small.svg', sidebarPadding: '6px'  },
   { name: 'Podcasts',    href: '/podcasts',    color: '#d4920a', iconSrc: '/icons/podcasts-small.svg',    sidebarPadding: '6px'  },

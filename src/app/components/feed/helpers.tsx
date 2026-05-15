@@ -216,46 +216,34 @@ export function SkeletonCard() {
   )
 }
 
+const EMPTY_STATE_ICONS: Record<string, { src: string; color: string; padding: string }> = {
+  books:       { src: '/icons/books-small.svg',       color: '#5271FF', padding: '12px' },
+  movies:      { src: '/icons/movies-small.svg',      color: '#dc4f5c', padding: '16px' },
+  music:       { src: '/icons/music-small.svg',       color: '#4aad4e', padding: '14px' },
+  restaurants: { src: '/icons/restaurants-small.svg', color: '#9055d0', padding: '12px' },
+  podcasts:    { src: '/icons/podcasts-small.svg',    color: '#d4920a', padding: '12px' },
+}
+
 export function EmptyStateIcon({ category }: { category: string }) {
-  const stroke = '#6b5d4f'
-  const props = { fill: 'none', stroke, strokeWidth: '1.5', strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, width: 80, height: 80 }
-  if (category === 'books') return (
-    <svg viewBox="0 0 64 64" {...props}>
-      <line x1="32" y1="10" x2="32" y2="54" />
-      <path d="M6 13c0-2.8 2.2-5 5-5h16a5 5 0 015 5v39c0-2.5-2-4-5-4H11a5 5 0 01-5-5V13z" />
-      <path d="M58 13c0-2.8-2.2-5-5-5H37a5 5 0 00-5 5v39c0-2.5 2-4 5-4h15a5 5 0 005-5V13z" />
-    </svg>
-  )
-  if (category === 'movies') return (
-    <svg viewBox="0 0 64 64" {...props}>
-      <rect x="8" y="26" width="48" height="32" rx="3" />
-      <rect x="8" y="14" width="48" height="12" rx="2" />
-      <line x1="8" y1="26" x2="20" y2="14" />
-      <line x1="22" y1="26" x2="34" y2="14" />
-      <line x1="36" y1="26" x2="48" y2="14" />
-    </svg>
-  )
-  if (category === 'music') return (
-    <svg viewBox="0 0 64 64" {...props}>
-      <circle cx="32" cy="36" r="22" />
-      <circle cx="32" cy="36" r="9" />
-      <circle cx="32" cy="36" r="2.5" />
-    </svg>
-  )
-  if (category === 'restaurants') return (
-    <svg viewBox="0 0 64 64" {...props}>
-      <circle cx="32" cy="36" r="18" />
-      <circle cx="32" cy="36" r="12" />
-      <line x1="10" y1="26" x2="10" y2="56" />
-      <line x1="54" y1="26" x2="54" y2="56" />
-    </svg>
-  )
+  const icon = EMPTY_STATE_ICONS[category]
+  if (!icon) return null
   return (
-    <svg viewBox="0 0 64 64" {...props}>
-      <rect x="24" y="6" width="16" height="28" rx="8" />
-      <path d="M14 24c0 10.5 8.1 18 18 18s18-7.5 18-18" />
-      <line x1="32" y1="42" x2="32" y2="54" />
-    </svg>
+    <div
+      style={{
+        width: 56, height: 56, borderRadius: '14px',
+        background: icon.color,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: icon.padding,
+        boxSizing: 'border-box',
+      }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={icon.src}
+        alt={category}
+        style={{ width: '100%', height: '100%', filter: 'brightness(0) invert(1)', opacity: 0.92 }}
+      />
+    </div>
   )
 }
 

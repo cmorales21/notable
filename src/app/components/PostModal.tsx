@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Whisper from '@/app/components/Whisper'
+import { useWhispers } from '@/app/hooks/useWhispers'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -42,14 +43,29 @@ const CAT_ORDER: Category[] = ['books', 'movies', 'music', 'restaurants', 'podca
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
-function CatIcon({ id, size = 13 }: { id: Category; size?: number }) {
-  const s = { width: size, height: size }
-  const p = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '1.8', strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
-  if (id === 'books') return <svg {...p} {...s}><path d="M12 20V5"/><path d="M3 4a2 2 0 012-2h4a2 2 0 012 2v15a2 2 0 00-2-2H5a2 2 0 01-2-2V4z"/><path d="M21 4a2 2 0 00-2-2h-4a2 2 0 00-2 2v15a2 2 0 012-2h4a2 2 0 002-2V4z"/></svg>
-  if (id === 'movies') return <svg {...p} {...s}><rect x="2" y="8" width="14" height="10" rx="2"/><path d="M16 11l5-3v8l-5-3V11z"/></svg>
-  if (id === 'music') return <svg {...p} {...s}><path d="M3 18v-6a9 9 0 0118 0v6"/><path d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3z"/><path d="M3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z"/></svg>
-  if (id === 'restaurants') return <svg {...p} {...s}><path d="M8 3v5a3 3 0 006 0V3"/><path d="M11 8v13"/><path d="M16 3a5 5 0 015 5c0 3-2 4.5-5 5v8"/></svg>
-  return <svg {...p} {...s}><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0014 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+const CAT_ICON_SRC: Record<Category, string> = {
+  books:       '/icons/books-small.svg',
+  movies:      '/icons/movies-small.svg',
+  music:       '/icons/music-small.svg',
+  restaurants: '/icons/restaurants-small.svg',
+  podcasts:    '/icons/podcasts-small.svg',
+}
+
+function CatIcon({ id, selected = false }: { id: Category; selected?: boolean }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={CAT_ICON_SRC[id]}
+      alt={id}
+      width={16}
+      height={16}
+      style={{
+        width: 16, height: 16,
+        filter: selected ? 'brightness(0) invert(1)' : 'brightness(0)',
+        opacity: selected ? 1 : 0.45,
+      }}
+    />
+  )
 }
 
 // ─── Result row ───────────────────────────────────────────────────────────────
@@ -213,6 +229,8 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
   const mentionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mentionAtPosRef = useRef(-1)
   const skipDupRef = useRef(false)
+
+  const { dismiss: dismissWhisper } = useWhispers()
 
   const accentColor = category ? CAT_CONFIG[category].color : '#6b9fd4'
   const canPost = !!category && (!!confirmedItem || !!uploadedImage || text.replace(URL_RE, '').trim().length > 5)
@@ -470,6 +488,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
   const handleCategorySelect = async (cat: Category) => {
     const next = category === cat ? null : cat
     syncCategory(next)
+    if (next) dismissWhisper('post-category-hint')
     if (!next) { setDropdownItems([]); setDropdownVisible(false); return }
     if (!confirmedItem && next !== 'restaurants') {
       const trimmed = text.replace(URL_RE, '').trim()
@@ -835,7 +854,8 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
             <div style={{
               display: 'flex', gap: '6px',
               overflowX: 'auto', scrollbarWidth: 'none',
-              marginBottom: '18px',
+              margin: '0 -16px 18px',
+              padding: '0 16px',
             }}>
               {CAT_ORDER.map(id => {
                 const { label, color } = CAT_CONFIG[id]
@@ -857,11 +877,16 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
                       display: 'flex', alignItems: 'center', gap: '5px',
                     }}
                   >
-                    <CatIcon id={id} size={13} />
+                    <CatIcon id={id} selected={sel} />
                     {label}
                   </button>
                 )
               })}
+            </div>
+
+            {/* Category hint whisper */}
+            <div style={{ marginTop: '-10px', marginBottom: '14px' }}>
+              <Whisper id="post-category-hint" message="Select the topic for your recommendation." />
             </div>
 
             {/* Compose area */}
@@ -908,10 +933,6 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
               />
             </div>
 
-            {/* Whisper hint */}
-            <div style={{ marginTop: '6px' }}>
-              <Whisper id="post-modal-search" message="Start typing to find what you want to share..." />
-            </div>
 
             {/* @ mention dropdown — immediately below textarea */}
             {mentionActive && (
@@ -1180,11 +1201,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
                     autoFocus
                     value={manualQuery}
                     onChange={handleManualQueryChange}
-                    placeholder={
-                      category && category !== 'restaurants'
-                        ? `Search ${CAT_CONFIG[category].label.toLowerCase()}…`
-                        : 'Search…'
-                    }
+                    placeholder={category ? `Search ${CAT_CONFIG[category].label.toLowerCase()}…` : 'Search…'}
                     className="font-body"
                     style={{
                       flex: 1, background: 'transparent', border: 'none', outline: 'none',
@@ -1237,28 +1254,12 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
                   <ResultRow key={item.id} item={item} onSelect={handleConfirm} />
                 ))}
 
-                {!manualQuery && (
-                  <div style={{ padding: '18px 16px', textAlign: 'center' }}>
-                    <p className="font-body" style={{ color: '#6b5d4f', fontSize: '12px' }}>
-                      {category === 'restaurants'
-                        ? 'Restaurants use text + photo — no search needed'
-                        : 'Type to search…'}
-                    </p>
-                  </div>
-                )}
-
                 {manualQuery.length > 0 && !manualSearching && dropdownItems.length === 0 && (
                   <div style={{ padding: '18px 16px', textAlign: 'center' }}>
                     <p className="font-body" style={{ color: '#6b5d4f', fontSize: '12px' }}>No results found</p>
                   </div>
                 )}
 
-                <p className="font-body" style={{
-                  color: '#6b5d4f', fontSize: '12px', textAlign: 'center',
-                  padding: '10px 14px',
-                }}>
-                  Not here? Paste a URL instead
-                </p>
               </div>
             )}
 

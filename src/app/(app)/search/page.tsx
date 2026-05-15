@@ -21,7 +21,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 const CATEGORY_LABELS: Record<string, string> = {
   books: 'Books',
-  movies: 'Movies',
+  movies: 'Movies & TV',
   music: 'Music',
   restaurants: 'Restaurants',
   podcasts: 'Podcasts',
@@ -32,7 +32,7 @@ type FilterId = 'all' | 'books' | 'movies' | 'music' | 'restaurants' | 'podcasts
 const FILTERS: { id: FilterId; label: string }[] = [
   { id: 'all',         label: 'All' },
   { id: 'books',       label: 'Books' },
-  { id: 'movies',      label: 'Movies' },
+  { id: 'movies',      label: 'Movies & TV' },
   { id: 'music',       label: 'Music' },
   { id: 'restaurants', label: 'Restaurants' },
   { id: 'podcasts',    label: 'Podcasts' },

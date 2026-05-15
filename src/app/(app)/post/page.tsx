@@ -35,7 +35,7 @@ interface SelectedItem {
 
 const CATEGORIES: { id: Category; label: string; emoji: string; color: string }[] = [
   { id: 'books',       label: 'Books',       emoji: '📖', color: '#5271FF' },
-  { id: 'movies',      label: 'Movies',      emoji: '🎬', color: '#dc4f5c' },
+  { id: 'movies',      label: 'Movies & TV', emoji: '🎬', color: '#dc4f5c' },
   { id: 'music',       label: 'Music',       emoji: '🎵', color: '#4aad4e' },
   { id: 'restaurants', label: 'Restaurants', emoji: '🍽️', color: '#9055d0' },
   { id: 'podcasts',    label: 'Podcasts',    emoji: '🎙️', color: '#d4920a' },

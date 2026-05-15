@@ -8,7 +8,6 @@ import { SkeletonCard, EmptyStateIcon } from './feed/helpers'
 import { GroupedCard } from './feed/GroupedCard'
 import { GroupedModal } from './feed/GroupedModal'
 import { theme } from '@/app/lib/theme'
-import { useWhispers } from '@/app/hooks/useWhispers'
 
 // ─── Public re-exports (consumed by profile page, search page, hooks) ─────────
 
@@ -45,8 +44,6 @@ export default function CategoryFeed({ category }: { category: string }) {
   const [selectedGroup, setSelectedGroup] = useState<GroupedRecommendation | null>(null)
   const [focusOnOpen, setFocusOnOpen] = useState(false)
   const autoOpenedRef = useRef(false)
-
-  const { shouldShow: whisperShouldShow } = useWhispers()
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -410,8 +407,7 @@ export default function CategoryFeed({ category }: { category: string }) {
                 group={group}
                 accentColor={accentColor}
                 tab={activeTab}
-                showWhisper={idx === 0 && whisperShouldShow('grouped-card')}
-                onLike={(e) => toggleLike(e, group.lead_rec_id)}
+onLike={(e) => toggleLike(e, group.lead_rec_id)}
                 onBookmark={(e) => toggleBookmark(e, group.lead_rec_id)}
                 onClick={() => { setFocusOnOpen(false); setSelectedGroup(group) }}
                 onCommentClick={(e) => { e.stopPropagation(); setFocusOnOpen(true); setSelectedGroup(group) }}

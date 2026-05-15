@@ -7,7 +7,6 @@ import type { GroupedRecommendation, GroupedRecommender } from '@/lib/groupRecom
 import { Avatar, ActionButton, TeaserText } from './helpers'
 import { LikeIcon, BookmarkIcon, CommentIcon } from './icons'
 import { theme } from '@/app/lib/theme'
-import Whisper from '@/app/components/Whisper'
 
 function OverlappingAvatars({ recommenders }: { recommenders: GroupedRecommender[] }) {
   const shown = recommenders.slice(0, 3)
@@ -63,7 +62,6 @@ export function GroupedCard({
   group,
   accentColor,
   tab,
-  showWhisper,
   onLike,
   onBookmark,
   onClick,
@@ -72,7 +70,6 @@ export function GroupedCard({
   group: GroupedRecommendation
   accentColor: string
   tab: 'discovery' | 'following'
-  showWhisper?: boolean
   onLike: (e: React.MouseEvent) => void
   onBookmark: (e: React.MouseEvent) => void
   onClick: () => void
@@ -222,11 +219,6 @@ export function GroupedCard({
       </div>
     </div>
 
-    {showWhisper && (
-      <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, zIndex: 40 }}>
-        <Whisper id="grouped-card" message="More than one person loved this. Tap to see what they're saying." />
-      </div>
-    )}
     </div>
   )
 }

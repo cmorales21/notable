@@ -25,7 +25,7 @@ export default function AboutPage() {
         </p>
 
         <p>
-          We cover five categories: <strong>Books</strong> that stayed with you long after the last page, <strong>Movies</strong> worth two hours of your evening, <strong>Music</strong> you&rsquo;ve had on repeat, <strong>Restaurants</strong> you&rsquo;d send a friend to without hesitation, and <strong>Podcasts</strong> that made a long drive feel short. Each one curated by hand, by humans.
+          We cover five categories: <strong>Books</strong> that stayed with you long after the last page, <strong>Movies & TV</strong> worth two hours of your evening, <strong>Music</strong> you&rsquo;ve had on repeat, <strong>Restaurants</strong> you&rsquo;d send a friend to without hesitation, and <strong>Podcasts</strong> that made a long drive feel short. Each one curated by hand, by humans.
         </p>
 
         <p>
