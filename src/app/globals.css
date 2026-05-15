@@ -188,3 +188,30 @@ body {
     margin-bottom: 48px;
   }
 }
+
+/* ─── Scrolling strip (landing page) ─────────────────────────────────── */
+
+/* Images flow left-to-right: track starts at -50% and advances toward 0 */
+@keyframes scroll-right {
+  from { transform: translateX(-50%); }
+  to   { transform: translateX(0); }
+}
+
+.strip-section:hover .strip-row {
+  animation-play-state: paused;
+}
+
+.strip-box {
+  width: 73px;
+  height: 73px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden; /* clips img to rounded corners */
+}
+
+@media (min-width: 768px) {
+  .strip-box {
+    width: 97px;
+    height: 97px;
+  }
+}

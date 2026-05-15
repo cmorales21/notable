@@ -22,49 +22,42 @@ export default function Navbar() {
         borderBottom: scrolled ? '1px solid rgba(0,0,0,0.06)' : '1px solid transparent',
       }}
     >
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-        {/* Logo */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        {/* Logo — clamp keeps 1.85rem on desktop, shrinks to 1.25rem on small mobile */}
         <Link
           href="/"
-          className="font-bold text-text tracking-tight"
-          style={{ fontSize: '1.5rem', letterSpacing: '-0.01em', fontFamily: 'var(--font-climate-crisis)' }}
+          className="select-none"
+          style={{
+            fontFamily: 'var(--font-climate-crisis)',
+            fontSize: 'clamp(1.25rem, 5vw, 1.85rem)',
+            fontWeight: 400,
+            letterSpacing: '0.04em',
+            color: '#33261a',
+            textTransform: 'uppercase',
+            textDecoration: 'none',
+            lineHeight: 1,
+          }}
         >
-          Notable
+          NOTABLE
         </Link>
 
         {/* Actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-4">
           <Link
             href="/login"
-            className="font-body text-sm font-medium text-text px-5 py-2 rounded-full transition-all duration-200"
-            style={{
-              border: '1px solid rgba(0,0,0,0.15)',
-              color: 'var(--color-text)',
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(0,0,0,0.3)'
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLAnchorElement).style.borderColor = 'rgba(0,0,0,0.15)'
-            }}
+            className="font-body text-xs sm:text-sm font-medium transition-opacity duration-200 hover:opacity-70"
+            style={{ color: 'var(--color-text)', textDecoration: 'none' }}
           >
             Sign In
           </Link>
           <Link
             href="/signup"
-            className="font-body text-sm font-semibold px-5 py-2 rounded-full transition-all duration-200"
-            style={{
-              background: 'var(--color-books)',
-              color: 'var(--color-background)',
-            }}
-            onMouseEnter={e => {
-              (e.currentTarget as HTMLAnchorElement).style.opacity = '0.88'
-            }}
-            onMouseLeave={e => {
-              (e.currentTarget as HTMLAnchorElement).style.opacity = '1'
-            }}
+            className="font-body text-xs sm:text-sm font-semibold px-3 py-1.5 sm:px-5 sm:py-2 rounded-full transition-opacity duration-200"
+            style={{ background: 'var(--color-books)', color: '#fff', textDecoration: 'none' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.opacity = '0.88' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.opacity = '1' }}
           >
-            Join Free
+            Join Notable
           </Link>
         </div>
       </div>

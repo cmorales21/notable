@@ -15,10 +15,11 @@ import { createServerClient } from '@supabase/ssr'
  *     route (/lobby, /profile, etc.) without being logged in,
  *     they get redirected to /login.
  *
- * Public routes (no login required): /, /login, /signup, /auth/*
+ * Public routes (no login required): /, /login, /signup, /auth/*,
+ *   /about, /privacy, /terms, /contact
  */
 
-const PUBLIC_ROUTES = ['/', '/login', '/signup']
+const PUBLIC_ROUTES = ['/', '/login', '/signup', '/about', '/privacy', '/terms', '/contact']
 const PUBLIC_PREFIXES = ['/auth/'] // covers /auth/callback etc.
 
 export async function middleware(request: NextRequest) {
