@@ -226,14 +226,9 @@ export function GroupedModal({
     const primaryId = group.recommenders[0]?.recommendation_id
     if (!primaryId) return
     const url = `${window.location.origin}/rec/${primaryId}`
-    const text = `Check out ${group.title} on Notable`
-    if (navigator.share) {
-      try { await navigator.share({ title: group.title, text, url }) } catch (_) {}
-    } else {
-      await navigator.clipboard.writeText(url)
-      setShowCopied(true)
-      setTimeout(() => setShowCopied(false), 2000)
-    }
+    await navigator.clipboard.writeText(url)
+    setShowCopied(true)
+    setTimeout(() => setShowCopied(false), 2000)
   }
 
   async function handleLike(e: React.MouseEvent) {

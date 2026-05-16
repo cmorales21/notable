@@ -138,14 +138,9 @@ export function RecModal({
 
   async function handleShare() {
     const url = `${window.location.origin}/rec/${rec.id}`
-    const text = `Check out ${rec.title} on Notable`
-    if (navigator.share) {
-      try { await navigator.share({ title: rec.title, text, url }) } catch (_) {}
-    } else {
-      await navigator.clipboard.writeText(url)
-      setShowCopied(true)
-      setTimeout(() => setShowCopied(false), 2000)
-    }
+    await navigator.clipboard.writeText(url)
+    setShowCopied(true)
+    setTimeout(() => setShowCopied(false), 2000)
   }
 
   const isRecAuthor = currentUserId === rec.user_id

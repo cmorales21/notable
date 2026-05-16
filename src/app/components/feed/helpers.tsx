@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { RecComment } from '@/app/lib/types'
 import { theme } from '@/app/lib/theme'
@@ -149,6 +149,17 @@ export function TeaserText({
   accentColor: string
   attribution?: { name: string | null; avatarUrl?: string | null }
 }) {
+  const [expanded, setExpanded] = useState(false)
+  const [overflows, setOverflows] = useState(false)
+  const pRef = useRef<HTMLParagraphElement>(null)
+
+  useEffect(() => {
+    const el = pRef.current
+    if (!el) return
+    // Measure while clamped: scrollHeight > clientHeight means text is cut off
+    setOverflows(el.scrollHeight > el.clientHeight + 1)
+  }, [text])
+
   return (
     <div style={{ padding: '6px 16px 0' }}>
       {attribution && (
@@ -160,15 +171,33 @@ export function TeaserText({
         </div>
       )}
       <p
+        ref={pRef}
         className="font-body"
         style={{
           fontSize: '14px', color: theme.colors.textPrimary, lineHeight: '1.55', margin: 0,
-          marginBottom: '10px', display: '-webkit-box',
-          WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+          marginBottom: overflows && !expanded ? '4px' : '10px',
+          ...(expanded ? {} : {
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }),
         }}
       >
         {text}
       </p>
+      {overflows && !expanded && (
+        <button
+          onClick={e => { e.stopPropagation(); setExpanded(true) }}
+          className="font-body"
+          style={{
+            background: 'none', border: 'none', padding: '0 0 6px',
+            fontSize: '13px', color: accentColor, cursor: 'pointer', fontWeight: 500,
+          }}
+        >
+          see more
+        </button>
+      )}
     </div>
   )
 }
