@@ -25,7 +25,7 @@ import { createServerClient } from '@supabase/ssr'
  */
 
 const PUBLIC_ROUTES = ['/', '/login', '/signup', '/about', '/privacy', '/terms', '/contact']
-const PUBLIC_PREFIXES = ['/auth/', '/rec/'] // covers /auth/callback, /rec/[id] (public OG links)
+const PUBLIC_PREFIXES = ['/auth/', '/rec/', '/forgot-password', '/reset-password']
 
 export async function middleware(request: NextRequest) {
   // We need to forward cookies in both directions.

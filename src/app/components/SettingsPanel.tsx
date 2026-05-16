@@ -483,14 +483,14 @@ function PrivacySection({ userId }: { userId: string }) {
           : 'Your profile is public. Anyone can discover your recommendations.'}
       </p>
       <ToggleRow
-        label="Private bookmarks"
-        checked={bookmarksPrivate}
+        label="Make bookmarks public"
+        checked={!bookmarksPrivate}
         onChange={toggleBookmarksPrivate}
       />
       <p className="font-body" style={{ fontSize: '12px', color: '#6b5d4f', lineHeight: '1.55', padding: '6px 0 0' }}>
         {bookmarksPrivate
-          ? 'Only you can see your Bookmarked tab.'
-          : 'Anyone visiting your profile can see your Bookmarked tab.'}
+          ? 'Your Bookmarked tab is private — only you can see it.'
+          : 'Your Bookmarked tab is visible to anyone who visits your profile.'}
       </p>
     </div>
   )

@@ -720,11 +720,9 @@ export default function ProfilePage() {
     if (!profile) return
     const gated = profile.profile_private === true && !isOwnProfile && !isFollowing
     if (gated) { setRecs([]); setRecsLoading(false); return }
-    if (activeTab === 'liked' && !isOwnProfile) {
-      setActiveTab('posted')
-      return
-    }
-    if (activeTab === 'bookmarked' && !isOwnProfile && profile?.bookmarks_private) {
+    // Likes are always public — no per-tab gate needed.
+    // Bookmarks are private by default; only shown to others when explicitly set to false.
+    if (activeTab === 'bookmarked' && !isOwnProfile && profile?.bookmarks_private !== false) {
       setActiveTab('posted')
       return
     }
@@ -873,12 +871,9 @@ export default function ProfilePage() {
 
   const filteredRecs = categoryFilter === 'all' ? recs : recs.filter(r => r.category === categoryFilter)
   const accentColor = selectedRec ? (CATEGORY_COLORS[selectedRec.category] ?? '#6b5d4f') : '#6b5d4f'
-  const showBookmarked = isOwnProfile || !profile?.bookmarks_private
-  const tabs: TabId[] = isOwnProfile
-    ? ['posted', 'liked', 'bookmarked']
-    : showBookmarked
-      ? ['posted', 'bookmarked']
-      : ['posted']
+  // Liked is always public. Bookmarked is shown only to owner or when explicitly public.
+  const showBookmarked = isOwnProfile || profile?.bookmarks_private === false
+  const tabs: TabId[] = ['posted', 'liked', ...(showBookmarked ? ['bookmarked' as TabId] : [])]
   const isPrivateAndGated = profile?.profile_private === true && !isOwnProfile && !isFollowing
 
   // ── Early returns ───────────────────────────────────────────────────────────

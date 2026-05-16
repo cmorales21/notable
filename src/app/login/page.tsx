@@ -216,20 +216,28 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Sign up link */}
-          <p
-            className="font-body text-center mt-6"
-            style={{ color: 'var(--color-muted)', fontSize: '0.875rem' }}
-          >
-            New to Notable?{' '}
+          {/* Bottom links */}
+          <div className="flex items-center justify-between mt-6">
             <Link
-              href="/signup"
-              className="transition-colors duration-200"
-              style={{ color: 'var(--color-books)' }}
+              href="/forgot-password"
+              className="font-body"
+              style={{ color: 'var(--color-muted)', fontSize: '0.875rem', textDecoration: 'none' }}
+              onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+              onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
             >
-              Join free
+              Forgot your password?
             </Link>
-          </p>
+            <span className="font-body" style={{ color: 'var(--color-muted)', fontSize: '0.875rem' }}>
+              New to Notable?{' '}
+              <Link
+                href="/signup"
+                className="transition-colors duration-200"
+                style={{ color: 'var(--color-books)' }}
+              >
+                Join free
+              </Link>
+            </span>
+          </div>
         </div>
       </div>
     </div>
