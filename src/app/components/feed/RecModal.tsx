@@ -77,6 +77,8 @@ export function RecModal({
   const [deletingRec, setDeletingRec] = useState(false)
   const [localDescription, setLocalDescription] = useState(rec.description)
   const [deletedCommentIds, setDeletedCommentIds] = useState<Set<string>>(new Set())
+  const [showCopied, setShowCopied] = useState(false)
+  const [reportStep, setReportStep] = useState<'idle' | 'confirm' | 'thanks'>('idle')
 
   useEffect(() => {
     const map: Record<string, { count: number; likedByMe: boolean }> = {}
@@ -132,6 +134,18 @@ export function RecModal({
     await supabaseRef.current.from('recommendations').delete().eq('id', rec.id).eq('user_id', currentUserId)
     onClose()
     onRecDeleted?.()
+  }
+
+  async function handleShare() {
+    const url = `${window.location.origin}/rec/${rec.id}`
+    const text = `Check out ${rec.title} on Notable`
+    if (navigator.share) {
+      try { await navigator.share({ title: rec.title, text, url }) } catch (_) {}
+    } else {
+      await navigator.clipboard.writeText(url)
+      setShowCopied(true)
+      setTimeout(() => setShowCopied(false), 2000)
+    }
   }
 
   const isRecAuthor = currentUserId === rec.user_id
@@ -206,7 +220,35 @@ export function RecModal({
             )}
           </div>
           <div style={{ display: 'flex', gap: '6px', flexShrink: 0, alignItems: 'center' }}>
-            {isRecAuthor && (
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={handleShare}
+                style={{
+                  width: '32px', height: '32px', borderRadius: '50%',
+                  background: theme.colors.border, border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: theme.colors.textMuted, transition: 'background 0.15s',
+                }}
+                aria-label="Share"
+              >
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                  <polyline points="16 6 12 2 8 6" />
+                  <line x1="12" y1="2" x2="12" y2="15" />
+                </svg>
+              </button>
+              {showCopied && (
+                <div style={{
+                  position: 'absolute', bottom: '-30px', right: 0, zIndex: 10,
+                  background: '#1a1a1a', color: '#fff', fontSize: '12px',
+                  padding: '4px 10px', borderRadius: '6px', whiteSpace: 'nowrap',
+                  pointerEvents: 'none',
+                }}>
+                  Link copied!
+                </div>
+              )}
+            </div>
+            {(isRecAuthor || (currentUserId && currentUserId !== rec.user_id)) && (
               <div style={{ position: 'relative' }}>
                 <button
                   onClick={() => setOpenRecMenu(v => !v)}
@@ -232,21 +274,37 @@ export function RecModal({
                       borderRadius: '10px', overflow: 'hidden', minWidth: '160px',
                       boxShadow: theme.shadows.menu,
                     }}>
-                      <button
-                        onClick={() => { setEditDescInput(localDescription); setEditingDesc(true); setOpenRecMenu(false) }}
-                        className="font-body"
-                        style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', color: theme.colors.textPrimary, fontSize: '14px', textAlign: 'left' }}
-                      >
-                        Edit post
-                      </button>
-                      <div style={{ height: '1px', background: theme.colors.border }} />
-                      <button
-                        onClick={() => { setDeletingRec(true); setOpenRecMenu(false) }}
-                        className="font-body"
-                        style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', color: theme.colors.error, fontSize: '14px', textAlign: 'left' }}
-                      >
-                        Delete recommendation
-                      </button>
+                      {isRecAuthor ? (
+                        <>
+                          <button
+                            onClick={() => { setEditDescInput(localDescription); setEditingDesc(true); setOpenRecMenu(false) }}
+                            className="font-body"
+                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', color: theme.colors.textPrimary, fontSize: '14px', textAlign: 'left' }}
+                          >
+                            Edit post
+                          </button>
+                          <div style={{ height: '1px', background: theme.colors.border }} />
+                          <button
+                            onClick={() => { setDeletingRec(true); setOpenRecMenu(false) }}
+                            className="font-body"
+                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', color: theme.colors.error, fontSize: '14px', textAlign: 'left' }}
+                          >
+                            Delete recommendation
+                          </button>
+                        </>
+                      ) : reportStep === 'thanks' ? (
+                        <div className="font-body" style={{ padding: '10px 14px', color: theme.colors.textMuted, fontSize: '14px' }}>
+                          Thank you — we&apos;ll review this.
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => { setReportStep('thanks'); setOpenRecMenu(false) }}
+                          className="font-body"
+                          style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', color: theme.colors.textMuted, fontSize: '14px', textAlign: 'left' }}
+                        >
+                          Report
+                        </button>
+                      )}
                     </div>
                   </>
                 )}

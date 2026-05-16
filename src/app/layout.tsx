@@ -6,8 +6,19 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Notable",
-  description: "Social recommendations for the things that matter.",
+  metadataBase: new URL('https://notable-one-xi.vercel.app'),
+  title: {
+    default: 'Notable',
+    template: '%s',
+  },
+  description: 'Get in, get inspired, go live your life.',
+  openGraph: {
+    siteName: 'Notable',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+  },
 };
 
 export default function RootLayout({

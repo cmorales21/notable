@@ -1,7 +1,24 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import Navbar from './components/Navbar'
 import FadeIn from './components/FadeIn'
 import AuthCard from './components/AuthCard'
+
+export const metadata: Metadata = {
+  title: 'Notable — Get in, get inspired, go live your life',
+  description: "A social recommendation platform for Books, Movies, Music, Restaurants and Podcasts. Discover what's genuinely worth your time through people whose taste you trust.",
+  openGraph: {
+    title: 'Notable — Get in, get inspired, go live your life',
+    description: "A social recommendation platform for Books, Movies, Music, Restaurants and Podcasts. Discover what's genuinely worth your time through people whose taste you trust.",
+    siteName: 'Notable',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Notable — Get in, get inspired, go live your life',
+    description: "A social recommendation platform for Books, Movies, Music, Restaurants and Podcasts. Discover what's genuinely worth your time through people whose taste you trust.",
+  },
+}
 
 /* ─── Tile data (matches lobby exactly) ─────────────────────────────────── */
 const TILES = [
