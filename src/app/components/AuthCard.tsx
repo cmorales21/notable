@@ -293,33 +293,42 @@ export default function AuthCard() {
             </button>
           </form>
 
-          {/* Switch view link */}
-          <p
-            className="font-body"
-            style={{ fontSize: '0.78rem', color: 'var(--color-muted)', textAlign: 'center', marginTop: '14px' }}
-          >
-            {isSignup ? (
-              <>
-                Already a member?{' '}
-                <button
-                  type="button"
-                  onClick={() => switchView('login')}
-                  className="font-body"
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--color-books)',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    padding: 0,
-                    fontSize: 'inherit',
-                  }}
-                >
-                  Sign in
-                </button>
-              </>
-            ) : (
-              <>
+          {/* Switch view / footer links */}
+          {isSignup ? (
+            <p
+              className="font-body"
+              style={{ fontSize: '0.78rem', color: 'var(--color-muted)', textAlign: 'center', marginTop: '14px' }}
+            >
+              Already a member?{' '}
+              <button
+                type="button"
+                onClick={() => switchView('login')}
+                className="font-body"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--color-books)',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  padding: 0,
+                  fontSize: 'inherit',
+                }}
+              >
+                Sign in
+              </button>
+            </p>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '14px' }}>
+              <a
+                href="/forgot-password"
+                className="font-body"
+                style={{ fontSize: '0.78rem', color: 'var(--color-muted)', textDecoration: 'none' }}
+                onMouseEnter={e => ((e.currentTarget as HTMLAnchorElement).style.textDecoration = 'underline')}
+                onMouseLeave={e => ((e.currentTarget as HTMLAnchorElement).style.textDecoration = 'none')}
+              >
+                Forgot your password?
+              </a>
+              <p className="font-body" style={{ fontSize: '0.78rem', color: 'var(--color-muted)', margin: 0 }}>
                 New here?{' '}
                 <button
                   type="button"
@@ -337,9 +346,9 @@ export default function AuthCard() {
                 >
                   Join Notable
                 </button>
-              </>
-            )}
-          </p>
+              </p>
+            </div>
+          )}
         </>
       )}
     </div>

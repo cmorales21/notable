@@ -22,6 +22,11 @@ export async function GET(request: Request) {
     const { data: exchangeData, error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
+      // Password recovery flow — skip onboarding check, session is now active
+      if (next === '/reset-password') {
+        return NextResponse.redirect(`${origin}/reset-password`)
+      }
+
       // Use the user returned directly by exchangeCodeForSession.
       // We cannot call getUser() here because exchangeCodeForSession writes
       // the session to the *response* cookies, but getUser() reads from the
