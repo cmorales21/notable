@@ -33,7 +33,7 @@ export default function SignupPage() {
       password,
       options: {
         data: {
-          full_name: cleanHandle ? name : undefined,
+          full_name: name,
           handle: cleanHandle || undefined,
         },
       },
@@ -62,17 +62,33 @@ export default function SignupPage() {
     }
 
     // 3. Insert the profile. Only attempted when we have a non-empty handle
-    //    so we never write handle:'' to the database (empty string passes
-    //    NOT NULL but breaks the hasHandle check on the onboarding page).
-    //    Treated as best-effort — if it still fails for any reason,
-    //    onboarding/page.tsx recreates it server-side from user_metadata.
+    //    so we never write handle:'' to the database.
     if (cleanHandle) {
-      await supabase.from('profiles').insert({
+      const { error: insertError } = await supabase.from('profiles').insert({
         id: authData.user.id,
         name,
         handle: cleanHandle,
         email,
       })
+
+      if (insertError) {
+        if (insertError.code === '23505') {
+          // A Supabase trigger already created the profile row — patch it.
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ name, handle: cleanHandle })
+            .eq('id', authData.user.id)
+          if (updateError) {
+            setError(updateError.message)
+            setLoading(false)
+            return
+          }
+        } else {
+          setError(insertError.message)
+          setLoading(false)
+          return
+        }
+      }
     }
 
     // 4. With email confirmation disabled, the session is live — go straight

@@ -68,11 +68,15 @@ export default function WelcomeOverlay({ userId, hasHandle }: Props) {
 
     const { error } = await supabase
       .from('profiles')
-      .update({ handle })
-      .eq('id', userId)
+      .upsert({ id: userId, handle }, { onConflict: 'id' })
 
     if (error) {
-      setHandleError(error.message)
+      if (error.code === '23505') {
+        // Another user claimed this handle between the availability check and save.
+        setHandleStatus('taken')
+      } else {
+        setHandleError(error.message)
+      }
       setSaving(false)
       return
     }

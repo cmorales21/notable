@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSearch } from '@/app/hooks/useSearch'
 import { Avatar } from '@/app/components/CategoryFeed'
+import { SkeletonPulse } from '@/app/components/skeletons'
 import type { SearchGroupedRec } from '@/lib/groupRecommendations'
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -210,6 +211,20 @@ export default function SearchDropdown({ onClose, panelRef }: { onClose: () => v
               <p className="font-body" style={{ color: '#4a4438', fontSize: '13px' }}>
                 Search for recommendations and people
               </p>
+            </div>
+          )}
+
+          {hasQuery && loading && (
+            <div style={{ padding: '6px 0' }}>
+              {[0, 1, 2].map(i => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 14px' }}>
+                  <SkeletonPulse style={{ width: 48, height: 48, borderRadius: 8, flexShrink: 0 }} />
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <SkeletonPulse style={{ height: 13, width: '65%', borderRadius: 5 }} />
+                    <SkeletonPulse style={{ height: 10, width: '40%', borderRadius: 5 }} />
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 

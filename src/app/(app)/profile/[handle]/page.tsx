@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Avatar, RecModal, Recommendation, RecComment, RecProfile, sortComments } from '@/app/components/CategoryFeed'
 import EmptyState from '@/app/components/EmptyState'
 import { ReportModal } from '@/app/components/feed/ReportModal'
+import { ProfileSkeleton, ProfileGridSkeleton } from '@/app/components/skeletons'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -950,56 +951,7 @@ export default function ProfilePage() {
   }
 
   if (profileLoading || !profile) {
-    return (
-      <div style={{ maxWidth: '680px', margin: '0 auto', padding: '14px 20px 48px' }}>
-        {/* Header row */}
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', marginBottom: '14px' }}>
-          <div className="skeleton-pulse" style={{ width: 72, height: 72, borderRadius: '50%', background: '#efe9e0', flexShrink: 0 }} />
-          <div style={{ flex: 1, paddingTop: '2px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-              <div className="skeleton-pulse" style={{ height: 22, width: '42%', borderRadius: 8, background: '#efe9e0' }} />
-              <div className="skeleton-pulse" style={{ height: 22, width: 80, borderRadius: 20, background: '#efe9e0' }} />
-            </div>
-            <div className="skeleton-pulse" style={{ height: 12, width: '22%', borderRadius: 6, background: '#efe9e0', marginBottom: 8 }} />
-            <div className="skeleton-pulse" style={{ height: 12, width: '68%', borderRadius: 6, background: '#efe9e0', marginBottom: 10 }} />
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <div className="skeleton-pulse" style={{ height: 12, width: 64, borderRadius: 6, background: '#efe9e0' }} />
-              <div className="skeleton-pulse" style={{ height: 12, width: 64, borderRadius: 6, background: '#efe9e0' }} />
-            </div>
-          </div>
-        </div>
-        {/* Tab bar */}
-        <div style={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,0.08)', marginBottom: '14px', gap: '4px' }}>
-          {[60, 56, 68].map((w, i) => (
-            <div key={i} className="skeleton-pulse" style={{ height: 14, width: w, borderRadius: 6, background: '#efe9e0', margin: '9px 8px', marginBottom: 10 }} />
-          ))}
-        </div>
-        {/* Category filter row */}
-        <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
-          {[48, 56, 52, 72, 62].map((w, i) => (
-            <div key={i} className="skeleton-pulse" style={{ height: 28, width: w, borderRadius: 20, background: '#efe9e0', flexShrink: 0 }} />
-          ))}
-        </div>
-        {/* Feed card skeletons */}
-        {[0, 1, 2].map(i => (
-          <div key={i} style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.06)', background: '#faf8f4', marginBottom: 12 }}>
-            <div className="skeleton-pulse" style={{ height: 160, background: '#efe9e0' }} />
-            <div style={{ padding: '12px 14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                <div className="skeleton-pulse" style={{ width: 28, height: 28, borderRadius: '50%', background: '#efe9e0', flexShrink: 0 }} />
-                <div style={{ flex: 1 }}>
-                  <div className="skeleton-pulse" style={{ height: 11, width: '38%', borderRadius: 5, background: '#efe9e0', marginBottom: 5 }} />
-                  <div className="skeleton-pulse" style={{ height: 10, width: '24%', borderRadius: 5, background: '#efe9e0' }} />
-                </div>
-              </div>
-              <div className="skeleton-pulse" style={{ height: 14, width: '75%', borderRadius: 6, background: '#efe9e0', marginBottom: 6 }} />
-              <div className="skeleton-pulse" style={{ height: 11, width: '90%', borderRadius: 5, background: '#efe9e0', marginBottom: 4 }} />
-              <div className="skeleton-pulse" style={{ height: 11, width: '60%', borderRadius: 5, background: '#efe9e0' }} />
-            </div>
-          </div>
-        ))}
-      </div>
-    )
+    return <ProfileSkeleton />
   }
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -1361,11 +1313,7 @@ export default function ProfilePage() {
 
             {/* ── Grid ────────────────────────────────────────────────── */}
             {recsLoading ? (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
-                {[1, 2, 3, 4, 5, 6].map(i => (
-                  <div key={i} className="skeleton-pulse" style={{ aspectRatio: '3/4', borderRadius: '10px', background: '#efe9e0' }} />
-                ))}
-              </div>
+              <ProfileGridSkeleton />
             ) : filteredRecs.length === 0 ? (
               activeTab === 'posted' ? (
                 isOwnProfile ? (

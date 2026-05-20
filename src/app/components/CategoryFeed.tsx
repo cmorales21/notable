@@ -4,8 +4,9 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { groupRecommendations, normalizeTitle, type GroupedRecommendation } from '@/lib/groupRecommendations'
 import { CATEGORY_CONFIG, type Category } from './feed/categoryConfig'
-import { SkeletonCard, EmptyStateIcon } from './feed/helpers'
+import { EmptyStateIcon } from './feed/helpers'
 import EmptyState from '@/app/components/EmptyState'
+import { FeedSkeleton } from '@/app/components/skeletons'
 import { GroupedCard } from './feed/GroupedCard'
 import { GroupedModal } from './feed/GroupedModal'
 import { theme } from '@/app/lib/theme'
@@ -420,9 +421,7 @@ export default function CategoryFeed({ category }: { category: string }) {
 
         {/* Feed content */}
         {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <SkeletonCard /><SkeletonCard /><SkeletonCard />
-          </div>
+          <FeedSkeleton />
         ) : visibleGroups.length === 0 ? (
           activeTab === 'following' ? (
             followCount === 0 ? (

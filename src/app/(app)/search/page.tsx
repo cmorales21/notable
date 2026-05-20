@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { useSearch } from '@/app/hooks/useSearch'
 import { Avatar } from '@/app/components/CategoryFeed'
+import { SearchSkeleton } from '@/app/components/skeletons'
 import type { SearchPerson } from '@/app/hooks/useSearch'
 import type { SearchGroupedRec } from '@/lib/groupRecommendations'
 
@@ -322,6 +323,9 @@ function SearchPageContent() {
             )
           })}
         </div>
+
+        {/* ── Loading skeleton ──────────────────────────────────────── */}
+        {hasQuery && loading && <SearchSkeleton />}
 
         {/* ── Initial empty state ───────────────────────────────────── */}
         {!hasQuery && (
