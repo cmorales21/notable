@@ -23,6 +23,7 @@ export function RecommenderSection({
   onLikeToggle,
   onBookmarkToggle,
   onExpand,
+  onIgnore,
 }: {
   recommender: GroupedRecommender
   category: string
@@ -33,6 +34,7 @@ export function RecommenderSection({
   onLikeToggle: (recId: string, wasLiked: boolean) => void
   onBookmarkToggle: (recId: string, wasBookmarked: boolean) => void
   onExpand?: () => void
+  onIgnore?: (userId: string, userName: string) => void
 }) {
   const supabaseRef = useRef(createClient())
   const [liked, setLiked] = useState(recommender.is_liked_by_user)
@@ -48,6 +50,8 @@ export function RecommenderSection({
   const [commentLikesMap, setCommentLikesMap] = useState<Record<string, { count: number; likedByMe: boolean }>>({})
   const [openMenuCommentId, setOpenMenuCommentId] = useState<string | null>(null)
   const [deletedCommentIds, setDeletedCommentIds] = useState<Set<string>>(new Set())
+  const [openRecMenu, setOpenRecMenu] = useState(false)
+  const [ignoringUser, setIgnoringUser] = useState(false)
 
   const recId = recommender.recommendation_id
   const profile = recommender.profile
@@ -195,18 +199,52 @@ export function RecommenderSection({
             </span>
           </div>
         </div>
-        {onExpand && (
-          <button
-            onClick={e => { e.stopPropagation(); onExpand() }}
-            aria-label="View full post"
-            style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'none', border: 'none', cursor: 'pointer', color: theme.colors.textMuted, padding: '4px 0', flexShrink: 0 }}
-          >
-            <span className="font-body" style={{ fontSize: '12px' }}>View post</span>
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 18l6-6-6-6" />
-            </svg>
-          </button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+          {onExpand && (
+            <button
+              onClick={e => { e.stopPropagation(); onExpand() }}
+              aria-label="View full post"
+              style={{ display: 'flex', alignItems: 'center', gap: '3px', background: 'none', border: 'none', cursor: 'pointer', color: theme.colors.textMuted, padding: '4px 0' }}
+            >
+              <span className="font-body" style={{ fontSize: '12px' }}>View post</span>
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </button>
+          )}
+          {onIgnore && currentUserId && currentUserId !== recommender.user_id && (
+            <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+              <button
+                onClick={e => { e.stopPropagation(); setOpenRecMenu(v => !v) }}
+                style={{ display: 'flex', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', color: theme.colors.textMuted, borderRadius: '4px' }}
+                aria-label="More options"
+              >
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+                  <circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" />
+                </svg>
+              </button>
+              {openRecMenu && (
+                <>
+                  <div onClick={() => setOpenRecMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 0 }} />
+                  <div style={{
+                    position: 'absolute', top: '24px', right: 0, zIndex: 10,
+                    background: theme.colors.surface, border: '1px solid rgba(0,0,0,0.1)',
+                    borderRadius: '10px', overflow: 'hidden', minWidth: '155px',
+                    boxShadow: theme.shadows.menu,
+                  }}>
+                    <button
+                      onClick={e => { e.stopPropagation(); setOpenRecMenu(false); setIgnoringUser(true) }}
+                      className="font-body"
+                      style={{ display: 'block', width: '100%', padding: '9px 14px', background: 'none', border: 'none', cursor: 'pointer', color: theme.colors.textMuted, fontSize: '13px', textAlign: 'left' }}
+                    >
+                      Ignore {profile?.name ?? 'this person'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <p className="font-body" style={{ fontSize: '14px', color: theme.colors.textPrimary, lineHeight: '1.65', marginBottom: '10px' }}>
@@ -242,6 +280,43 @@ export function RecommenderSection({
           </span>
         </ActionButton>
       </div>
+
+      {ignoringUser && (
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            marginTop: '10px', padding: '14px', background: theme.colors.input,
+            borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '8px',
+          }}
+        >
+          <p className="font-body" style={{ fontSize: '13px', color: theme.colors.textPrimary, fontWeight: 500 }}>
+            Ignore {profile?.name ?? 'this person'}?
+          </p>
+          <p className="font-body" style={{ fontSize: '12px', color: theme.colors.textMuted, lineHeight: 1.5 }}>
+            You won&apos;t see their recommendations in your feeds. Undo in Settings.
+          </p>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={e => { e.stopPropagation(); setIgnoringUser(false) }}
+              className="font-body"
+              style={{ padding: '6px 14px', background: theme.colors.border, border: 'none', borderRadius: '7px', color: theme.colors.textMuted, fontSize: '12px', cursor: 'pointer' }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={e => {
+                e.stopPropagation()
+                setIgnoringUser(false)
+                onIgnore?.(recommender.user_id, profile?.name ?? profile?.handle ?? 'this person')
+              }}
+              className="font-body"
+              style={{ padding: '6px 14px', background: theme.colors.textPrimary, border: 'none', borderRadius: '7px', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+            >
+              Ignore
+            </button>
+          </div>
+        </div>
+      )}
 
       {commentsOpen && (
         <div onClick={e => e.stopPropagation()} style={{ marginTop: '12px' }}>

@@ -8,6 +8,7 @@ import type { Recommendation, RecComment, RecProfile } from '@/app/lib/types'
 import { Avatar, ActionButton, ExternalLink, getExternalLinkLabel, formatRelativeTime } from './helpers'
 import { LikeIcon, BookmarkIcon, CommentIcon } from './icons'
 import { theme } from '@/app/lib/theme'
+import { ReportModal } from './ReportModal'
 
 type Profile = RecProfile
 type Comment = RecComment
@@ -35,6 +36,7 @@ export function RecModal({
   onRecDeleted,
   onRecUpdated,
   onCommentCountChange,
+  onIgnore,
   zIndex = 100,
   context,
 }: {
@@ -60,6 +62,7 @@ export function RecModal({
   onRecDeleted?: () => void
   onRecUpdated?: (recId: string, newDescription: string) => void
   onCommentCountChange?: (recId: string, delta: number) => void
+  onIgnore?: (userId: string, userName: string) => void
   zIndex?: number
   context?: 'profile'
 }) {
@@ -75,10 +78,12 @@ export function RecModal({
   const [editDescInput, setEditDescInput] = useState(rec.description)
   const [submittingEdit, setSubmittingEdit] = useState(false)
   const [deletingRec, setDeletingRec] = useState(false)
+  const [ignoringUser, setIgnoringUser] = useState(false)
   const [localDescription, setLocalDescription] = useState(rec.description)
   const [deletedCommentIds, setDeletedCommentIds] = useState<Set<string>>(new Set())
   const [showCopied, setShowCopied] = useState(false)
-  const [reportStep, setReportStep] = useState<'idle' | 'confirm' | 'thanks'>('idle')
+  const [reportingRec, setReportingRec] = useState(false)
+  const [reportingCommentId, setReportingCommentId] = useState<string | null>(null)
 
   useEffect(() => {
     const map: Record<string, { count: number; likedByMe: boolean }> = {}
@@ -112,10 +117,16 @@ export function RecModal({
     onCommentCountChange?.(rec.id, -1)
   }
 
-  async function reportComment(commentId: string) {
+  async function reportComment(commentId: string, reason: string, details: string) {
     if (!currentUserId) return
-    setOpenMenuCommentId(null)
-    await supabaseRef.current.from('comment_reports').insert({ comment_id: commentId, reporter_id: currentUserId })
+    const fullReason = details ? `${reason} — ${details}` : reason
+    await supabaseRef.current.from('comment_reports').insert({ comment_id: commentId, reporter_id: currentUserId, reason: fullReason })
+  }
+
+  async function reportRec(reason: string, details: string) {
+    if (!currentUserId) return
+    const fullReason = details ? `${reason} — ${details}` : reason
+    await supabaseRef.current.from('recommendation_reports').insert({ recommendation_id: rec.id, reporter_id: currentUserId, reason: fullReason })
   }
 
   async function saveDescEdit() {
@@ -161,13 +172,16 @@ export function RecModal({
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
+      if (reportingRec) { setReportingRec(false); return }
+      if (reportingCommentId) { setReportingCommentId(null); return }
       if (openRecMenu) { setOpenRecMenu(false); return }
       if (deletingRec) { setDeletingRec(false); return }
+      if (ignoringUser) { setIgnoringUser(false); return }
       onClose()
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [openRecMenu, deletingRec, onClose])
+  }, [reportingRec, reportingCommentId, openRecMenu, deletingRec, ignoringUser, onClose])
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
@@ -287,18 +301,28 @@ export function RecModal({
                             Delete recommendation
                           </button>
                         </>
-                      ) : reportStep === 'thanks' ? (
-                        <div className="font-body" style={{ padding: '10px 14px', color: theme.colors.textMuted, fontSize: '14px' }}>
-                          Thank you — we&apos;ll review this.
-                        </div>
                       ) : (
-                        <button
-                          onClick={() => { setReportStep('thanks'); setOpenRecMenu(false) }}
-                          className="font-body"
-                          style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', color: theme.colors.textMuted, fontSize: '14px', textAlign: 'left' }}
-                        >
-                          Report
-                        </button>
+                        <>
+                          <button
+                            onClick={() => { setOpenRecMenu(false); setReportingRec(true) }}
+                            className="font-body"
+                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', color: theme.colors.textMuted, fontSize: '14px', textAlign: 'left' }}
+                          >
+                            Report
+                          </button>
+                          {onIgnore && (
+                            <>
+                              <div style={{ height: '1px', background: theme.colors.border }} />
+                              <button
+                                onClick={() => { setIgnoringUser(true); setOpenRecMenu(false) }}
+                                className="font-body"
+                                style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', color: theme.colors.textMuted, fontSize: '14px', textAlign: 'left' }}
+                              >
+                                Ignore {profile?.name ?? 'this person'}
+                              </button>
+                            </>
+                          )}
+                        </>
                       )}
                     </div>
                   </>
@@ -504,7 +528,7 @@ export function RecModal({
                                       )}
                                       {canReport && (
                                         <button
-                                          onClick={() => reportComment(comment.id)}
+                                          onClick={() => { setOpenMenuCommentId(null); setReportingCommentId(comment.id) }}
                                           className="font-body"
                                           style={{ display: 'block', width: '100%', padding: '9px 14px', background: 'none', border: 'none', cursor: 'pointer', color: theme.colors.textMuted, fontSize: '13px', textAlign: 'left' }}
                                         >
@@ -590,6 +614,63 @@ export function RecModal({
             </div>
           </form>
         </div>
+
+        {/* Ignore confirmation overlay */}
+        {ignoringUser && (
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 10,
+            background: 'rgba(245,240,232,0.95)', backdropFilter: 'blur(4px)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '24px', gap: '12px',
+          }}>
+            <p className="font-display" style={{ fontSize: '18px', fontWeight: 600, color: theme.colors.textPrimary, textAlign: 'center' }}>
+              Ignore {profile?.name ?? 'this person'}?
+            </p>
+            <p className="font-body" style={{ fontSize: '14px', color: theme.colors.textMuted, textAlign: 'center', lineHeight: 1.55 }}>
+              You won&apos;t see their recommendations in your feeds. You can undo this in Settings.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+              <button
+                onClick={() => setIgnoringUser(false)}
+                className="font-body"
+                style={{ padding: '9px 20px', background: theme.colors.border, border: 'none', borderRadius: '10px', color: theme.colors.textMuted, fontSize: '14px', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setIgnoringUser(false)
+                  onIgnore?.(rec.user_id, profile?.name ?? profile?.handle ?? 'this person')
+                  onClose()
+                }}
+                className="font-body"
+                style={{ padding: '9px 20px', background: theme.colors.textPrimary, border: 'none', borderRadius: '10px', color: '#fff', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Ignore
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Recommendation report modal */}
+        {reportingRec && (
+          <ReportModal
+            title={`Report ${profile?.name ?? 'this recommendation'}`}
+            onSubmit={reportRec}
+            onClose={() => setReportingRec(false)}
+            zIndex={zIndex + 10}
+          />
+        )}
+
+        {/* Comment report modal */}
+        {reportingCommentId && (
+          <ReportModal
+            title="Report this comment"
+            onSubmit={(reason, details) => reportComment(reportingCommentId, reason, details)}
+            onClose={() => setReportingCommentId(null)}
+            zIndex={zIndex + 10}
+          />
+        )}
 
         {/* Delete confirmation overlay */}
         {deletingRec && (

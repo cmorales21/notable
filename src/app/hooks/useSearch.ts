@@ -11,6 +11,7 @@ export interface SearchPerson {
   handle: string | null
   avatar_url: string | null
   bio: string | null
+  profile_private: boolean | null
 }
 
 export function useSearch({
@@ -31,6 +32,24 @@ export function useSearch({
   const [people, setPeople] = useState<SearchPerson[]>([])
   const [loading, setLoading] = useState(false)
   const searchIdRef = useRef(0)
+  const blockedIdsRef = useRef(new Set<string>())
+
+  useEffect(() => {
+    const supabase = supabaseRef.current
+    ;(async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase
+        .from('user_blocks')
+        .select('blocked_id, blocker_id')
+        .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`)
+      const ids = new Set<string>()
+      for (const r of (data ?? []) as { blocker_id: string; blocked_id: string }[]) {
+        ids.add(r.blocker_id === user.id ? r.blocked_id : r.blocker_id)
+      }
+      blockedIdsRef.current = ids
+    })()
+  }, [])
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(rawQuery), debounceMs)
@@ -76,16 +95,18 @@ export function useSearch({
       const profileMap: Record<string, RecProfile> = {}
       for (const p of (profilesData ?? [])) profileMap[p.id] = p as RecProfile
 
-      return rows.map(r => ({ ...r, profiles: profileMap[r.user_id] ?? null }))
+      return rows
+        .filter(r => !blockedIdsRef.current.has(r.user_id))
+        .map(r => ({ ...r, profiles: profileMap[r.user_id] ?? null }))
     }
 
     async function fetchPeople(): Promise<SearchPerson[]> {
       const { data } = await supabase
         .from('profiles')
-        .select('id, name, handle, avatar_url, bio')
+        .select('id, name, handle, avatar_url, bio, profile_private')
         .or(`name.ilike.%${cleanQuery}%,handle.ilike.%${cleanQuery}%`)
         .limit(peopleLimit)
-      return (data ?? []) as SearchPerson[]
+      return ((data ?? []) as SearchPerson[]).filter(p => !blockedIdsRef.current.has(p.id))
     }
 
     async function doSearch() {

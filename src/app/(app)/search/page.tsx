@@ -84,9 +84,10 @@ function groupAttribution(group: SearchGroupedRec): string {
 // ─── Follow button ────────────────────────────────────────────────────────────
 
 function FollowButton({
-  following, pending, onToggle,
-}: { following: boolean; pending: boolean; onToggle: () => void }) {
+  following, requested, pending, onToggle,
+}: { following: boolean; requested: boolean; pending: boolean; onToggle: () => void }) {
   const [hovered, setHovered] = useState(false)
+  const isActive = following || requested
   return (
     <button
       onClick={e => { e.stopPropagation(); onToggle() }}
@@ -95,16 +96,16 @@ function FollowButton({
       onMouseLeave={() => setHovered(false)}
       className="font-body"
       style={{
-        background: following ? (hovered ? 'rgba(212,99,107,0.12)' : 'rgba(0,0,0,0.08)') : 'transparent',
-        border: `1px solid ${following ? (hovered ? 'rgba(212,99,107,0.4)' : 'rgba(0,0,0,0.12)') : 'rgba(0,0,0,0.15)'}`,
+        background: isActive ? (hovered ? 'rgba(212,99,107,0.12)' : 'rgba(0,0,0,0.08)') : 'transparent',
+        border: `1px solid ${isActive ? (hovered ? 'rgba(212,99,107,0.4)' : 'rgba(0,0,0,0.12)') : 'rgba(0,0,0,0.15)'}`,
         borderRadius: 20, padding: '5px 14px',
         fontSize: '12px', fontWeight: 500,
-        color: following ? (hovered ? '#d4636b' : '#33261a') : '#33261a',
+        color: isActive ? (hovered ? '#d4636b' : '#33261a') : '#33261a',
         cursor: pending ? 'default' : 'pointer',
         transition: 'all 0.15s', flexShrink: 0, minWidth: 80, textAlign: 'center',
       }}
     >
-      {following ? (hovered ? 'Unfollow' : 'Following') : 'Follow'}
+      {following ? (hovered ? 'Unfollow' : 'Following') : requested ? (hovered ? 'Cancel' : 'Requested') : 'Follow'}
     </button>
   )
 }
@@ -151,6 +152,7 @@ function SearchPageContent() {
   // Current user & follow state
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [followedIds, setFollowedIds] = useState<Set<string>>(new Set())
+  const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set())
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
@@ -164,25 +166,45 @@ function SearchPageContent() {
   useEffect(() => {
     if (!currentUserId || people.length === 0) return
     const ids = people.map(p => p.id)
-    supabase.current.from('follows').select('following_id')
+    supabase.current.from('follows').select('following_id, status')
       .eq('follower_id', currentUserId).in('following_id', ids)
       .then(({ data }) => {
-        setFollowedIds(new Set((data ?? []).map((f: { following_id: string }) => f.following_id)))
+        const accepted = new Set<string>()
+        const pending = new Set<string>()
+        for (const f of (data ?? []) as { following_id: string; status: string }[]) {
+          if (f.status === 'accepted') accepted.add(f.following_id)
+          else if (f.status === 'pending') pending.add(f.following_id)
+        }
+        setFollowedIds(accepted)
+        setRequestedIds(pending)
       })
   }, [people, currentUserId])
 
   async function toggleFollow(targetId: string) {
     if (!currentUserId || pendingIds.has(targetId)) return
     setPendingIds(prev => new Set([...prev, targetId]))
+
     if (followedIds.has(targetId)) {
       await supabase.current.from('follows').delete()
         .eq('follower_id', currentUserId).eq('following_id', targetId)
       setFollowedIds(prev => { const n = new Set(prev); n.delete(targetId); return n })
+    } else if (requestedIds.has(targetId)) {
+      await supabase.current.from('follows').delete()
+        .eq('follower_id', currentUserId).eq('following_id', targetId)
+      setRequestedIds(prev => { const n = new Set(prev); n.delete(targetId); return n })
+      void supabase.current.from('notifications').delete()
+        .eq('user_id', targetId).eq('actor_id', currentUserId).eq('type', 'follow_request')
     } else {
-      await supabase.current.from('follows').insert({ follower_id: currentUserId, following_id: targetId })
-      setFollowedIds(prev => new Set([...prev, targetId]))
-      supabase.current.from('notifications').insert({ user_id: targetId, actor_id: currentUserId, type: 'follow', read: false })
+      const targetPerson = people.find(p => p.id === targetId)
+      if (targetPerson?.profile_private) {
+        await supabase.current.from('follows').insert({ follower_id: currentUserId, following_id: targetId, status: 'pending' })
+        setRequestedIds(prev => new Set([...prev, targetId]))
+      } else {
+        await supabase.current.from('follows').insert({ follower_id: currentUserId, following_id: targetId })
+        setFollowedIds(prev => new Set([...prev, targetId]))
+      }
     }
+
     setPendingIds(prev => { const n = new Set(prev); n.delete(targetId); return n })
   }
 
@@ -202,7 +224,7 @@ function SearchPageContent() {
         setRecCounts(map)
       })
 
-    supabase.current.from('follows').select('following_id').in('following_id', ids)
+    supabase.current.from('follows').select('following_id').in('following_id', ids).eq('status', 'accepted')
       .then(({ data }) => {
         const map: Record<string, number> = {}
         for (const id of ids) map[id] = 0
@@ -444,6 +466,7 @@ function SearchPageContent() {
                   {!isCurrentUser && currentUserId && (
                     <FollowButton
                       following={followedIds.has(person.id)}
+                      requested={requestedIds.has(person.id)}
                       pending={pendingIds.has(person.id)}
                       onToggle={() => toggleFollow(person.id)}
                     />

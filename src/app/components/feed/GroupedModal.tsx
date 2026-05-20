@@ -9,6 +9,7 @@ import { ExternalLink, getExternalLinkLabel, fetchComments, sortComments } from 
 import { theme } from '@/app/lib/theme'
 import { RecModal } from './RecModal'
 import { RecommenderSection } from './RecommenderSection'
+import { ReportModal } from './ReportModal'
 
 type Profile = RecProfile
 type Comment = RecComment
@@ -22,6 +23,7 @@ function SingleRecDetailModal({
   onLikeToggle,
   onBookmarkToggle,
   onClose,
+  onIgnore,
 }: {
   recommender: GroupedRecommender
   group: GroupedRecommendation
@@ -31,6 +33,7 @@ function SingleRecDetailModal({
   onLikeToggle: (recId: string, wasLiked: boolean) => void
   onBookmarkToggle: (recId: string, wasBookmarked: boolean) => void
   onClose: () => void
+  onIgnore?: (userId: string, userName: string) => void
 }) {
   const supabaseRef = useRef(createClient())
   const commentInputRef = useRef<HTMLTextAreaElement>(null)
@@ -140,6 +143,7 @@ function SingleRecDetailModal({
       onClose={onClose}
       onCommentChange={setCommentInput}
       onCommentSubmit={handleComment}
+      onIgnore={onIgnore}
       zIndex={200}
     />
   )
@@ -157,6 +161,7 @@ export function GroupedModal({
   onRecDeleted,
   onRecUpdated,
   onCommentCountChange,
+  onIgnore,
 }: {
   group: GroupedRecommendation
   accentColor: string
@@ -169,6 +174,7 @@ export function GroupedModal({
   onRecDeleted?: (recId: string) => void
   onRecUpdated?: (recId: string, newDescription: string) => void
   onCommentCountChange?: (recId: string, delta: number) => void
+  onIgnore?: (userId: string, userName: string) => void
 }) {
   const isSingle = group.recommenders.length === 1
   const leadRec = group.recommenders[0]
@@ -180,7 +186,7 @@ export function GroupedModal({
   const [expandedRecommender, setExpandedRecommender] = useState<GroupedRecommender | null>(null)
   const [showCopied, setShowCopied] = useState(false)
   const [openRecMenu, setOpenRecMenu] = useState(false)
-  const [reportStep, setReportStep] = useState<'idle' | 'thanks'>('idle')
+  const [reportingRec, setReportingRec] = useState(false)
 
   const [liked, setLiked] = useState(leadRec.is_liked_by_user)
   const [bookmarked, setBookmarked] = useState(leadRec.is_bookmarked_by_user)
@@ -214,13 +220,14 @@ export function GroupedModal({
     if (isSingle) return
     const handler = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
+      if (reportingRec) { setReportingRec(false); return }
       if (openRecMenu) { setOpenRecMenu(false); return }
       if (expandedRecommender) { setExpandedRecommender(null); return }
       onClose()
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [isSingle, openRecMenu, expandedRecommender, onClose])
+  }, [isSingle, reportingRec, openRecMenu, expandedRecommender, onClose])
 
   async function handleShare() {
     const primaryId = group.recommenders[0]?.recommendation_id
@@ -229,6 +236,14 @@ export function GroupedModal({
     await navigator.clipboard.writeText(url)
     setShowCopied(true)
     setTimeout(() => setShowCopied(false), 2000)
+  }
+
+  async function reportRec(reason: string, details: string) {
+    if (!currentUserId) return
+    const primaryId = group.recommenders[0]?.recommendation_id
+    if (!primaryId) return
+    const fullReason = details ? `${reason} — ${details}` : reason
+    await supabaseRef.current.from('recommendation_reports').insert({ recommendation_id: primaryId, reporter_id: currentUserId, reason: fullReason })
   }
 
   async function handleLike(e: React.MouseEvent) {
@@ -325,6 +340,7 @@ export function GroupedModal({
         onRecDeleted={() => onRecDeleted?.(singleRec.id)}
         onRecUpdated={onRecUpdated}
         onCommentCountChange={onCommentCountChange}
+        onIgnore={onIgnore}
       />
     )
   }
@@ -404,19 +420,13 @@ export function GroupedModal({
                         borderRadius: '10px', overflow: 'hidden', minWidth: '160px',
                         boxShadow: theme.shadows.menu,
                       }}>
-                        {reportStep === 'thanks' ? (
-                          <div className="font-body" style={{ padding: '10px 14px', color: theme.colors.textMuted, fontSize: '14px' }}>
-                            Thank you — we&apos;ll review this.
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => { setReportStep('thanks'); setOpenRecMenu(false) }}
-                            className="font-body"
-                            style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', color: theme.colors.textMuted, fontSize: '14px', textAlign: 'left' }}
-                          >
-                            Report
-                          </button>
-                        )}
+                        <button
+                          onClick={() => { setOpenRecMenu(false); setReportingRec(true) }}
+                          className="font-body"
+                          style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', color: theme.colors.textMuted, fontSize: '14px', textAlign: 'left' }}
+                        >
+                          Report
+                        </button>
                       </div>
                     </>
                   )}
@@ -437,6 +447,15 @@ export function GroupedModal({
               </button>
             </div>
           </div>
+
+          {reportingRec && (
+            <ReportModal
+              title="Report this recommendation"
+              onSubmit={reportRec}
+              onClose={() => setReportingRec(false)}
+              zIndex={110}
+            />
+          )}
 
           <div ref={scrollableRef} style={{ overflowY: 'auto', flex: 1 }}>
             {(!willEmbed(group.external_url, group.category, 'feed') || embedFailed) && (
@@ -492,6 +511,7 @@ export function GroupedModal({
                 onLikeToggle={onLikeToggle}
                 onBookmarkToggle={onBookmarkToggle}
                 onExpand={() => setExpandedRecommender(recommender)}
+                onIgnore={onIgnore}
               />
             ))}
 
@@ -510,6 +530,7 @@ export function GroupedModal({
           onLikeToggle={onLikeToggle}
           onBookmarkToggle={onBookmarkToggle}
           onClose={() => setExpandedRecommender(null)}
+          onIgnore={onIgnore}
         />
       )}
     </>

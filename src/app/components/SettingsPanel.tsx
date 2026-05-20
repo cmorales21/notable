@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type Section = 'account' | 'notifications' | 'privacy' | 'about'
+type Section = 'account' | 'notifications' | 'privacy' | 'ignored' | 'blocked' | 'about'
 
 interface SettingsPanelProps {
   open: boolean
@@ -496,6 +496,192 @@ function PrivacySection({ userId }: { userId: string }) {
   )
 }
 
+// ── Section: Ignored Users ────────────────────────────────────────────────────
+
+interface IgnoredUser {
+  ignored_user_id: string
+  name: string | null
+  handle: string | null
+}
+
+function IgnoredUsersSection({ userId }: { userId: string }) {
+  const [ignored, setIgnored] = useState<IgnoredUser[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('user_ignores')
+      .select('ignored_user_id, profiles:ignored_user_id(name, handle)')
+      .eq('user_id', userId)
+      .then(({ data }) => {
+        const rows: IgnoredUser[] = (data ?? []).map((r: { ignored_user_id: string; profiles: { name: string | null; handle: string | null }[] | null }) => {
+          const p = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles
+          return {
+            ignored_user_id: r.ignored_user_id,
+            name: p?.name ?? null,
+            handle: p?.handle ?? null,
+          }
+        })
+        setIgnored(rows)
+        setLoading(false)
+      })
+  }, [userId])
+
+  async function unignore(targetId: string) {
+    setIgnored(prev => prev.filter(u => u.ignored_user_id !== targetId))
+    const supabase = createClient()
+    await supabase.from('user_ignores').delete().eq('user_id', userId).eq('ignored_user_id', targetId)
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {[1, 2].map(i => (
+          <div key={i} style={{ height: '44px', background: 'rgba(0,0,0,0.04)', borderRadius: '8px' }} />
+        ))}
+      </div>
+    )
+  }
+
+  if (ignored.length === 0) {
+    return (
+      <p className="font-body" style={{ fontSize: '14px', color: '#6b5d4f', lineHeight: '1.65' }}>
+        You haven&apos;t ignored anyone.
+      </p>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      {ignored.map(user => (
+        <div
+          key={user.ignored_user_id}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '10px 0', borderBottom: '1px solid rgba(0,0,0,0.06)',
+          }}
+        >
+          <div>
+            <span className="font-body" style={{ fontSize: '14px', color: '#33261a', fontWeight: 500 }}>
+              {user.name ?? user.handle ?? 'Unknown'}
+            </span>
+            {user.handle && (
+              <span className="font-body" style={{ fontSize: '13px', color: '#6b5d4f', marginLeft: '6px' }}>
+                @{user.handle}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => unignore(user.ignored_user_id)}
+            className="font-body"
+            style={{
+              background: 'none', border: '1px solid rgba(0,0,0,0.12)', borderRadius: '7px',
+              color: '#6b5d4f', fontSize: '12px', padding: '5px 12px', cursor: 'pointer', flexShrink: 0,
+              transition: 'color 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#33261a'; e.currentTarget.style.borderColor = 'rgba(0,0,0,0.2)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#6b5d4f'; e.currentTarget.style.borderColor = 'rgba(0,0,0,0.12)' }}
+          >
+            Unignore
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Section: Blocked Users ────────────────────────────────────────────────────
+
+interface BlockedUser {
+  blocked_id: string
+  name: string | null
+  handle: string | null
+}
+
+function BlockedUsersSection({ userId }: { userId: string }) {
+  const [blocked, setBlocked] = useState<BlockedUser[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('user_blocks')
+      .select('blocked_id, profiles:blocked_id(name, handle)')
+      .eq('blocker_id', userId)
+      .then(({ data }) => {
+        const rows: BlockedUser[] = (data ?? []).map((r: { blocked_id: string; profiles: { name: string | null; handle: string | null }[] | null }) => {
+          const p = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles
+          return { blocked_id: r.blocked_id, name: p?.name ?? null, handle: p?.handle ?? null }
+        })
+        setBlocked(rows)
+        setLoading(false)
+      })
+  }, [userId])
+
+  async function unblock(targetId: string) {
+    setBlocked(prev => prev.filter(u => u.blocked_id !== targetId))
+    const supabase = createClient()
+    await supabase.from('user_blocks').delete().eq('blocker_id', userId).eq('blocked_id', targetId)
+  }
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {[1, 2].map(i => (
+          <div key={i} style={{ height: '44px', background: 'rgba(0,0,0,0.04)', borderRadius: '8px' }} />
+        ))}
+      </div>
+    )
+  }
+
+  if (blocked.length === 0) {
+    return (
+      <p className="font-body" style={{ fontSize: '14px', color: '#6b5d4f', lineHeight: '1.65' }}>
+        You haven&apos;t blocked anyone.
+      </p>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      {blocked.map(user => (
+        <div
+          key={user.blocked_id}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '10px 0', borderBottom: '1px solid rgba(0,0,0,0.06)',
+          }}
+        >
+          <div>
+            <span className="font-body" style={{ fontSize: '14px', color: '#33261a', fontWeight: 500 }}>
+              {user.name ?? user.handle ?? 'Unknown'}
+            </span>
+            {user.handle && (
+              <span className="font-body" style={{ fontSize: '13px', color: '#6b5d4f', marginLeft: '6px' }}>
+                @{user.handle}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => unblock(user.blocked_id)}
+            className="font-body"
+            style={{
+              background: 'none', border: '1px solid rgba(0,0,0,0.12)', borderRadius: '7px',
+              color: '#6b5d4f', fontSize: '12px', padding: '5px 12px', cursor: 'pointer', flexShrink: 0,
+              transition: 'color 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#33261a'; e.currentTarget.style.borderColor = 'rgba(0,0,0,0.2)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#6b5d4f'; e.currentTarget.style.borderColor = 'rgba(0,0,0,0.12)' }}
+          >
+            Unblock
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Section: About ────────────────────────────────────────────────────────────
 
 function AboutSection() {
@@ -600,6 +786,8 @@ const SECTIONS: { id: Section; label: string }[] = [
   { id: 'account', label: 'Account' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'privacy', label: 'Privacy' },
+  { id: 'ignored', label: 'Ignored Users' },
+  { id: 'blocked', label: 'Blocked Users' },
   { id: 'about', label: 'About' },
 ]
 
@@ -659,6 +847,10 @@ function PanelContent({
         return <NotificationsSection userId={userId} />
       case 'privacy':
         return <PrivacySection userId={userId} />
+      case 'ignored':
+        return <IgnoredUsersSection userId={userId} />
+      case 'blocked':
+        return <BlockedUsersSection userId={userId} />
       case 'about':
         return <AboutSection />
     }

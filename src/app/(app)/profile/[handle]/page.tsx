@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar, RecModal, Recommendation, RecComment, RecProfile, sortComments } from '@/app/components/CategoryFeed'
 import EmptyState from '@/app/components/EmptyState'
+import { ReportModal } from '@/app/components/feed/ReportModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -217,11 +218,11 @@ function FollowListModal({
 
       if (type === 'followers') {
         const { data } = await supabase.current
-          .from('follows').select('follower_id').eq('following_id', profileId)
+          .from('follows').select('follower_id').eq('following_id', profileId).eq('status', 'accepted')
         userIds = (data ?? []).map((f: { follower_id: string }) => f.follower_id)
       } else {
         const { data } = await supabase.current
-          .from('follows').select('following_id').eq('follower_id', profileId)
+          .from('follows').select('following_id').eq('follower_id', profileId).eq('status', 'accepted')
         userIds = (data ?? []).map((f: { following_id: string }) => f.following_id)
       }
 
@@ -233,7 +234,7 @@ function FollowListModal({
         if (currentUserId) {
           const { data: myFollows } = await supabase.current
             .from('follows').select('following_id')
-            .eq('follower_id', currentUserId).in('following_id', userIds)
+            .eq('follower_id', currentUserId).eq('status', 'accepted').in('following_id', userIds)
           setFollowedIds(new Set((myFollows ?? []).map((f: { following_id: string }) => f.following_id)))
         }
       }
@@ -253,7 +254,6 @@ function FollowListModal({
     } else {
       await supabase.current.from('follows').insert({ follower_id: currentUserId, following_id: targetId })
       setFollowedIds(prev => new Set([...prev, targetId]))
-      supabase.current.from('notifications').insert({ user_id: targetId, actor_id: currentUserId, type: 'follow', read: false })
     }
     setPending(prev => { const n = new Set(prev); n.delete(targetId); return n })
   }
@@ -592,10 +592,19 @@ export default function ProfilePage() {
 
   const [profileLoading, setProfileLoading] = useState(true)
   const [isFollowing, setIsFollowing] = useState(false)
+  const [isPendingFollow, setIsPendingFollow] = useState(false)
   const [followerCount, setFollowerCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
   const [followLoading, setFollowLoading] = useState(false)
   const [followHovered, setFollowHovered] = useState(false)
+
+  const [iBlockedThem, setIBlockedThem] = useState(false)
+  const [theyBlockedMe, setTheyBlockedMe] = useState(false)
+  const [blockMenuOpen, setBlockMenuOpen] = useState(false)
+  const [blockConfirm, setBlockConfirm] = useState(false)
+  const [blockLoading, setBlockLoading] = useState(false)
+  const [profileToast, setProfileToast] = useState<string | null>(null)
+  const [reportOpen, setReportOpen] = useState(false)
 
   // Followers/following modal
   const [followListModal, setFollowListModal] = useState<'followers' | 'following' | null>(null)
@@ -643,20 +652,29 @@ export default function ProfilePage() {
         setIsOwnProfile(uid === profileData.id)
 
         if (uid) {
-          const [{ data: myProfile }, { data: followRow }, { data: followers }, { data: following }] = await Promise.all([
+          const isOther = uid !== profileData.id
+          const [{ data: myProfile }, { data: followRow }, { data: followers }, { data: following }, { data: iBlockRow }, { data: theyBlockRow }] = await Promise.all([
             supabase.current.from('profiles').select('name, handle, avatar_url').eq('id', uid).maybeSingle(),
-            supabase.current.from('follows').select('id').eq('follower_id', uid).eq('following_id', profileData.id).maybeSingle(),
-            supabase.current.from('follows').select('id').eq('following_id', profileData.id),
-            supabase.current.from('follows').select('id').eq('follower_id', profileData.id),
+            supabase.current.from('follows').select('id, status').eq('follower_id', uid).eq('following_id', profileData.id).maybeSingle(),
+            supabase.current.from('follows').select('id').eq('following_id', profileData.id).eq('status', 'accepted'),
+            supabase.current.from('follows').select('id').eq('follower_id', profileData.id).eq('status', 'accepted'),
+            isOther ? supabase.current.from('user_blocks').select('id').eq('blocker_id', uid).eq('blocked_id', profileData.id).maybeSingle() : Promise.resolve({ data: null }),
+            isOther ? supabase.current.from('user_blocks').select('id').eq('blocker_id', profileData.id).eq('blocked_id', uid).maybeSingle() : Promise.resolve({ data: null }),
           ])
           setCurrentUserProfile(myProfile as RecProfile)
-          setIsFollowing(!!followRow)
+          const fr = followRow as { id: string; status: string } | null
+          setIsFollowing(fr?.status === 'accepted')
+          setIsPendingFollow(fr?.status === 'pending')
           setFollowerCount(followers?.length ?? 0)
           setFollowingCount(following?.length ?? 0)
+          if (isOther) {
+            setIBlockedThem(!!iBlockRow)
+            setTheyBlockedMe(!!theyBlockRow)
+          }
         } else {
           const [{ data: followers }, { data: following }] = await Promise.all([
-            supabase.current.from('follows').select('id').eq('following_id', profileData.id),
-            supabase.current.from('follows').select('id').eq('follower_id', profileData.id),
+            supabase.current.from('follows').select('id').eq('following_id', profileData.id).eq('status', 'accepted'),
+            supabase.current.from('follows').select('id').eq('follower_id', profileData.id).eq('status', 'accepted'),
           ])
           setFollowerCount(followers?.length ?? 0)
           setFollowingCount(following?.length ?? 0)
@@ -718,7 +736,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!profile) return
-    const gated = profile.profile_private === true && !isOwnProfile && !isFollowing
+    const gated = (profile.profile_private === true && !isOwnProfile && !isFollowing) || iBlockedThem || theyBlockedMe
     if (gated) { setRecs([]); setRecsLoading(false); return }
     // Likes are always public — no per-tab gate needed.
     // Bookmarks are private by default; only shown to others when explicitly set to false.
@@ -728,7 +746,7 @@ export default function ProfilePage() {
     }
     loadRecs(activeTab, profile.id)
     setCategoryFilter('all')
-  }, [activeTab, profile, isOwnProfile, isFollowing, loadRecs])
+  }, [activeTab, profile, isOwnProfile, isFollowing, iBlockedThem, theyBlockedMe, loadRecs])
 
   // ── Follow / Unfollow ───────────────────────────────────────────────────────
 
@@ -739,13 +757,54 @@ export default function ProfilePage() {
       await supabase.current.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', profile.id)
       setIsFollowing(false)
       setFollowerCount(c => c - 1)
+    } else if (isPendingFollow) {
+      await supabase.current.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', profile.id)
+      await supabase.current.from('notifications').delete()
+        .eq('user_id', profile.id).eq('actor_id', currentUserId).eq('type', 'follow_request')
+      setIsPendingFollow(false)
+    } else if (profile.profile_private) {
+      await supabase.current.from('follows').insert({ follower_id: currentUserId, following_id: profile.id, status: 'pending' })
+      setIsPendingFollow(true)
     } else {
       await supabase.current.from('follows').insert({ follower_id: currentUserId, following_id: profile.id })
       setIsFollowing(true)
       setFollowerCount(c => c + 1)
-      supabase.current.from('notifications').insert({ user_id: profile.id, actor_id: currentUserId, type: 'follow', read: false })
     }
     setFollowLoading(false)
+  }
+
+  // ── Block / Unblock ─────────────────────────────────────────────────────────
+
+  async function handleBlock() {
+    if (!currentUserId || !profile || blockLoading) return
+    setBlockLoading(true)
+    await supabase.current.from('user_blocks').insert({ blocker_id: currentUserId, blocked_id: profile.id })
+    await Promise.all([
+      supabase.current.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', profile.id),
+      supabase.current.from('follows').delete().eq('follower_id', profile.id).eq('following_id', currentUserId),
+    ])
+    if (isFollowing) {
+      setIsFollowing(false)
+      setFollowerCount(c => c - 1)
+    }
+    setIBlockedThem(true)
+    setBlockConfirm(false)
+    setBlockMenuOpen(false)
+    const name = profile.name ?? `@${profile.handle}`
+    setProfileToast(`${name} blocked`)
+    setTimeout(() => setProfileToast(null), 3000)
+    setBlockLoading(false)
+  }
+
+  async function handleUnblock() {
+    if (!currentUserId || !profile) return
+    await supabase.current.from('user_blocks').delete()
+      .eq('blocker_id', currentUserId).eq('blocked_id', profile.id)
+    setIBlockedThem(false)
+    setBlockMenuOpen(false)
+    const name = profile.name ?? `@${profile.handle}`
+    setProfileToast(`${name} unblocked`)
+    setTimeout(() => setProfileToast(null), 3000)
   }
 
   // ── Avatar upload ───────────────────────────────────────────────────────────
@@ -863,9 +922,9 @@ export default function ProfilePage() {
   // ── Scroll lock ─────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    document.body.style.overflow = (selectedRec || followListModal) ? 'hidden' : ''
+    document.body.style.overflow = (selectedRec || followListModal || blockConfirm) ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
-  }, [selectedRec, followListModal])
+  }, [selectedRec, followListModal, blockConfirm])
 
   // ── Derived values ──────────────────────────────────────────────────────────
 
@@ -874,7 +933,10 @@ export default function ProfilePage() {
   // Liked is always public. Bookmarked is shown only to owner or when explicitly public.
   const showBookmarked = isOwnProfile || profile?.bookmarks_private === false
   const tabs: TabId[] = ['posted', 'liked', ...(showBookmarked ? ['bookmarked' as TabId] : [])]
-  const isPrivateAndGated = profile?.profile_private === true && !isOwnProfile && !isFollowing
+  const isPrivateAndGated = (profile?.profile_private === true && !isOwnProfile && !isFollowing && !iBlockedThem) || (theyBlockedMe && !isOwnProfile)
+  const privateGateMessage = isPendingFollow
+    ? `Your follow request is pending. ${profile?.name ?? `@${profile?.handle}`} needs to approve it.`
+    : `Follow ${profile?.name ?? `@${profile?.handle}`} to see their recommendations.`
 
   // ── Early returns ───────────────────────────────────────────────────────────
 
@@ -1055,29 +1117,113 @@ export default function ProfilePage() {
                   Edit Profile
                 </button>
               ) : currentUserId ? (
-                <button
-                  onClick={handleFollow}
-                  disabled={followLoading}
-                  onMouseEnter={() => setFollowHovered(true)}
-                  onMouseLeave={() => setFollowHovered(false)}
-                  className="font-body"
-                  style={{
-                    background: isFollowing
-                      ? (followHovered ? 'rgba(212,99,107,0.12)' : 'rgba(0,0,0,0.08)')
-                      : 'transparent',
-                    border: isFollowing
-                      ? `1px solid ${followHovered ? 'rgba(212,99,107,0.5)' : 'rgba(0,0,0,0.15)'}`
-                      : '1px solid rgba(0,0,0,0.15)',
-                    borderRadius: '20px', padding: '3px 14px',
-                    color: isFollowing ? (followHovered ? '#d4636b' : '#33261a') : '#33261a',
-                    fontSize: '12px', fontWeight: 500,
-                    cursor: followLoading ? 'default' : 'pointer',
-                    transition: 'all 0.15s',
-                    flexShrink: 0, minWidth: '80px', textAlign: 'center',
-                  }}
-                >
-                  {isFollowing ? (followHovered ? 'Unfollow' : 'Following') : 'Follow'}
-                </button>
+                <>
+                  {!iBlockedThem && !theyBlockedMe && (
+                    <button
+                      onClick={handleFollow}
+                      disabled={followLoading}
+                      onMouseEnter={() => setFollowHovered(true)}
+                      onMouseLeave={() => setFollowHovered(false)}
+                      className="font-body"
+                      style={{
+                        background: isFollowing
+                          ? (followHovered ? 'rgba(212,99,107,0.12)' : 'rgba(0,0,0,0.08)')
+                          : isPendingFollow
+                            ? 'rgba(0,0,0,0.05)'
+                            : 'transparent',
+                        border: isFollowing
+                          ? `1px solid ${followHovered ? 'rgba(212,99,107,0.5)' : 'rgba(0,0,0,0.15)'}`
+                          : '1px solid rgba(0,0,0,0.15)',
+                        borderRadius: '20px', padding: '3px 14px',
+                        color: isFollowing
+                          ? (followHovered ? '#d4636b' : '#33261a')
+                          : isPendingFollow
+                            ? (followHovered ? '#d4636b' : '#6b5d4f')
+                            : '#33261a',
+                        fontSize: '12px', fontWeight: 500,
+                        cursor: followLoading ? 'default' : 'pointer',
+                        transition: 'all 0.15s',
+                        flexShrink: 0, minWidth: '80px', textAlign: 'center',
+                      }}
+                    >
+                      {isFollowing
+                        ? (followHovered ? 'Unfollow' : 'Following')
+                        : isPendingFollow
+                          ? (followHovered ? 'Cancel' : 'Requested')
+                          : 'Follow'}
+                    </button>
+                  )}
+                  {/* Three-dot menu */}
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <button
+                      onClick={() => setBlockMenuOpen(o => !o)}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px',
+                        color: '#6b5d4f', display: 'flex', alignItems: 'center',
+                      }}
+                      aria-label="More options"
+                    >
+                      <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+                        <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+                      </svg>
+                    </button>
+                    {blockMenuOpen && (
+                      <>
+                        <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setBlockMenuOpen(false)} />
+                        <div style={{
+                          position: 'absolute', left: 0, top: 'calc(100% + 4px)', zIndex: 100,
+                          background: '#faf8f4', border: '1px solid rgba(0,0,0,0.08)',
+                          borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                          minWidth: '180px', overflow: 'hidden',
+                        }}>
+                          {iBlockedThem ? (
+                            <button
+                              onClick={() => handleUnblock()}
+                              className="font-body"
+                              style={{
+                                display: 'block', width: '100%', textAlign: 'left',
+                                padding: '11px 16px', background: 'none', border: 'none',
+                                fontSize: '14px', color: '#33261a', cursor: 'pointer',
+                              }}
+                              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.04)' }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+                            >
+                              Unblock {profile.name ?? `@${profile.handle}`}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => { setBlockMenuOpen(false); setBlockConfirm(true) }}
+                              className="font-body"
+                              style={{
+                                display: 'block', width: '100%', textAlign: 'left',
+                                padding: '11px 16px', background: 'none', border: 'none',
+                                fontSize: '14px', color: '#e85d5d', cursor: 'pointer',
+                              }}
+                              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(232,93,93,0.06)' }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+                            >
+                              Block {profile.name ?? `@${profile.handle}`}
+                            </button>
+                          )}
+                          <div style={{ height: '1px', background: 'rgba(0,0,0,0.06)' }} />
+                          <button
+                            onClick={() => { setBlockMenuOpen(false); setReportOpen(true) }}
+                            className="font-body"
+                            style={{
+                              display: 'block', width: '100%', textAlign: 'left',
+                              padding: '11px 16px', background: 'none', border: 'none',
+                              fontSize: '14px', color: '#6b5d4f', cursor: 'pointer',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,0,0,0.04)' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+                          >
+                            Report
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
               ) : null}
             </div>
 
@@ -1094,7 +1240,7 @@ export default function ProfilePage() {
             )}
 
             {/* Follower / following counts — clickable */}
-            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
               <button className="count-btn" onClick={() => setFollowListModal('followers')}>
                 {followerCount} {followerCount === 1 ? 'follower' : 'followers'}
               </button>
@@ -1106,7 +1252,39 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {isPrivateAndGated ? (
+        {iBlockedThem ? (
+          /* ── You blocked this user ─────────────────────────────────── */
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            paddingTop: '56px', gap: '10px', textAlign: 'center',
+          }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="#6b5d4f" strokeWidth="1.5"
+              strokeLinecap="round" strokeLinejoin="round" width="36" height="36">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M4.93 4.93l14.14 14.14"/>
+            </svg>
+            <p className="font-display" style={{ fontSize: '1.15rem', fontWeight: 600, color: '#33261a', marginTop: '6px' }}>
+              You&apos;ve blocked this user
+            </p>
+            <p className="font-body" style={{ color: '#6b5d4f', fontSize: '14px', maxWidth: '260px', lineHeight: '1.55' }}>
+              Their content is hidden from your feeds. You can unblock them from Settings.
+            </p>
+            <button
+              onClick={handleUnblock}
+              className="font-body"
+              style={{
+                marginTop: '4px', background: 'transparent',
+                border: '1px solid rgba(0,0,0,0.15)', borderRadius: '20px',
+                padding: '7px 20px', color: '#6b5d4f', fontSize: '13px', cursor: 'pointer',
+                transition: 'color 0.15s, border-color 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#33261a'; e.currentTarget.style.borderColor = 'rgba(0,0,0,0.25)' }}
+              onMouseLeave={e => { e.currentTarget.style.color = '#6b5d4f'; e.currentTarget.style.borderColor = 'rgba(0,0,0,0.15)' }}
+            >
+              Unblock
+            </button>
+          </div>
+        ) : isPrivateAndGated ? (
           /* ── Private profile locked state ─────────────────────────── */
           <div style={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -1121,7 +1299,7 @@ export default function ProfilePage() {
               This profile is private
             </p>
             <p className="font-body" style={{ color: '#6b5d4f', fontSize: '14px', maxWidth: '260px', lineHeight: '1.55' }}>
-              Follow {profile.name ?? `@${profile.handle}`} to see their recommendations.
+              {privateGateMessage}
             </p>
           </div>
         ) : (
@@ -1289,6 +1467,93 @@ export default function ProfilePage() {
             setSelectedRec(null)
           }}
         />
+      )}
+
+      {/* ── Block confirmation modal ────────────────────────────────── */}
+      {blockConfirm && profile && (
+        <div
+          onClick={() => setBlockConfirm(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 400,
+            background: 'rgba(0,0,0,0.65)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '16px',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: '400px',
+              background: '#faf8f4', borderRadius: '16px',
+              border: '1px solid rgba(0,0,0,0.08)',
+              padding: '28px 24px',
+              boxShadow: '0 32px 80px rgba(0,0,0,0.7)',
+            }}
+          >
+            <h3 className="font-display" style={{ fontSize: '1.05rem', fontWeight: 600, color: '#33261a', marginBottom: '12px' }}>
+              Block {profile.name ?? `@${profile.handle}`}?
+            </h3>
+            <p className="font-body" style={{ fontSize: '14px', color: '#6b5d4f', lineHeight: '1.55', marginBottom: '24px' }}>
+              Their recommendations won&apos;t appear in your feeds, and yours won&apos;t appear in theirs. You can undo this from Settings → Blocked Users.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setBlockConfirm(false)}
+                className="font-body"
+                style={{
+                  background: 'rgba(0,0,0,0.08)', border: 'none', borderRadius: '8px',
+                  color: '#6b5d4f', fontSize: '14px', padding: '9px 18px', cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBlock}
+                disabled={blockLoading}
+                className="font-body"
+                style={{
+                  background: '#e85d5d', border: 'none', borderRadius: '8px',
+                  color: '#fff', fontSize: '14px', fontWeight: 600,
+                  padding: '9px 18px', cursor: blockLoading ? 'default' : 'pointer',
+                  opacity: blockLoading ? 0.7 : 1, transition: 'opacity 0.15s',
+                }}
+              >
+                {blockLoading ? 'Blocking…' : 'Block'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Report user modal ─────────────────────────────────────────── */}
+      {reportOpen && profile && currentUserId && (
+        <ReportModal
+          title={`Report ${profile.name ?? `@${profile.handle}`}`}
+          onSubmit={async (reason, details) => {
+            const fullReason = details ? `${reason} — ${details}` : reason
+            await supabase.current.from('user_reports').insert({
+              reporter_id: currentUserId,
+              reported_user_id: profile.id,
+              reason: fullReason,
+            })
+          }}
+          onClose={() => setReportOpen(false)}
+          zIndex={450}
+        />
+      )}
+
+      {/* ── Toast ──────────────────────────────────────────────────────── */}
+      {profileToast && (
+        <div style={{
+          position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+          background: '#33261a', color: '#f5f0e8', fontSize: '14px',
+          fontFamily: 'var(--font-body, "DM Sans", sans-serif)',
+          padding: '10px 20px', borderRadius: '999px', zIndex: 500,
+          pointerEvents: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+          whiteSpace: 'nowrap',
+        }}>
+          {profileToast}
+        </div>
       )}
     </>
   )

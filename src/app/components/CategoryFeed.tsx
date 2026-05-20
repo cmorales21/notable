@@ -43,6 +43,9 @@ export default function CategoryFeed({ category }: { category: string }) {
   const [loadingMore, setLoadingMore] = useState(false)
   const [followCount, setFollowCount] = useState<number | null>(null)
 
+  const [ignoredUserIds, setIgnoredUserIds] = useState<Set<string>>(new Set())
+  const [toast, setToast] = useState<string | null>(null)
+
   const [selectedGroup, setSelectedGroup] = useState<GroupedRecommendation | null>(null)
   const [focusOnOpen, setFocusOnOpen] = useState(false)
   const autoOpenedRef = useRef(false)
@@ -60,16 +63,25 @@ export default function CategoryFeed({ category }: { category: string }) {
       setCurrentUserId(uid)
 
       if (uid) {
-        const { data: profileData } = await supabase
-          .from('profiles').select('name, handle, avatar_url').eq('id', uid).maybeSingle()
+        const [{ data: profileData }, { data: ignoreData }, { data: blockedByMe }, { data: blockingMe }] = await Promise.all([
+          supabase.from('profiles').select('name, handle, avatar_url').eq('id', uid).maybeSingle(),
+          supabase.from('user_ignores').select('ignored_user_id').eq('user_id', uid),
+          supabase.from('user_blocks').select('blocked_id').eq('blocker_id', uid),
+          supabase.from('user_blocks').select('blocker_id').eq('blocked_id', uid),
+        ])
         setCurrentUserProfile(profileData)
+        setIgnoredUserIds(new Set([
+          ...(ignoreData ?? []).map((r: { ignored_user_id: string }) => r.ignored_user_id),
+          ...(blockedByMe ?? []).map((r: { blocked_id: string }) => r.blocked_id),
+          ...(blockingMe ?? []).map((r: { blocker_id: string }) => r.blocker_id),
+        ]))
       }
 
       let followedUserIds: string[] | null = null
       if (activeTab === 'following') {
         if (!uid) return
         const { data: followData } = await supabase
-          .from('follows').select('following_id').eq('follower_id', uid)
+          .from('follows').select('following_id').eq('follower_id', uid).eq('status', 'accepted')
         followedUserIds = (followData ?? []).map((f: { following_id: string }) => f.following_id)
         setFollowCount(followedUserIds.length)
         if (followedUserIds.length === 0) return
@@ -147,7 +159,7 @@ export default function CategoryFeed({ category }: { category: string }) {
       if (activeTab === 'following') {
         if (!uid) return
         const { data: followData } = await supabase
-          .from('follows').select('following_id').eq('follower_id', uid)
+          .from('follows').select('following_id').eq('follower_id', uid).eq('status', 'accepted')
         followedUserIds = (followData ?? []).map((f: { following_id: string }) => f.following_id)
         if (followedUserIds.length === 0) return
       }
@@ -277,6 +289,18 @@ export default function CategoryFeed({ category }: { category: string }) {
     return groups
   }, [recs, likeCounts, commentCounts, userLikes, userBookmarks, activeTab])
 
+  const visibleGroups = useMemo(() => {
+    if (ignoredUserIds.size === 0) return groupedRecs
+    return groupedRecs
+      .map(group => {
+        const visible = group.recommenders.filter(r => !ignoredUserIds.has(r.user_id))
+        if (visible.length === 0) return null
+        if (visible.length === group.recommenders.length) return group
+        return { ...group, recommenders: visible, lead_rec_id: visible[0].recommendation_id }
+      })
+      .filter(Boolean) as GroupedRecommendation[]
+  }, [groupedRecs, ignoredUserIds])
+
   function closeModal() { setSelectedGroup(null); setFocusOnOpen(false) }
 
   function handleLikeToggle(recId: string, wasLiked: boolean) {
@@ -286,6 +310,14 @@ export default function CategoryFeed({ category }: { category: string }) {
 
   function handleBookmarkToggle(recId: string, wasBookmarked: boolean) {
     setUserBookmarks(prev => { const next = new Set(prev); if (wasBookmarked) next.delete(recId); else next.add(recId); return next })
+  }
+
+  async function handleIgnoreUser(targetUserId: string, targetUserName: string) {
+    if (!currentUserId) return
+    setIgnoredUserIds(prev => new Set([...prev, targetUserId]))
+    setToast(`${targetUserName} ignored`)
+    setTimeout(() => setToast(null), 3000)
+    await supabase.from('user_ignores').insert({ user_id: currentUserId, ignored_user_id: targetUserId })
   }
 
   useEffect(() => {
@@ -391,7 +423,7 @@ export default function CategoryFeed({ category }: { category: string }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <SkeletonCard /><SkeletonCard /><SkeletonCard />
           </div>
-        ) : groupedRecs.length === 0 ? (
+        ) : visibleGroups.length === 0 ? (
           activeTab === 'following' ? (
             followCount === 0 ? (
               <EmptyState
@@ -415,16 +447,19 @@ export default function CategoryFeed({ category }: { category: string }) {
           )
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {groupedRecs.map((group, idx) => (
+            {visibleGroups.map((group) => (
               <GroupedCard
                 key={group.groupKey}
                 group={group}
                 accentColor={accentColor}
                 tab={activeTab}
-onLike={(e) => toggleLike(e, group.lead_rec_id)}
+                currentUserId={currentUserId}
+                onLike={(e) => toggleLike(e, group.lead_rec_id)}
                 onBookmark={(e) => toggleBookmark(e, group.lead_rec_id)}
                 onClick={() => { setFocusOnOpen(false); setSelectedGroup(group) }}
                 onCommentClick={(e) => { e.stopPropagation(); setFocusOnOpen(true); setSelectedGroup(group) }}
+                onIgnore={handleIgnoreUser}
+                onDelete={(recId) => setRecs(prev => prev.filter(r => r.id !== recId))}
               />
             ))}
           </div>
@@ -450,6 +485,18 @@ onLike={(e) => toggleLike(e, group.lead_rec_id)}
         )}
       </div>
 
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+          background: '#33261a', color: '#f5f0e8', fontSize: '14px', fontFamily: 'var(--font-body, "DM Sans", sans-serif)',
+          padding: '10px 20px', borderRadius: '999px', zIndex: 200,
+          pointerEvents: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+          whiteSpace: 'nowrap',
+        }}>
+          {toast}
+        </div>
+      )}
+
       {selectedGroup && (
         <GroupedModal
           group={selectedGroup}
@@ -463,6 +510,7 @@ onLike={(e) => toggleLike(e, group.lead_rec_id)}
           onRecDeleted={(recId) => setRecs(prev => prev.filter(r => r.id !== recId))}
           onRecUpdated={(recId, desc) => setRecs(prev => prev.map(r => r.id === recId ? { ...r, description: desc } : r))}
           onCommentCountChange={(recId, delta) => setCommentCounts(prev => ({ ...prev, [recId]: Math.max(0, (prev[recId] ?? 0) + delta) }))}
+          onIgnore={handleIgnoreUser}
         />
       )}
     </>
