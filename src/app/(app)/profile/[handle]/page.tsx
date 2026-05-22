@@ -42,7 +42,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   movies: '#dc4f5c',
   music: '#4aad4e',
   restaurants: '#9055d0',
-  podcasts: '#d4920a',
+  podcasts: '#e5a517',
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -99,20 +99,22 @@ function GridTile({ rec, onClick }: { rec: Recommendation; onClick: () => void }
         borderRadius: '10px',
         overflow: 'hidden',
         cursor: 'pointer',
-        background: '#faf8f4',
+        background: showImage ? '#faf8f4' : `${color}18`,
         transform: hovered ? 'scale(1.03)' : 'scale(1)',
         transition: 'transform 0.2s ease',
       }}
     >
-      <RecommendationImage
-        fill
-        src={rec.image_url}
-        category={rec.category}
-        alt={rec.title}
-        sizes="(max-width: 768px) 33vw, 25vw"
-        onError={() => setImgError(true)}
-        style={{ objectFit: 'cover' }}
-      />
+      {showImage && (
+        <RecommendationImage
+          fill
+          src={rec.image_url}
+          category={rec.category}
+          alt={rec.title}
+          sizes="(max-width: 768px) 33vw, 25vw"
+          onFallback={() => setImgError(true)}
+          style={{ objectFit: 'cover' }}
+        />
+      )}
 
       {/* Category dot */}
       <div style={{
@@ -122,18 +124,17 @@ function GridTile({ rec, onClick }: { rec: Recommendation; onClick: () => void }
         boxShadow: `0 0 6px ${color}88`,
       }} />
 
-      {showImage && (
+      {showImage ? (
         <>
-          {/* Dark gradient overlay — only over real images */}
+          {/* Dark gradient overlay */}
           <div style={{
             position: 'absolute', inset: 0,
             background: 'linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.1) 55%, transparent 100%)',
           }} />
-
           {/* Title over image */}
           <p className="font-display" style={{
             position: 'absolute', bottom: '10px', left: '10px', right: '10px',
-            fontSize: '0.82rem', fontWeight: 600, color: '#33261a',
+            fontSize: '0.82rem', fontWeight: 600, color: '#ffffff',
             lineHeight: 1.3,
             overflow: 'hidden',
             display: '-webkit-box',
@@ -144,6 +145,25 @@ function GridTile({ rec, onClick }: { rec: Recommendation; onClick: () => void }
             {rec.title}
           </p>
         </>
+      ) : (
+        /* No image — centered title on tinted background */
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '16px',
+        }}>
+          <p className="font-display" style={{
+            fontSize: '0.88rem', fontWeight: 600, color: color,
+            textAlign: 'center', lineHeight: 1.35,
+            overflow: 'hidden',
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+            letterSpacing: '-0.01em',
+          }}>
+            {rec.title}
+          </p>
+        </div>
       )}
     </div>
   )

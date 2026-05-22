@@ -215,6 +215,7 @@ export function GroupedModal({
   const scrollableRef = useRef<HTMLDivElement>(null)
   const commentInputRef = useRef<HTMLTextAreaElement>(null)
   const [embedFailed, setEmbedFailed] = useState(false)
+  const [imgError, setImgError] = useState(false)
   const [expandedRecommender, setExpandedRecommender] = useState<GroupedRecommender | null>(null)
   const toast = useToast()
   const [openRecMenu, setOpenRecMenu] = useState(false)
@@ -511,9 +512,9 @@ export function GroupedModal({
           )}
 
           <div ref={scrollableRef} style={{ overflowY: 'auto', flex: 1 }}>
-            {(!willEmbed(group.external_url, group.category, 'feed') || embedFailed) && (
+            {(!willEmbed(group.external_url, group.category, 'feed') || embedFailed) && !!group.image_url && !imgError && (
               <div style={{ position: 'relative', width: '100%', height: '200px', background: theme.colors.surface }}>
-                <RecommendationImage fill src={group.image_url} category={group.category} alt={group.title} sizes="500px" style={{ objectFit: 'contain' }} />
+                <RecommendationImage fill src={group.image_url} category={group.category} alt={group.title} sizes="500px" onFallback={() => setImgError(true)} style={{ objectFit: 'contain' }} />
               </div>
             )}
 
@@ -558,6 +559,7 @@ export function GroupedModal({
                 onExpand={() => setExpandedRecommender(recommender)}
                 onIgnore={onIgnore}
                 onRecUpdated={onRecUpdated}
+                onClose={onClose}
               />
             ))}
 

@@ -15,7 +15,7 @@ const CAT: Record<string, { label: string; color: string; href: string }> = {
   movies:      { label: 'Movies & TV', color: '#dc4f5c', href: '/movies'      },
   music:       { label: 'Music',       color: '#4aad4e', href: '/music'       },
   restaurants: { label: 'Restaurants', color: '#9055d0', href: '/restaurants' },
-  podcasts:    { label: 'Podcasts',    color: '#d4920a', href: '/podcasts'    },
+  podcasts:    { label: 'Podcasts',    color: '#e5a517', href: '/podcasts'    },
 }
 
 function relativeTime(dateStr: string): string {

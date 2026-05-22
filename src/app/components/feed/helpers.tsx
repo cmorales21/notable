@@ -238,7 +238,7 @@ const EMPTY_STATE_ICONS: Record<string, { src: string; color: string; padding: s
   movies:      { src: '/icons/movies-small.svg',      color: '#dc4f5c', padding: '16px' },
   music:       { src: '/icons/music-small.svg',       color: '#4aad4e', padding: '14px' },
   restaurants: { src: '/icons/restaurants-small.svg', color: '#9055d0', padding: '12px' },
-  podcasts:    { src: '/icons/podcasts-small.svg',    color: '#d4920a', padding: '12px' },
+  podcasts:    { src: '/icons/podcasts-small.svg',    color: '#e5a517', padding: '12px' },
 }
 
 export function EmptyStateIcon({ category }: { category: string }) {

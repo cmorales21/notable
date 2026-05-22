@@ -40,7 +40,7 @@ const CAT_CONFIG: Record<Category, { label: string; color: string }> = {
   movies:      { label: 'Movies & TV', color: '#dc4f5c' },
   music:       { label: 'Music',       color: '#4aad4e' },
   restaurants: { label: 'Restaurants', color: '#9055d0' },
-  podcasts:    { label: 'Podcasts',    color: '#d4920a' },
+  podcasts:    { label: 'Podcasts',    color: '#e5a517' },
 }
 const CAT_ORDER: Category[] = ['books', 'movies', 'music', 'restaurants', 'podcasts']
 
@@ -1011,9 +1011,9 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
                           onClick={() => handlePodcastTypeToggle(t)}
                           className="font-body"
                           style={{
-                            background: podcastSearchType === t ? '#d4920a' : 'transparent',
+                            background: podcastSearchType === t ? '#e5a517' : 'transparent',
                             color: podcastSearchType === t ? '#ffffff' : '#6b5d4f',
-                            border: `1px solid ${podcastSearchType === t ? '#d4920a' : 'rgba(0,0,0,0.1)'}`,
+                            border: `1px solid ${podcastSearchType === t ? '#e5a517' : 'rgba(0,0,0,0.1)'}`,
                             borderRadius: '12px',
                             padding: '3px 10px',
                             fontSize: '11px', fontWeight: podcastSearchType === t ? 600 : 400,
@@ -1232,9 +1232,9 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
                         onClick={() => handlePodcastTypeToggle(t)}
                         className="font-body"
                         style={{
-                          background: podcastSearchType === t ? '#d4920a' : 'transparent',
+                          background: podcastSearchType === t ? '#e5a517' : 'transparent',
                           color: podcastSearchType === t ? '#ffffff' : '#6b5d4f',
-                          border: `1px solid ${podcastSearchType === t ? '#d4920a' : 'rgba(0,0,0,0.1)'}`,
+                          border: `1px solid ${podcastSearchType === t ? '#e5a517' : 'rgba(0,0,0,0.1)'}`,
                           borderRadius: '12px',
                           padding: '3px 10px',
                           fontSize: '11px', fontWeight: podcastSearchType === t ? 600 : 400,

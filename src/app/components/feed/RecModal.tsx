@@ -72,6 +72,7 @@ export function RecModal({
   const scrollableRef = useRef<HTMLDivElement>(null)
   const supabaseRef = useRef(createClient())
   const [embedFailed, setEmbedFailed] = useState(false)
+  const [imgError, setImgError] = useState(false)
   const [likeAnim, setLikeAnim] = useState<'pop' | 'shrink' | null>(null)
   const [bookmarkAnim, setBookmarkAnim] = useState(false)
   const [commentLikesMap, setCommentLikesMap] = useState<Record<string, { count: number; likedByMe: boolean }>>({})
@@ -230,9 +231,10 @@ export function RecModal({
               </span>
             )}
             {profile?.handle && (
-              <span className="font-body" style={{ color: theme.colors.textMuted, fontSize: '13px' }}>
+              <Link href={`/profile/${profile.handle}`} onClick={onClose} className="font-body profile-link"
+                style={{ color: theme.colors.textMuted, fontSize: '13px', textDecoration: 'none' }}>
                 {' · '}@{profile.handle}
-              </span>
+              </Link>
             )}
           </div>
           <div style={{ display: 'flex', gap: '6px', flexShrink: 0, alignItems: 'center' }}>
@@ -407,9 +409,9 @@ export function RecModal({
             </div>
           )}
 
-          {(!willEmbed(rec.external_url, rec.category, context ?? 'feed') || embedFailed) && (
+          {(!willEmbed(rec.external_url, rec.category, context ?? 'feed') || embedFailed) && !!rec.image_url && !imgError && (
             <div style={{ position: 'relative', width: '100%', height: '200px', background: theme.colors.surface }}>
-              <RecommendationImage fill src={rec.image_url} category={rec.category} alt={rec.title} sizes="500px" style={{ objectFit: 'contain' }} />
+              <RecommendationImage fill src={rec.image_url} category={rec.category} alt={rec.title} sizes="500px" onFallback={() => setImgError(true)} style={{ objectFit: 'contain' }} />
             </div>
           )}
 
@@ -502,17 +504,31 @@ export function RecModal({
                   const canReport = !!currentUserId && currentUserId !== comment.user_id
                   return (
                     <div key={comment.id} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                      <Avatar url={comment.profiles?.avatar_url} name={comment.profiles?.name} size={28} />
+                      {comment.profiles?.handle ? (
+                        <Link href={`/profile/${comment.profiles.handle}`} onClick={onClose} style={{ lineHeight: 0, flexShrink: 0 }} className="profile-link">
+                          <Avatar url={comment.profiles.avatar_url} name={comment.profiles.name} size={28} />
+                        </Link>
+                      ) : (
+                        <Avatar url={comment.profiles?.avatar_url} name={comment.profiles?.name} size={28} />
+                      )}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px', gap: '8px' }}>
                           <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', minWidth: 0 }}>
-                            <span className="font-body" style={{ color: theme.colors.textPrimary, fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {comment.profiles?.name ?? 'Unknown'}
-                            </span>
-                            {comment.profiles?.handle && (
-                              <span className="font-body" style={{ color: theme.colors.textMuted, fontSize: '12px', whiteSpace: 'nowrap' }}>
-                                @{comment.profiles.handle}
+                            {comment.profiles?.handle ? (
+                              <Link href={`/profile/${comment.profiles.handle}`} onClick={onClose} className="font-body profile-link"
+                                style={{ color: theme.colors.textPrimary, fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: 'none' }}>
+                                {comment.profiles.name ?? 'Unknown'}
+                              </Link>
+                            ) : (
+                              <span className="font-body" style={{ color: theme.colors.textPrimary, fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {comment.profiles?.name ?? 'Unknown'}
                               </span>
+                            )}
+                            {comment.profiles?.handle && (
+                              <Link href={`/profile/${comment.profiles.handle}`} onClick={onClose} className="font-body profile-link"
+                                style={{ color: theme.colors.textMuted, fontSize: '12px', whiteSpace: 'nowrap', textDecoration: 'none' }}>
+                                @{comment.profiles.handle}
+                              </Link>
                             )}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>

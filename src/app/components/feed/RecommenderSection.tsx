@@ -26,6 +26,7 @@ export function RecommenderSection({
   onExpand,
   onIgnore,
   onRecUpdated,
+  onClose,
 }: {
   recommender: GroupedRecommender
   category: string
@@ -38,6 +39,7 @@ export function RecommenderSection({
   onExpand?: () => void
   onIgnore?: (userId: string, userName: string) => void
   onRecUpdated?: (recId: string, newDescription: string) => void
+  onClose?: () => void
 }) {
   const supabaseRef = useRef(createClient())
   const [liked, setLiked] = useState(recommender.is_liked_by_user)
@@ -196,7 +198,7 @@ export function RecommenderSection({
       {/* Profile row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
         {profile?.handle ? (
-          <Link href={`/profile/${profile.handle}`} onClick={e => e.stopPropagation()} style={{ lineHeight: 0, flexShrink: 0 }}>
+          <Link href={`/profile/${profile.handle}`} onClick={e => { e.stopPropagation(); onClose?.() }} style={{ lineHeight: 0, flexShrink: 0 }} className="profile-link">
             <Avatar url={profile.avatar_url} name={profile.name} size={30} />
           </Link>
         ) : (
@@ -205,7 +207,7 @@ export function RecommenderSection({
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
             {profile?.handle ? (
-              <Link href={`/profile/${profile.handle}`} onClick={e => e.stopPropagation()} className="font-body"
+              <Link href={`/profile/${profile.handle}`} onClick={e => { e.stopPropagation(); onClose?.() }} className="font-body profile-link"
                 style={{ color: theme.colors.textPrimary, fontSize: '14px', fontWeight: 500, textDecoration: 'none' }}>
                 {profile.name ?? 'Unknown'}
               </Link>
@@ -215,9 +217,10 @@ export function RecommenderSection({
               </span>
             )}
             {profile?.handle && (
-              <span className="font-body" style={{ color: theme.colors.textMuted, fontSize: '12px' }}>
+              <Link href={`/profile/${profile.handle}`} onClick={e => { e.stopPropagation(); onClose?.() }} className="font-body profile-link"
+                style={{ color: theme.colors.textMuted, fontSize: '12px', textDecoration: 'none' }}>
                 @{profile.handle}
-              </span>
+              </Link>
             )}
             <span className="font-body" style={{ color: theme.colors.textTertiary, fontSize: '11px', marginLeft: 'auto' }}>
               {formatRelativeTime(recommender.created_at)}
@@ -428,14 +431,30 @@ export function RecommenderSection({
                 const canReport = !!currentUserId && currentUserId !== comment.user_id
                 return (
                   <div key={comment.id} style={{ display: 'flex', gap: '8px' }}>
-                    <Avatar url={comment.profiles?.avatar_url} name={comment.profiles?.name} size={24} />
+                    {comment.profiles?.handle ? (
+                      <Link href={`/profile/${comment.profiles.handle}`} onClick={e => { e.stopPropagation(); onClose?.() }} style={{ lineHeight: 0, flexShrink: 0 }} className="profile-link">
+                        <Avatar url={comment.profiles.avatar_url} name={comment.profiles.name} size={24} />
+                      </Link>
+                    ) : (
+                      <Avatar url={comment.profiles?.avatar_url} name={comment.profiles?.name} size={24} />
+                    )}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', marginBottom: '2px', flexWrap: 'wrap' }}>
-                        <span className="font-body" style={{ color: theme.colors.textPrimary, fontSize: '12px', fontWeight: 500 }}>
-                          {comment.profiles?.name ?? 'Unknown'}
-                        </span>
+                        {comment.profiles?.handle ? (
+                          <Link href={`/profile/${comment.profiles.handle}`} onClick={e => { e.stopPropagation(); onClose?.() }} className="font-body profile-link"
+                            style={{ color: theme.colors.textPrimary, fontSize: '12px', fontWeight: 500, textDecoration: 'none' }}>
+                            {comment.profiles.name ?? 'Unknown'}
+                          </Link>
+                        ) : (
+                          <span className="font-body" style={{ color: theme.colors.textPrimary, fontSize: '12px', fontWeight: 500 }}>
+                            {comment.profiles?.name ?? 'Unknown'}
+                          </span>
+                        )}
                         {comment.profiles?.handle && (
-                          <span className="font-body" style={{ color: theme.colors.textMuted, fontSize: '11px' }}>@{comment.profiles.handle}</span>
+                          <Link href={`/profile/${comment.profiles.handle}`} onClick={e => { e.stopPropagation(); onClose?.() }} className="font-body profile-link"
+                            style={{ color: theme.colors.textMuted, fontSize: '11px', textDecoration: 'none' }}>
+                            @{comment.profiles.handle}
+                          </Link>
                         )}
                         <span className="font-body" style={{ color: theme.colors.textTertiary, fontSize: '11px', marginLeft: 'auto' }}>
                           {formatRelativeTime(comment.created_at)}

@@ -18,7 +18,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   movies: '#dc4f5c',
   music: '#4aad4e',
   restaurants: '#9055d0',
-  podcasts: '#d4920a',
+  podcasts: '#e5a517',
 }
 
 const CATEGORY_LABELS: Record<string, string> = {

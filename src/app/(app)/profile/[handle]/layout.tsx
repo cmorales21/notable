@@ -8,13 +8,15 @@ export async function generateMetadata(
   const supabase = await createClient()
   const { data: profile } = await supabase
     .from('profiles')
-    .select('name, avatar_url')
+    .select('name, bio, avatar_url')
     .eq('handle', handle)
     .maybeSingle()
 
   const name = profile?.name ?? `@${handle}`
-  const title = `${name} — Notable`
-  const description = `See what ${name} recommends on Notable`
+  const title = `${name} (@${handle}) on Notable`
+  const description = profile?.bio?.trim()
+    ? profile.bio.trim()
+    : `See what ${name} recommends on Notable`
 
   return {
     title,

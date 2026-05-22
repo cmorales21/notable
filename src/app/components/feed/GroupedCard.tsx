@@ -270,7 +270,7 @@ export function GroupedCard({
         <div style={{ padding: '0 16px' }}>
           <RichMediaEmbed external_url={leadRec.external_url!} category={group.category} context="feed" title={group.title} onEmbedFail={() => setEmbedFailed(true)} />
         </div>
-      ) : (
+      ) : !!group.image_url && !imgError ? (
         <div style={{ height: '280px', overflow: 'hidden', position: 'relative', background: theme.colors.surface }}>
           {leadRec.external_url ? (
             <a
@@ -282,13 +282,13 @@ export function GroupedCard({
               onMouseLeave={() => setImageHovered(false)}
               style={{ display: 'block', height: '100%', position: 'relative' }}
             >
-              <RecommendationImage fill src={group.image_url} category={group.category} alt={group.title} sizes="(max-width: 768px) 100vw, 50vw" onError={() => setImgError(true)} style={{ objectFit: 'contain', background: theme.colors.surface }} />
+              <RecommendationImage fill src={group.image_url} category={group.category} alt={group.title} sizes="(max-width: 768px) 100vw, 50vw" onFallback={() => setImgError(true)} style={{ objectFit: 'contain', background: theme.colors.surface }} />
               <div style={{
                 position: 'absolute', top: '8px', right: '8px',
                 background: 'rgba(0,0,0,0.55)', borderRadius: '7px',
                 width: '28px', height: '28px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                opacity: imageHovered && !!group.image_url && !imgError ? 1 : 0, transition: 'opacity 0.15s',
+                opacity: imageHovered ? 1 : 0, transition: 'opacity 0.15s',
                 backdropFilter: 'blur(4px)', pointerEvents: 'none',
               }}>
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -297,10 +297,10 @@ export function GroupedCard({
               </div>
             </a>
           ) : (
-            <RecommendationImage fill src={group.image_url} category={group.category} alt={group.title} sizes="(max-width: 768px) 100vw, 50vw" onError={() => setImgError(true)} style={{ objectFit: 'contain', background: theme.colors.surface }} />
+            <RecommendationImage fill src={group.image_url} category={group.category} alt={group.title} sizes="(max-width: 768px) 100vw, 50vw" onFallback={() => setImgError(true)} style={{ objectFit: 'contain', background: theme.colors.surface }} />
           )}
         </div>
-      )}
+      ) : null}
 
       <div style={{ padding: '8px 16px 10px' }}>
         <h2

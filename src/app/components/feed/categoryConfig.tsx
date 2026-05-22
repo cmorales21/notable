@@ -48,7 +48,7 @@ export const CATEGORY_CONFIG: Record<Category, { label: string; color: string; I
   },
   podcasts: {
     label: 'Podcasts',
-    color: '#d4920a',
+    color: '#e5a517',
     Icon: () => (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
         <rect x="9" y="2" width="6" height="12" rx="3" />

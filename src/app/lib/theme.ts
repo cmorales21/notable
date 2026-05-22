@@ -21,7 +21,7 @@ export const theme = {
     movies: '#dc4f5c',
     music: '#4aad4e',
     restaurants: '#9055d0',
-    podcasts: '#d4920a',
+    podcasts: '#e5a517',
   },
   fonts: {
     display: 'var(--font-display, "Playfair Display", serif)',

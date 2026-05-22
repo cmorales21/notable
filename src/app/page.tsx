@@ -27,7 +27,7 @@ const TILES = [
   { name: 'Movies & TV', href: '/movies',      color: '#dc4f5c', iconSrc: '/icons/movies-large.svg',      iconWidth: '44%' },
   { name: 'Music',       href: '/music',       color: '#4aad4e', iconSrc: '/icons/music-large.svg',       iconWidth: '44%' },
   { name: 'Restaurants', href: '/restaurants', color: '#9055d0', iconSrc: '/icons/restaurants-ramen.svg',  iconWidth: '52%' },
-  { name: 'Podcasts',    href: '/podcasts',    color: '#d4920a', iconSrc: '/icons/podcasts-large.svg',    iconWidth: '44%' },
+  { name: 'Podcasts',    href: '/podcasts',    color: '#e5a517', iconSrc: '/icons/podcasts-large.svg',    iconWidth: '44%' },
 ]
 
 /* ─── Mosaic image data — 75 images, all {cat}-{n}.jpg, interleaved 5×5 ─── */

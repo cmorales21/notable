@@ -112,7 +112,7 @@ const CATEGORIES = [
   { name: 'Movies & TV', href: '/movies',      color: '#dc4f5c', iconSrc: '/icons/movies-small.svg',      sidebarPadding: '10px' },
   { name: 'Music',       href: '/music',       color: '#4aad4e', iconSrc: '/icons/music-small.svg',       sidebarPadding: '8px'  },
   { name: 'Restaurants', href: '/restaurants', color: '#9055d0', iconSrc: '/icons/restaurants-small.svg', sidebarPadding: '6px'  },
-  { name: 'Podcasts',    href: '/podcasts',    color: '#d4920a', iconSrc: '/icons/podcasts-small.svg',    sidebarPadding: '6px'  },
+  { name: 'Podcasts',    href: '/podcasts',    color: '#e5a517', iconSrc: '/icons/podcasts-small.svg',    sidebarPadding: '6px'  },
 ]
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -607,7 +607,7 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
                 className="app-cat-btn rounded-xl"
                 style={{ width: '48px', height: '48px', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
               >
-                <Image src={iconSrc} alt={name} width={iconPx} height={iconPx} style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)', opacity: 0.92 }} />
+                <Image src={iconSrc} alt={name} width={iconPx} height={iconPx} style={{ width: iconPx, height: iconPx, objectFit: 'contain', filter: 'brightness(0) invert(1)', opacity: 0.92 }} />
               </Link>
             )
           })}
@@ -681,7 +681,7 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
                 className="app-cat-btn rounded-xl"
                 style={{ width: '44px', height: '44px', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
               >
-                <Image src={iconSrc} alt={name} width={iconPx} height={iconPx} style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)', opacity: 0.92 }} />
+                <Image src={iconSrc} alt={name} width={iconPx} height={iconPx} style={{ width: iconPx, height: iconPx, objectFit: 'contain', filter: 'brightness(0) invert(1)', opacity: 0.92 }} />
               </Link>
             )
           })}

@@ -14,7 +14,7 @@
   --color-movies:       #dc4f5c;
   --color-music:        #4aad4e;
   --color-restaurants:  #9055d0;
-  --color-podcasts:     #d4920a;
+  --color-podcasts:     #e5a517;
 }
 
 /* ─── Tailwind v4 theme ─────────────────────────────────────────────── */
@@ -263,7 +263,11 @@ body {
 
 /* ─── Page transition ────────────────────────────────────────────────── */
 @keyframes page-fade-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
-.page-enter { animation: page-fade-in 150ms ease-out both; }
+.page-enter { animation: page-fade-in 150ms ease-out; }
+
+/* ─── Profile link hover ─────────────────────────────────────────────── */
+.profile-link { transition: opacity 0.15s; }
+.profile-link:hover { opacity: 0.8; }

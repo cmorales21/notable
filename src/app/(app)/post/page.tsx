@@ -40,7 +40,7 @@ const CATEGORIES: { id: Category; label: string; emoji: string; color: string }[
   { id: 'movies',      label: 'Movies & TV', emoji: '🎬', color: '#dc4f5c' },
   { id: 'music',       label: 'Music',       emoji: '🎵', color: '#4aad4e' },
   { id: 'restaurants', label: 'Restaurants', emoji: '🍽️', color: '#9055d0' },
-  { id: 'podcasts',    label: 'Podcasts',    emoji: '🎙️', color: '#d4920a' },
+  { id: 'podcasts',    label: 'Podcasts',    emoji: '🎙️', color: '#e5a517' },
 ]
 
 const CAT = Object.fromEntries(CATEGORIES.map(c => [c.id, c])) as Record<Category, typeof CATEGORIES[0]>
