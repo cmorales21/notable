@@ -34,7 +34,7 @@ export function ShareButton({ recId }: { recId: string }) {
       {copied && (
         <div style={{
           position: 'absolute', bottom: '-32px', right: 0, zIndex: 10,
-          background: '#1a1a1a', color: '#fff', fontSize: '12px',
+          background: '#33261a', color: '#f5f0e8', fontSize: '12px',
           padding: '4px 10px', borderRadius: '6px', whiteSpace: 'nowrap',
           pointerEvents: 'none', fontFamily: 'var(--font-body, "DM Sans", sans-serif)',
         }}>

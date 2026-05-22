@@ -1,5 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+function isPrivateHost(hostname: string): boolean {
+  if (hostname === 'localhost' || hostname.endsWith('.local')) return true
+  // Only block raw IP addresses — no DNS resolution
+  const ipv4 = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (ipv4) {
+    const [, a, b] = ipv4.map(Number)
+    if (a === 127) return true                            // 127.0.0.0/8
+    if (a === 10) return true                             // 10.0.0.0/8
+    if (a === 172 && b >= 16 && b <= 31) return true     // 172.16.0.0/12
+    if (a === 192 && b === 168) return true               // 192.168.0.0/16
+    if (a === 169 && b === 254) return true               // 169.254.0.0/16 (link-local)
+    if (a === 0) return true                              // 0.0.0.0/8
+  }
+  return false
+}
+
+function validateUrl(raw: string): string | null {
+  let parsed: URL
+  try {
+    parsed = new URL(raw)
+  } catch {
+    return null
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
+  if (isPrivateHost(parsed.hostname)) return null
+  return raw
+}
+
 function getMeta(html: string, property: string): string | null {
   const patterns = [
     new RegExp(`<meta[^>]+(?:property|name)=["']${property}["'][^>]+content=["']([^"']*?)["']`, 'i'),
@@ -53,6 +81,10 @@ export async function POST(req: NextRequest) {
     if (!url || typeof url !== 'string') throw new Error()
   } catch {
     return NextResponse.json({ error: 'URL required' }, { status: 400 })
+  }
+
+  if (!validateUrl(url)) {
+    return NextResponse.json({ error: 'Invalid or blocked URL' }, { status: 400 })
   }
 
   const imdbResult = await handleImdb(url)

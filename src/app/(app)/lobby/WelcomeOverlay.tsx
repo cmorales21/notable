@@ -240,7 +240,7 @@ export default function WelcomeOverlay({ userId, hasHandle }: Props) {
                   </svg>
                 )}
                 {(handleStatus === 'taken' || handleStatus === 'invalid') && (
-                  <svg style={{ width: 16, height: 16 }} viewBox="0 0 24 24" fill="none" stroke="#d4636b" strokeWidth="2.5" strokeLinecap="round">
+                  <svg style={{ width: 16, height: 16 }} viewBox="0 0 24 24" fill="none" stroke="#e05555" strokeWidth="2.5" strokeLinecap="round">
                     <path d="M18 6L6 18M6 6l12 12" />
                   </svg>
                 )}
@@ -253,7 +253,7 @@ export default function WelcomeOverlay({ userId, hasHandle }: Props) {
                 fontSize: '0.78rem',
                 color:
                   handleStatus === 'available' ? '#4aad4e'
-                  : (handleStatus === 'taken' || handleStatus === 'invalid') ? '#d4636b'
+                  : (handleStatus === 'taken' || handleStatus === 'invalid') ? '#e05555'
                   : '#9a8d7f',
               }}
             >
@@ -264,7 +264,7 @@ export default function WelcomeOverlay({ userId, hasHandle }: Props) {
             </p>
 
             {handleError && (
-              <p className="font-body" style={{ fontSize: '0.82rem', color: '#d4636b' }}>
+              <p className="font-body" style={{ fontSize: '0.82rem', color: '#e05555' }}>
                 {handleError}
               </p>
             )}

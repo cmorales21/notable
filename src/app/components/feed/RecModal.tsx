@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { RichMediaEmbed, willEmbed } from '@/app/components/RichMediaEmbed'
@@ -249,7 +250,7 @@ export function RecModal({
               {showCopied && (
                 <div style={{
                   position: 'absolute', bottom: '-30px', right: 0, zIndex: 10,
-                  background: '#1a1a1a', color: '#fff', fontSize: '12px',
+                  background: '#33261a', color: '#f5f0e8', fontSize: '12px',
                   padding: '4px 10px', borderRadius: '6px', whiteSpace: 'nowrap',
                   pointerEvents: 'none',
                 }}>
@@ -386,13 +387,16 @@ export function RecModal({
 
           {(!willEmbed(rec.external_url, rec.category, context ?? 'feed') || embedFailed) && (
             rec.image_url && !imgError ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={rec.image_url}
-                alt={rec.title}
-                onError={() => setImgError(true)}
-                style={{ width: '100%', height: '200px', objectFit: 'contain', display: 'block', background: theme.colors.surface }}
-              />
+              <div style={{ position: 'relative', width: '100%', height: '200px', background: theme.colors.surface }}>
+                <Image
+                  src={rec.image_url}
+                  alt={rec.title}
+                  fill
+                  sizes="500px"
+                  onError={() => setImgError(true)}
+                  style={{ objectFit: 'contain' }}
+                />
+              </div>
             ) : (
               <div style={{ width: '100%', height: '200px', background: `linear-gradient(135deg, ${accentColor}55, ${accentColor}22)` }} />
             )

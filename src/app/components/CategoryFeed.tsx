@@ -252,7 +252,11 @@ export default function CategoryFeed({ category }: { category: string }) {
       await supabase.from('likes').insert({ user_id: currentUserId, recommendation_id: recId })
       const recAuthorId = recs.find(r => r.id === recId)?.user_id ?? null
       if (recAuthorId && recAuthorId !== currentUserId) {
-        void supabase.from('notifications').insert({ user_id: recAuthorId, actor_id: currentUserId, type: 'like', rec_id: recId, read: false })
+        const { data: recipientProfile } = await supabase
+          .from('profiles').select('notify_likes').eq('id', recAuthorId).single()
+        if (recipientProfile?.notify_likes !== false) {
+          void supabase.from('notifications').insert({ user_id: recAuthorId, actor_id: currentUserId, type: 'like', rec_id: recId, read: false })
+        }
       }
     }
   }
@@ -268,7 +272,11 @@ export default function CategoryFeed({ category }: { category: string }) {
       await supabase.from('bookmarks').insert({ user_id: currentUserId, recommendation_id: recId })
       const recAuthorId = recs.find(r => r.id === recId)?.user_id ?? null
       if (recAuthorId && recAuthorId !== currentUserId) {
-        void supabase.from('notifications').insert({ user_id: recAuthorId, actor_id: currentUserId, type: 'bookmark', rec_id: recId, read: false })
+        const { data: recipientProfile } = await supabase
+          .from('profiles').select('notify_bookmarks').eq('id', recAuthorId).single()
+        if (recipientProfile?.notify_bookmarks !== false) {
+          void supabase.from('notifications').insert({ user_id: recAuthorId, actor_id: currentUserId, type: 'bookmark', rec_id: recId, read: false })
+        }
       }
     }
   }

@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=podcast&entity=${entity}&limit=8`
-    const res = await fetch(url, { cache: 'no-store' })
+    const res = await fetch(url)
     if (!res.ok) return NextResponse.json({ items: [] }, { status: 502 })
 
     const data = await res.json() as { results?: Record<string, unknown>[] }
@@ -34,7 +34,9 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    return NextResponse.json({ items })
+    return NextResponse.json({ items }, {
+      headers: { 'Cache-Control': 'public, max-age=300, stale-while-revalidate=600' },
+    })
   } catch {
     return NextResponse.json({ items: [] }, { status: 502 })
   }

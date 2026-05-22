@@ -154,7 +154,7 @@ export default function ResetPasswordPage() {
                 style={{
                   background: 'rgba(212,99,107,0.1)',
                   border: '1px solid rgba(212,99,107,0.22)',
-                  color: '#d4636b',
+                  color: '#e05555',
                   fontSize: '0.9rem',
                   lineHeight: '1.55',
                 }}
@@ -187,7 +187,7 @@ export default function ResetPasswordPage() {
                   style={{
                     background: 'rgba(212,99,107,0.12)',
                     border: '1px solid rgba(212,99,107,0.25)',
-                    color: '#d4636b',
+                    color: '#e05555',
                     fontSize: '0.875rem',
                   }}
                 >

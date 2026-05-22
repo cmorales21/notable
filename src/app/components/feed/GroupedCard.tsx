@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { RichMediaEmbed, willEmbed } from '@/app/components/RichMediaEmbed'
@@ -8,6 +9,7 @@ import type { GroupedRecommendation, GroupedRecommender } from '@/lib/groupRecom
 import { Avatar, ActionButton, TeaserText } from './helpers'
 import { LikeIcon, BookmarkIcon, CommentIcon } from './icons'
 import { theme } from '@/app/lib/theme'
+import { ReportModal } from './ReportModal'
 
 function OverlappingAvatars({ recommenders }: { recommenders: GroupedRecommender[] }) {
   const shown = recommenders.slice(0, 3)
@@ -90,6 +92,7 @@ export function GroupedCard({
   const [openMenu, setOpenMenu] = useState(false)
   const [ignoreConfirm, setIgnoreConfirm] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [showReport, setShowReport] = useState(false)
 
   const liked = leadRec.is_liked_by_user
   const bookmarked = leadRec.is_bookmarked_by_user
@@ -129,6 +132,16 @@ export function GroupedCard({
 
   const leadName = leadRec.profile?.name ?? leadRec.profile?.handle ?? 'this person'
 
+  async function reportRec(reason: string, details: string) {
+    if (!currentUserId) return
+    const fullReason = details ? `${reason} — ${details}` : reason
+    await supabaseRef.current.from('recommendation_reports').insert({
+      recommendation_id: leadRec.recommendation_id,
+      reporter_id: currentUserId,
+      reason: fullReason,
+    })
+  }
+
   return (
     <div style={{ position: 'relative' }}>
     <div
@@ -145,7 +158,7 @@ export function GroupedCard({
         {isMulti ? (
           <>
             <OverlappingAvatars recommenders={group.recommenders} />
-            <span className="font-body" style={{ color: '#b0a290', fontSize: '13px', lineHeight: 1.3, flex: 1, minWidth: 0 }}>
+            <span className="font-body" style={{ color: '#6b5d4f', fontSize: '13px', lineHeight: 1.3, flex: 1, minWidth: 0 }}>
               {getAttributionText(group.recommenders, tab)}
             </span>
           </>
@@ -216,7 +229,7 @@ export function GroupedCard({
                       </button>
                       <div style={{ height: '1px', background: theme.colors.border }} />
                       <button
-                        onClick={e => { e.stopPropagation(); setOpenMenu(false) }}
+                        onClick={e => { e.stopPropagation(); setOpenMenu(false); setShowReport(true) }}
                         className="font-body"
                         style={{ display: 'block', width: '100%', padding: '10px 14px', background: 'none', border: 'none', cursor: 'pointer', color: theme.colors.textMuted, fontSize: '14px', textAlign: 'left' }}
                       >
@@ -264,8 +277,7 @@ export function GroupedCard({
               style={{ display: 'block', height: '100%', position: 'relative' }}
             >
               {group.image_url && !imgError ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={group.image_url} alt={group.title} loading="lazy" onError={() => setImgError(true)} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: theme.colors.surface }} />
+                <Image src={group.image_url} alt={group.title} fill sizes="(max-width: 768px) 100vw, 50vw" onError={() => setImgError(true)} style={{ objectFit: 'contain', background: theme.colors.surface }} />
               ) : (
                 <div style={{ width: '100%', height: '100%', background: `linear-gradient(135deg, ${accentColor}55, ${accentColor}22)` }} />
               )}
@@ -284,8 +296,7 @@ export function GroupedCard({
             </a>
           ) : (
             group.image_url && !imgError ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={group.image_url} alt={group.title} loading="lazy" onError={() => setImgError(true)} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: theme.colors.surface }} />
+              <Image src={group.image_url} alt={group.title} fill sizes="(max-width: 768px) 100vw, 50vw" onError={() => setImgError(true)} style={{ objectFit: 'contain', background: theme.colors.surface }} />
             ) : (
               <div style={{ width: '100%', height: '100%', background: `linear-gradient(135deg, ${accentColor}55, ${accentColor}22)` }} />
             )
@@ -397,6 +408,14 @@ export function GroupedCard({
       )}
     </div>
 
+    {showReport && (
+      <ReportModal
+        title={`Report "${group.title}"`}
+        onSubmit={reportRec}
+        onClose={() => setShowReport(false)}
+        zIndex={200}
+      />
+    )}
     </div>
   )
 }

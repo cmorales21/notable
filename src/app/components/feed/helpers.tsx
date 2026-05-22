@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import type { RecComment } from '@/app/lib/types'
 import { theme } from '@/app/lib/theme'
@@ -27,6 +28,7 @@ export function sortComments(comments: RecComment[]): RecComment[] {
   })
 }
 
+// Simplified from a 3-query fallback chain — schema is stable in production
 export async function fetchComments(
   client: ReturnType<typeof createClient>,
   recId: string,
@@ -36,22 +38,11 @@ export async function fetchComments(
     .select('*, profiles(name, handle, avatar_url), comment_likes(id, user_id)')
     .eq('recommendation_id', recId)
     .order('created_at', { ascending: true })
-  if (!error && data) return sortComments(data)
-
-  const { data: noLikes, error: noLikesErr } = await client
-    .from('comments')
-    .select('*, profiles(name, handle, avatar_url)')
-    .eq('recommendation_id', recId)
-    .order('created_at', { ascending: true })
-  if (!noLikesErr && noLikes) return sortComments(noLikes)
-
-  const { data: bare, error: bareErr } = await client
-    .from('comments')
-    .select('*')
-    .eq('recommendation_id', recId)
-    .order('created_at', { ascending: true })
-  if (bareErr) console.error('[Notable] bare fetch failed — check RLS select policy on comments table:', bareErr.message)
-  return sortComments(bare ?? [])
+  if (error) {
+    if (process.env.NODE_ENV !== 'production') console.error('[Notable] fetchComments failed:', error.message)
+    return []
+  }
+  return sortComments(data ?? [])
 }
 
 export function getExternalLinkLabel(_category: string, url: string): string {
@@ -82,13 +73,12 @@ export function Avatar({
   const initial = name ? name.charAt(0).toUpperCase() : '?'
   if (url) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <Image
         src={url}
         alt={name ?? ''}
         width={size}
         height={size}
-        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+        style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
       />
     )
   }
@@ -266,12 +256,14 @@ export function EmptyStateIcon({ category }: { category: string }) {
         boxSizing: 'border-box',
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={icon.src}
-        alt={category}
-        style={{ width: '100%', height: '100%', filter: 'brightness(0) invert(1)', opacity: 0.92 }}
-      />
+      <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+        <Image
+          src={icon.src}
+          alt={category}
+          fill
+          style={{ filter: 'brightness(0) invert(1)', opacity: 0.92 }}
+        />
+      </div>
     </div>
   )
 }

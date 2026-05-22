@@ -52,7 +52,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void 
           width: '16px',
           height: '16px',
           borderRadius: '50%',
-          background: '#fff',
+          background: '#faf8f4',
           transition: 'left 0.18s',
         }}
       />
@@ -135,7 +135,7 @@ function InlineEdit({
             disabled={saving}
             className="font-body"
             style={{
-              background: '#3a2a1a', color: '#f5f0e8', border: 'none', borderRadius: '7px',
+              background: '#33261a', color: '#f5f0e8', border: 'none', borderRadius: '7px',
               fontSize: '13px', fontWeight: 600, padding: '7px 14px',
               cursor: 'pointer', opacity: saving ? 0.6 : 1,
             }}
@@ -280,7 +280,7 @@ function AccountSection({
               style={inputStyle}
             />
             {pwMsg && (
-              <p className="font-body" style={{ fontSize: '12px', color: pwMsg.ok ? '#4aad4e' : '#e85d5d' }}>
+              <p className="font-body" style={{ fontSize: '12px', color: pwMsg.ok ? '#4aad4e' : '#e05555' }}>
                 {pwMsg.text}
               </p>
             )}
@@ -331,12 +331,12 @@ function AccountSection({
           className="font-body"
           style={{
             background: 'none', border: 'none',
-            color: '#5a5248', fontSize: '13px',
+            color: '#6b5d4f', fontSize: '13px',
             padding: 0, cursor: 'pointer',
             transition: 'color 0.15s',
           }}
-          onMouseEnter={e => (e.currentTarget.style.color = '#e85d5d')}
-          onMouseLeave={e => (e.currentTarget.style.color = '#5a5248')}
+          onMouseEnter={e => (e.currentTarget.style.color = '#e05555')}
+          onMouseLeave={e => (e.currentTarget.style.color = '#6b5d4f')}
         >
           Delete account
         </button>
@@ -717,7 +717,7 @@ function AboutSection() {
       <p className="font-body" style={{ fontSize: '14px', color: '#6b5d4f', lineHeight: '1.65' }}>
         Notable is a place to share the things that genuinely moved you — books, films, music, restaurants, and more. It&apos;s built for people who care about their recommendations and love discovering what the people they trust are into.
       </p>
-      <p className="font-body" style={{ fontSize: '12px', color: '#5a5248', marginTop: '4px' }}>
+      <p className="font-body" style={{ fontSize: '12px', color: '#6b5d4f', marginTop: '4px' }}>
         Version 0.1.0
       </p>
     </div>
@@ -766,7 +766,7 @@ function DeleteModal({ onCancel, onConfirm, deleting }: { onCancel: () => void; 
             disabled={deleting}
             className="font-body"
             style={{
-              flex: 1, background: '#e85d5d', border: 'none',
+              flex: 1, background: '#e05555', border: 'none',
               borderRadius: '8px', color: '#fff', fontSize: '14px', fontWeight: 600,
               padding: '10px', cursor: 'pointer', opacity: deleting ? 0.7 : 1,
               transition: 'opacity 0.15s',

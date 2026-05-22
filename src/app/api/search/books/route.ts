@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=8&fields=key,title,author_name,cover_i`
-    const res = await fetch(url, { cache: 'no-store' })
+    const res = await fetch(url)
     if (!res.ok) return NextResponse.json({ items: [] }, { status: 502 })
 
     const data = await res.json() as { docs?: Record<string, unknown>[] }
@@ -21,7 +21,9 @@ export async function GET(req: NextRequest) {
         external_url: `https://openlibrary.org${doc.key}`,
       }))
 
-    return NextResponse.json({ items })
+    return NextResponse.json({ items }, {
+      headers: { 'Cache-Control': 'public, max-age=300, stale-while-revalidate=600' },
+    })
   } catch {
     return NextResponse.json({ items: [] }, { status: 502 })
   }

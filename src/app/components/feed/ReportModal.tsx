@@ -52,7 +52,7 @@ export function ReportModal({
           borderRadius: '16px',
           border: '1px solid rgba(0,0,0,0.08)',
           padding: '24px',
-          boxShadow: '0 32px 80px rgba(0,0,0,0.5)',
+          boxShadow: '0 32px 80px rgba(58,42,26,0.4)',
         }}
       >
         {done ? (

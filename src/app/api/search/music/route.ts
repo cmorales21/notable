@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&limit=10`
-    const res = await fetch(url, { cache: 'no-store' })
+    const res = await fetch(url)
     if (!res.ok) return NextResponse.json({ items: [] }, { status: 502 })
 
     const data = await res.json()
@@ -19,7 +19,9 @@ export async function GET(req: NextRequest) {
       external_url: (r.trackViewUrl as string) ?? null,
     }))
 
-    return NextResponse.json({ items })
+    return NextResponse.json({ items }, {
+      headers: { 'Cache-Control': 'public, max-age=300, stale-while-revalidate=600' },
+    })
   } catch {
     return NextResponse.json({ items: [] }, { status: 502 })
   }

@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
+import { cache } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 import { theme } from '@/app/lib/theme'
 import { ShareButton } from './ShareButton'
 
@@ -41,7 +44,7 @@ function externalLinkLabel(url: string): string {
 
 // ─── Data helpers ─────────────────────────────────────────────────────────────
 
-async function fetchRec(id: string) {
+const fetchRec = cache(async (id: string) => {
   const db = createAdminClient()
   if (!db) return null
   const { data: rec } = await db
@@ -52,11 +55,11 @@ async function fetchRec(id: string) {
   if (!rec) return null
   const { data: profile } = await db
     .from('profiles')
-    .select('name, handle, avatar_url')
+    .select('name, handle, avatar_url, profile_private')
     .eq('id', rec.user_id)
     .maybeSingle()
   return { ...rec, profiles: profile }
-}
+})
 
 // ─── generateMetadata ─────────────────────────────────────────────────────────
 
@@ -99,13 +102,9 @@ export default async function RecPage(
   const db = createAdminClient()
   if (!db) return null
 
-  const { data: recRow } = await db
-    .from('recommendations')
-    .select('id, user_id, category, title, description, image_url, external_url, created_at')
-    .eq('id', id)
-    .maybeSingle()
+  const recData = await fetchRec(id)
 
-  if (!recRow) {
+  if (!recData) {
     return (
       <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
         <div style={{ textAlign: 'center', maxWidth: '360px' }}>
@@ -132,13 +131,70 @@ export default async function RecPage(
     )
   }
 
+  const recRow = recData
+  const recProfile = Array.isArray(recData.profiles) ? recData.profiles[0] : recData.profiles
+
+  // Privacy gate: if the recommender's profile is private, only followers may view
+  if (recProfile?.profile_private) {
+    const serverClient = await createClient()
+    const { data: { user } } = await serverClient.auth.getUser()
+
+    if (!user) {
+      return (
+        <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
+          <div style={{ textAlign: 'center', maxWidth: '360px' }}>
+            <p className="font-display" style={{ fontSize: '22px', fontWeight: 600, color: theme.colors.textPrimary, marginBottom: '10px' }}>
+              Private profile
+            </p>
+            <p className="font-body" style={{ color: theme.colors.textMuted, fontSize: '15px', marginBottom: '28px', lineHeight: '1.55' }}>
+              This recommendation is from a private profile. Sign in and follow this person to view it.
+            </p>
+            <Link
+              href="/auth/login"
+              className="font-body"
+              style={{
+                display: 'inline-block', padding: '10px 24px',
+                background: theme.colors.textPrimary, color: '#f5f0e8',
+                borderRadius: theme.radii.pill, fontSize: '14px', fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              Sign in
+            </Link>
+          </div>
+        </div>
+      )
+    }
+
+    const { data: followRow } = await db
+      .from('follows')
+      .select('id')
+      .eq('follower_id', user.id)
+      .eq('following_id', recRow.user_id)
+      .eq('status', 'accepted')
+      .maybeSingle()
+
+    if (!followRow) {
+      return (
+        <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
+          <div style={{ textAlign: 'center', maxWidth: '360px' }}>
+            <p className="font-display" style={{ fontSize: '22px', fontWeight: 600, color: theme.colors.textPrimary, marginBottom: '10px' }}>
+              Private profile
+            </p>
+            <p className="font-body" style={{ color: theme.colors.textMuted, fontSize: '15px', lineHeight: '1.55' }}>
+              This recommendation is from a private profile. Follow this person to view their recommendations.
+            </p>
+          </div>
+        </div>
+      )
+    }
+  }
+
   const [
-    { data: recProfile },
     { count: likeCount },
     { count: bookmarkCount },
     { data: commentsRaw },
   ] = await Promise.all([
-    db.from('profiles').select('name, handle, avatar_url').eq('id', recRow.user_id).maybeSingle(),
     db.from('likes').select('*', { count: 'exact', head: true }).eq('recommendation_id', id),
     db.from('bookmarks').select('*', { count: 'exact', head: true }).eq('recommendation_id', id),
     db
@@ -148,7 +204,7 @@ export default async function RecPage(
       .order('created_at', { ascending: true }),
   ])
 
-  const rec     = { ...recRow, profiles: recProfile }
+  const rec     = recData
   const profile = recProfile
   const cat     = CAT[rec.category] ?? { label: rec.category, color: theme.colors.textMuted, href: '/lobby' }
 
@@ -200,26 +256,27 @@ export default async function RecPage(
 
           {/* Cover image or category-colored placeholder */}
           {rec.image_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={rec.image_url}
-              alt={rec.title}
-              style={{
-                width: '100%', height: '380px', objectFit: 'cover',
-                display: 'block', background: theme.colors.input,
-              }}
-            />
+            <div style={{ position: 'relative', width: '100%', height: '380px', background: theme.colors.input }}>
+              <Image
+                src={rec.image_url}
+                alt={rec.title}
+                fill
+                sizes="(max-width: 768px) 100vw, 680px"
+                style={{ objectFit: 'cover' }}
+              />
+            </div>
           ) : (
             <div style={{
               width: '100%', height: '200px',
               background: `linear-gradient(135deg, ${cat.color}40, ${cat.color}1a)`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 src={`/icons/${rec.category}-small.svg`}
                 alt=""
-                style={{ width: 48, height: 48, opacity: 0.3 }}
+                width={48}
+                height={48}
+                style={{ opacity: 0.3 }}
               />
             </div>
           )}
@@ -239,11 +296,12 @@ export default async function RecPage(
                   fontSize: '12px', fontWeight: 600, textDecoration: 'none',
                 }}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <Image
                   src={`/icons/${rec.category}-small.svg`}
                   alt=""
-                  style={{ width: 13, height: 13, filter: 'brightness(0) invert(1)', opacity: 0.9 }}
+                  width={13}
+                  height={13}
+                  style={{ filter: 'brightness(0) invert(1)', opacity: 0.9 }}
                 />
                 {cat.label}
               </Link>
@@ -264,11 +322,12 @@ export default async function RecPage(
             {/* ── Recommender row + share button ─────────────────────── */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
               {profile?.avatar_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <Image
                   src={profile.avatar_url}
                   alt={profile.name ?? ''}
-                  style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                  width={36}
+                  height={36}
+                  style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
                 />
               ) : (
                 <div style={{
@@ -418,11 +477,12 @@ export default async function RecPage(
 
                         {/* Avatar */}
                         {cp?.avatar_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
+                          <Image
                             src={cp.avatar_url}
                             alt={cp.name ?? ''}
-                            style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, marginTop: '1px' }}
+                            width={28}
+                            height={28}
+                            style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0, marginTop: '1px' }}
                           />
                         ) : (
                           <div style={{

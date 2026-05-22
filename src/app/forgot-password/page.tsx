@@ -99,7 +99,7 @@ export default function ForgotPasswordPage() {
                   style={{
                     background: 'rgba(212,99,107,0.12)',
                     border: '1px solid rgba(212,99,107,0.25)',
-                    color: '#d4636b',
+                    color: '#e05555',
                     fontSize: '0.875rem',
                   }}
                 >

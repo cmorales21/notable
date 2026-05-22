@@ -91,9 +91,7 @@ export default function SignupPage() {
       }
     }
 
-    // 4. With email confirmation disabled, the session is live — go straight
-    //    to onboarding. No "check your email" screen needed.
-    router.push('/onboarding')
+    router.push('/lobby')
   }
 
   async function handleGoogleSignup() {
@@ -103,7 +101,7 @@ export default function SignupPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
+        redirectTo: `${window.location.origin}/auth/callback?next=/lobby`,
       },
     })
 
@@ -180,7 +178,7 @@ export default function SignupPage() {
               style={{
                 background: 'rgba(212,99,107,0.12)',
                 border: '1px solid rgba(212,99,107,0.25)',
-                color: '#d4636b',
+                color: '#e05555',
                 fontSize: '0.875rem',
               }}
             >

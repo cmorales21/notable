@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const oembedUrl = `https://music.apple.com/oembed?url=${encodeURIComponent(url)}&format=json`
-    const res = await fetch(oembedUrl, { cache: 'no-store' })
+    const res = await fetch(oembedUrl)
 
     if (!res.ok) {
       if (process.env.NODE_ENV === 'development') {
@@ -27,7 +27,9 @@ export async function GET(req: NextRequest) {
 
     // Apple Music returns height as a top-level number in the oEmbed response
     const height = data.height ?? (url.includes('/album/') ? 450 : 175)
-    return NextResponse.json({ embedUrl: srcMatch[1], height })
+    return NextResponse.json({ embedUrl: srcMatch[1], height }, {
+      headers: { 'Cache-Control': 'public, max-age=86400, stale-while-revalidate=3600' },
+    })
   } catch (err) {
     if (process.env.NODE_ENV === 'development') {
       console.error('[Notable] apple-music oEmbed fetch threw', err)

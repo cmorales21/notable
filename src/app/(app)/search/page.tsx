@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { useSearch } from '@/app/hooks/useSearch'
 import { Avatar } from '@/app/components/CategoryFeed'
@@ -49,17 +50,18 @@ function RecImage({ imageUrl, category, size }: { imageUrl: string | null; categ
 
   return (
     <div style={{
-      width: size, height: size, borderRadius: 10, overflow: 'hidden',
+      position: 'relative', width: size, height: size, borderRadius: 10, overflow: 'hidden',
       flexShrink: 0, background: showImage ? '#faf8f4' : `${color}26`,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       {showImage ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <Image
           src={imageUrl!}
           alt=""
+          fill
+          sizes={`${size}px`}
           onError={() => setImgError(true)}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          style={{ objectFit: 'cover' }}
         />
       ) : (
         <div style={{ width: 8, height: 8, borderRadius: '50%', background: color }} />
@@ -101,7 +103,7 @@ function FollowButton({
         border: `1px solid ${isActive ? (hovered ? 'rgba(212,99,107,0.4)' : 'rgba(0,0,0,0.12)') : 'rgba(0,0,0,0.15)'}`,
         borderRadius: 20, padding: '5px 14px',
         fontSize: '12px', fontWeight: 500,
-        color: isActive ? (hovered ? '#d4636b' : '#33261a') : '#33261a',
+        color: isActive ? (hovered ? '#e05555' : '#33261a') : '#33261a',
         cursor: pending ? 'default' : 'pointer',
         transition: 'all 0.15s', flexShrink: 0, minWidth: 80, textAlign: 'center',
       }}

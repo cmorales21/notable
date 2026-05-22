@@ -1,12 +1,15 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
+import dynamic from 'next/dynamic'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import PostModal from './PostModal'
-import SearchDropdown from './SearchDropdown'
-import SettingsPanel from './SettingsPanel'
 import { createClient } from '@/lib/supabase/client'
+
+const PostModal = dynamic(() => import('./PostModal'), { ssr: false })
+const SearchDropdown = dynamic(() => import('./SearchDropdown'), { ssr: false })
+const SettingsPanel = dynamic(() => import('./SettingsPanel'), { ssr: false })
 
 interface Profile {
   name: string | null
@@ -152,7 +155,7 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
       .limit(1)
       .then(({ data, error }) => {
         if (error) {
-          console.error('[Notable] bell unread check failed:', error.message)
+          if (process.env.NODE_ENV !== 'production') console.error('[Notable] bell unread check failed:', error.message)
           return
         }
         if (data && data.length > 0) setHasUnread(true)
@@ -205,7 +208,7 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
         .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`),
     ])
     if (error) {
-      console.error('[Notable] dropdown fetch failed:', error.message)
+      if (process.env.NODE_ENV !== 'production') console.error('[Notable] dropdown fetch failed:', error.message)
     } else {
       const blockedIds = new Set<string>()
       for (const r of (blockData ?? []) as { blocker_id: string; blocked_id: string }[]) {
@@ -387,7 +390,7 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
                 <span style={{
                   position: 'absolute', top: '-4px', right: '-4px',
                   width: '12px', height: '12px', borderRadius: '50%',
-                  background: '#dc4f5c',
+                  background: '#e05555',
                 }} />
               )}
             </button>
@@ -433,9 +436,8 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
                 ) : (
                   previewNotifs.map(n => {
                     const avatar = n.actor?.avatar_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={n.actor.avatar_url} alt={n.actor.name ?? ''} width={28} height={28}
-                        style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, marginTop: '1px' }} />
+                      <Image src={n.actor.avatar_url} alt={n.actor.name ?? ''} width={28} height={28}
+                        style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0, marginTop: '1px' }} />
                     ) : (
                       <div style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, marginTop: '1px', background: 'rgba(0,0,0,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: '#6b5d4f' }}>
                         {n.actor?.name?.charAt(0).toUpperCase() ?? '?'}
@@ -458,7 +460,7 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
                             <button
                               onClick={() => acceptFollowRequest(n)}
                               className="font-body"
-                              style={{ flex: 1, background: '#3a2a1a', border: 'none', borderRadius: '6px', color: '#f5f0e8', fontSize: '12px', fontWeight: 600, padding: '6px 0', cursor: 'pointer' }}
+                              style={{ flex: 1, background: '#33261a', border: 'none', borderRadius: '6px', color: '#f5f0e8', fontSize: '12px', fontWeight: 600, padding: '6px 0', cursor: 'pointer' }}
                             >
                               Accept
                             </button>
@@ -499,7 +501,7 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
                           <span className="font-body" style={{ fontSize: '11px', color: '#6b5d4f' }}>{relTime(n.updated_at)}</span>
                         </div>
                         {!n.read && (
-                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e85d5d', flexShrink: 0, marginTop: '7px' }} />
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e05555', flexShrink: 0, marginTop: '7px' }} />
                         )}
                       </button>
                     )
@@ -548,15 +550,12 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
 
           <Link href={profile?.handle ? `/profile/${profile.handle}` : '/profile'} style={{ display: 'block', lineHeight: 0 }}>
             {profile?.avatar_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <Image
                 src={profile.avatar_url}
                 alt={profile.name ?? 'Profile'}
                 width={36}
                 height={36}
                 style={{
-                  width: '36px',
-                  height: '36px',
                   borderRadius: '50%',
                   objectFit: 'cover',
                   border: isLobby ? '1px solid rgba(26,24,20,0.18)' : '1px solid rgba(0,0,0,0.12)',
@@ -594,18 +593,20 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
             background: '#f5f0e8',
           }}
         >
-          {CATEGORIES.map(({ name, href, color, iconSrc, sidebarPadding }) => (
-            <Link
-              key={href}
-              href={href}
-              title={name}
-              className="app-cat-btn rounded-xl"
-              style={{ width: '48px', height: '48px', background: color, padding: sidebarPadding, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={iconSrc} alt={name} style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'brightness(0) invert(1)', opacity: 0.92, display: 'block' }} />
-            </Link>
-          ))}
+          {CATEGORIES.map(({ name, href, color, iconSrc, sidebarPadding }) => {
+            const iconPx = 48 - 2 * parseInt(sidebarPadding)
+            return (
+              <Link
+                key={href}
+                href={href}
+                title={name}
+                className="app-cat-btn rounded-xl"
+                style={{ width: '48px', height: '48px', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
+              >
+                <Image src={iconSrc} alt={name} width={iconPx} height={iconPx} style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)', opacity: 0.92 }} />
+              </Link>
+            )
+          })}
         </aside>
       )}
 
@@ -624,8 +625,8 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
         style={{
           width: '56px',
           height: '56px',
-          background: isLobby ? '#3a2a1a' : '#3a2a1a',
-          color: isLobby ? '#f0ead8' : '#f5f0e8',
+          background: '#33261a',
+          color: '#f5f0e8',
           boxShadow: isLobby ? '0 8px 28px rgba(58,42,26,0.25)' : '0 8px 28px rgba(58,42,26,0.2)',
           border: 'none',
           cursor: 'pointer',
@@ -664,18 +665,20 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
             background: '#f5f0e8',
           }}
         >
-          {CATEGORIES.map(({ name, href, color, iconSrc, sidebarPadding }) => (
-            <Link
-              key={href}
-              href={href}
-              title={name}
-              className="app-cat-btn rounded-xl"
-              style={{ width: '44px', height: '44px', background: color, padding: sidebarPadding, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={iconSrc} alt={name} style={{ width: '100%', height: '100%', objectFit: 'contain', filter: 'brightness(0) invert(1)', opacity: 0.92, display: 'block' }} />
-            </Link>
-          ))}
+          {CATEGORIES.map(({ name, href, color, iconSrc, sidebarPadding }) => {
+            const iconPx = 44 - 2 * parseInt(sidebarPadding)
+            return (
+              <Link
+                key={href}
+                href={href}
+                title={name}
+                className="app-cat-btn rounded-xl"
+                style={{ width: '44px', height: '44px', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
+              >
+                <Image src={iconSrc} alt={name} width={iconPx} height={iconPx} style={{ objectFit: 'contain', filter: 'brightness(0) invert(1)', opacity: 0.92 }} />
+              </Link>
+            )
+          })}
         </nav>
       )}
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'next/navigation'
+import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar, RecModal, Recommendation, RecComment, RecProfile, sortComments } from '@/app/components/CategoryFeed'
@@ -26,6 +27,7 @@ interface FollowUser {
   name: string | null
   handle: string | null
   avatar_url: string | null
+  profile_private?: boolean | null
 }
 
 type TabId = 'posted' | 'liked' | 'bookmarked'
@@ -101,12 +103,13 @@ function GridTile({ rec, onClick }: { rec: Recommendation; onClick: () => void }
       }}
     >
       {showImage ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <Image
           src={rec.image_url!}
           alt={rec.title}
+          fill
+          sizes="(max-width: 768px) 33vw, 25vw"
           onError={() => setImgError(true)}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          style={{ objectFit: 'cover' }}
         />
       ) : (
         <div style={{
@@ -182,11 +185,11 @@ function FollowRowButton({
       onMouseLeave={() => setHovered(false)}
       className="font-body"
       style={{
-        background: following ? (hovered ? 'rgba(212,99,107,0.12)' : 'rgba(0,0,0,0.08)') : 'transparent',
-        border: `1px solid ${following ? (hovered ? 'rgba(212,99,107,0.4)' : 'rgba(0,0,0,0.12)') : 'rgba(0,0,0,0.15)'}`,
+        background: following ? (hovered ? 'rgba(224,85,85,0.12)' : 'rgba(0,0,0,0.08)') : 'transparent',
+        border: `1px solid ${following ? (hovered ? 'rgba(224,85,85,0.4)' : 'rgba(0,0,0,0.12)') : 'rgba(0,0,0,0.15)'}`,
         borderRadius: '20px', padding: '4px 12px',
         fontSize: '12px', fontWeight: 500,
-        color: following ? (hovered ? '#d4636b' : '#33261a') : '#33261a',
+        color: following ? (hovered ? '#e05555' : '#33261a') : '#33261a',
         cursor: pending ? 'default' : 'pointer',
         transition: 'all 0.15s',
         flexShrink: 0, minWidth: '72px', textAlign: 'center',
@@ -229,7 +232,7 @@ function FollowListModal({
 
       if (userIds.length > 0) {
         const { data: profilesData } = await supabase.current
-          .from('profiles').select('id, name, handle, avatar_url').in('id', userIds)
+          .from('profiles').select('id, name, handle, avatar_url, profile_private').in('id', userIds)
         setUsers(profilesData ?? [])
 
         if (currentUserId) {
@@ -253,8 +256,16 @@ function FollowListModal({
         .eq('follower_id', currentUserId).eq('following_id', targetId)
       setFollowedIds(prev => { const n = new Set(prev); n.delete(targetId); return n })
     } else {
-      await supabase.current.from('follows').insert({ follower_id: currentUserId, following_id: targetId })
-      setFollowedIds(prev => new Set([...prev, targetId]))
+      const targetUser = users.find(u => u.id === targetId)
+      const isPrivate = targetUser?.profile_private === true
+      await supabase.current.from('follows').insert({
+        follower_id: currentUserId,
+        following_id: targetId,
+        ...(isPrivate ? { status: 'pending' } : {}),
+      })
+      if (!isPrivate) {
+        setFollowedIds(prev => new Set([...prev, targetId]))
+      }
     }
     setPending(prev => { const n = new Set(prev); n.delete(targetId); return n })
   }
@@ -279,7 +290,7 @@ function FollowListModal({
           background: '#faf8f4',
           borderRadius: '16px',
           border: '1px solid rgba(0,0,0,0.08)',
-          boxShadow: '0 32px 80px rgba(0,0,0,0.7)',
+          boxShadow: '0 32px 80px rgba(58,42,26,0.5)',
           display: 'flex', flexDirection: 'column',
           maxHeight: '80vh', overflow: 'hidden',
         }}
@@ -393,9 +404,10 @@ function FollowListModal({
 // ─── Edit Profile Modal ───────────────────────────────────────────────────────
 
 function EditProfileModal({
-  profile, onClose, onSave,
+  profile, currentUserId, onClose, onSave,
 }: {
   profile: FullProfile
+  currentUserId: string | null
   onClose: () => void
   onSave: (updates: { name: string; bio: string; avatar_url: string | null }) => void
 }) {
@@ -411,6 +423,15 @@ function EditProfileModal({
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+    if (!allowedTypes.includes(file.type)) {
+      setError('Only JPEG, PNG, WebP, or GIF images are allowed')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be smaller than 5 MB')
+      return
+    }
     setUploading(true)
     try {
       const ext = file.name.split('.').pop() ?? 'jpg'
@@ -434,7 +455,7 @@ function EditProfileModal({
       const { error: updateErr } = await supabase.current
         .from('profiles')
         .update({ name: name.trim(), bio: bio.trim(), avatar_url: avatarUrl })
-        .eq('id', profile.id)
+        .eq('id', currentUserId)
       if (updateErr) throw updateErr
       onSave({ name: name.trim(), bio: bio.trim(), avatar_url: avatarUrl })
     } catch (err) {
@@ -456,7 +477,7 @@ function EditProfileModal({
         borderRadius: '16px',
         border: '1px solid rgba(0,0,0,0.08)',
         padding: '24px 24px 22px',
-        boxShadow: '0 32px 80px rgba(0,0,0,0.7)',
+        boxShadow: '0 32px 80px rgba(58,42,26,0.5)',
       }}>
         <h2 className="font-display" style={{ fontSize: '1.15rem', fontWeight: 600, color: '#33261a', marginBottom: '20px' }}>
           Edit Profile
@@ -470,8 +491,7 @@ function EditProfileModal({
             title="Change photo"
           >
             {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarUrl} alt="" style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(0,0,0,0.1)', display: 'block' }} />
+              <Image src={avatarUrl} alt="Profile photo" width={56} height={56} style={{ borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(0,0,0,0.1)', display: 'block' }} />
             ) : (
               <InitialsAvatar name={name} size={56} />
             )}
@@ -517,7 +537,7 @@ function EditProfileModal({
         {/* Bio */}
         <div style={{ marginBottom: '14px' }}>
           <label className="font-body" style={{ display: 'block', color: '#6b5d4f', fontSize: '11px', marginBottom: '5px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-            Bio <span style={{ color: '#3a3428' }}>({160 - bio.length} left)</span>
+            Bio <span style={{ color: '#6b5d4f' }}>({160 - bio.length} left)</span>
           </label>
           <textarea
             value={bio}
@@ -543,7 +563,7 @@ function EditProfileModal({
         </div>
 
         {error && (
-          <p className="font-body" style={{ color: '#d4636b', fontSize: '13px', marginBottom: '12px' }}>{error}</p>
+          <p className="font-body" style={{ color: '#e05555', fontSize: '13px', marginBottom: '12px' }}>{error}</p>
         )}
 
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
@@ -563,7 +583,7 @@ function EditProfileModal({
             disabled={saving || !name.trim()}
             className="font-body"
             style={{
-              background: saving ? '#e8e0d4' : '#3a2a1a',
+              background: saving ? '#e8e0d4' : '#33261a',
               border: 'none', borderRadius: '20px', padding: '7px 18px',
               color: '#f5f0e8', fontSize: '13px', fontWeight: 600,
               cursor: saving ? 'default' : 'pointer',
@@ -813,6 +833,9 @@ export default function ProfilePage() {
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file || !currentUserId) return
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+    if (!allowedTypes.includes(file.type)) return
+    if (file.size > 5 * 1024 * 1024) return
     setAvatarUploading(true)
     try {
       const ext = file.name.split('.').pop() ?? 'jpg'
@@ -823,7 +846,7 @@ export default function ProfilePage() {
       await supabase.current.from('profiles').update({ avatar_url: publicUrl }).eq('id', currentUserId)
       setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : prev)
     } catch (err) {
-      console.error('Avatar upload failed:', err)
+      if (process.env.NODE_ENV !== 'production') console.error('Avatar upload failed:', err)
     } finally {
       setAvatarUploading(false)
     }
@@ -877,7 +900,11 @@ export default function ProfilePage() {
       setModalLiked(true)
       setModalLikeCount(c => c + 1)
       if (selectedRec.user_id !== currentUserId) {
-        supabase.current.from('notifications').insert({ user_id: selectedRec.user_id, actor_id: currentUserId, type: 'like', rec_id: selectedRec.id, read: false })
+        const { data: recipientProfile } = await supabase.current
+          .from('profiles').select('notify_likes').eq('id', selectedRec.user_id).single()
+        if (recipientProfile?.notify_likes !== false) {
+          supabase.current.from('notifications').insert({ user_id: selectedRec.user_id, actor_id: currentUserId, type: 'like', rec_id: selectedRec.id, read: false })
+        }
       }
     }
   }
@@ -892,7 +919,11 @@ export default function ProfilePage() {
       await supabase.current.from('bookmarks').insert({ user_id: currentUserId, recommendation_id: selectedRec.id })
       setModalBookmarked(true)
       if (selectedRec.user_id !== currentUserId) {
-        supabase.current.from('notifications').insert({ user_id: selectedRec.user_id, actor_id: currentUserId, type: 'bookmark', rec_id: selectedRec.id, read: false })
+        const { data: recipientProfile } = await supabase.current
+          .from('profiles').select('notify_bookmarks').eq('id', selectedRec.user_id).single()
+        if (recipientProfile?.notify_bookmarks !== false) {
+          supabase.current.from('notifications').insert({ user_id: selectedRec.user_id, actor_id: currentUserId, type: 'bookmark', rec_id: selectedRec.id, read: false })
+        }
       }
     }
   }
@@ -908,13 +939,33 @@ export default function ProfilePage() {
       .insert({ user_id: currentUserId, recommendation_id: selectedRec.id, text })
       .select('*')
       .single()
-    if (error) console.error('[Notable] comment insert error:', error.message)
+    if (error && process.env.NODE_ENV !== 'production') console.error('[Notable] comment insert error:', error.message)
     if (!error && inserted) {
       const newComment: RecComment = { ...inserted, profiles: currentUserProfile, comment_likes: [] }
       setModalComments(prev => sortComments([...prev, newComment]))
       setModalCommentCount(c => c + 1)
       if (selectedRec.user_id !== currentUserId) {
-        supabase.current.from('notifications').insert({ user_id: selectedRec.user_id, actor_id: currentUserId, type: 'comment', rec_id: selectedRec.id, read: false })
+        const { data: recipientProfile } = await supabase.current
+          .from('profiles').select('notify_comments').eq('id', selectedRec.user_id).single()
+        if (recipientProfile?.notify_comments !== false) {
+          supabase.current.from('notifications').insert({ user_id: selectedRec.user_id, actor_id: currentUserId, type: 'comment', rec_id: selectedRec.id, read: false })
+        }
+      }
+      // Parse @mentions and notify mentioned users
+      const handles = [...new Set([...text.matchAll(/@([a-zA-Z0-9_]+)/g)].map(m => m[1]))]
+      if (handles.length > 0) {
+        supabase.current.from('profiles').select('id, handle').in('handle', handles)
+          .then(({ data: mentioned }) => {
+            const rows = (mentioned ?? [])
+              .filter((p: { id: string }) => p.id !== currentUserId)
+              .map((p: { id: string }) => ({
+                user_id: p.id, actor_id: currentUserId, type: 'mention',
+                rec_id: selectedRec.id, read: false,
+              }))
+            if (rows.length > 0) {
+              supabase.current.from('notifications').insert(rows)
+            }
+          })
       }
     }
     setModalSubmittingComment(false)
@@ -982,14 +1033,14 @@ export default function ProfilePage() {
                 title="Change profile photo"
               >
                 {profile.avatar_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <Image
                     src={profile.avatar_url}
                     alt={profile.name ?? ''}
+                    width={72}
+                    height={72}
                     style={{
-                      width: 72, height: 72, borderRadius: '50%',
-                      objectFit: 'cover', border: '2px solid rgba(0,0,0,0.1)',
-                      display: 'block',
+                      borderRadius: '50%', objectFit: 'cover',
+                      border: '2px solid rgba(0,0,0,0.1)', display: 'block',
                       filter: avatarHovered ? 'brightness(0.78)' : 'none',
                       transition: 'filter 0.15s',
                     }}
@@ -1032,8 +1083,7 @@ export default function ProfilePage() {
               </button>
             ) : (
               profile.avatar_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={profile.avatar_url} alt={profile.name ?? ''} style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(0,0,0,0.1)', display: 'block' }} />
+                <Image src={profile.avatar_url} alt={profile.name ?? ''} width={72} height={72} style={{ borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(0,0,0,0.1)', display: 'block' }} />
               ) : (
                 <InitialsAvatar name={profile.name} size={72} />
               )
@@ -1079,18 +1129,18 @@ export default function ProfilePage() {
                       className="font-body"
                       style={{
                         background: isFollowing
-                          ? (followHovered ? 'rgba(212,99,107,0.12)' : 'rgba(0,0,0,0.08)')
+                          ? (followHovered ? 'rgba(224,85,85,0.12)' : 'rgba(0,0,0,0.08)')
                           : isPendingFollow
                             ? 'rgba(0,0,0,0.05)'
                             : 'transparent',
                         border: isFollowing
-                          ? `1px solid ${followHovered ? 'rgba(212,99,107,0.5)' : 'rgba(0,0,0,0.15)'}`
+                          ? `1px solid ${followHovered ? 'rgba(224,85,85,0.5)' : 'rgba(0,0,0,0.15)'}`
                           : '1px solid rgba(0,0,0,0.15)',
                         borderRadius: '20px', padding: '3px 14px',
                         color: isFollowing
-                          ? (followHovered ? '#d4636b' : '#33261a')
+                          ? (followHovered ? '#e05555' : '#33261a')
                           : isPendingFollow
-                            ? (followHovered ? '#d4636b' : '#6b5d4f')
+                            ? (followHovered ? '#e05555' : '#6b5d4f')
                             : '#33261a',
                         fontSize: '12px', fontWeight: 500,
                         cursor: followLoading ? 'default' : 'pointer',
@@ -1125,7 +1175,7 @@ export default function ProfilePage() {
                         <div style={{
                           position: 'absolute', left: 0, top: 'calc(100% + 4px)', zIndex: 100,
                           background: '#faf8f4', border: '1px solid rgba(0,0,0,0.08)',
-                          borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+                          borderRadius: '10px', boxShadow: '0 8px 24px rgba(58,42,26,0.12)',
                           minWidth: '180px', overflow: 'hidden',
                         }}>
                           {iBlockedThem ? (
@@ -1149,7 +1199,7 @@ export default function ProfilePage() {
                               style={{
                                 display: 'block', width: '100%', textAlign: 'left',
                                 padding: '11px 16px', background: 'none', border: 'none',
-                                fontSize: '14px', color: '#e85d5d', cursor: 'pointer',
+                                fontSize: '14px', color: '#e05555', cursor: 'pointer',
                               }}
                               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(232,93,93,0.06)' }}
                               onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
@@ -1274,7 +1324,7 @@ export default function ProfilePage() {
                       padding: '9px 16px',
                       fontSize: '13px', fontWeight: active ? 600 : 400,
                       color: active ? '#33261a' : '#6b5d4f',
-                      borderBottom: active ? '2px solid #3a2a1a' : '2px solid transparent',
+                      borderBottom: active ? '2px solid #33261a' : '2px solid transparent',
                       marginBottom: '-1px',
                       transition: 'color 0.15s',
                     }}
@@ -1379,6 +1429,7 @@ export default function ProfilePage() {
       {editOpen && profile && (
         <EditProfileModal
           profile={profile}
+          currentUserId={currentUserId}
           onClose={() => setEditOpen(false)}
           onSave={({ name, bio, avatar_url }) => {
             setProfile(prev => prev ? { ...prev, name, bio, avatar_url } : prev)
@@ -1435,7 +1486,7 @@ export default function ProfilePage() {
               background: '#faf8f4', borderRadius: '16px',
               border: '1px solid rgba(0,0,0,0.08)',
               padding: '28px 24px',
-              boxShadow: '0 32px 80px rgba(0,0,0,0.7)',
+              boxShadow: '0 32px 80px rgba(58,42,26,0.5)',
             }}
           >
             <h3 className="font-display" style={{ fontSize: '1.05rem', fontWeight: 600, color: '#33261a', marginBottom: '12px' }}>
@@ -1460,7 +1511,7 @@ export default function ProfilePage() {
                 disabled={blockLoading}
                 className="font-body"
                 style={{
-                  background: '#e85d5d', border: 'none', borderRadius: '8px',
+                  background: '#e05555', border: 'none', borderRadius: '8px',
                   color: '#fff', fontSize: '14px', fontWeight: 600,
                   padding: '9px 18px', cursor: blockLoading ? 'default' : 'pointer',
                   opacity: blockLoading ? 0.7 : 1, transition: 'opacity 0.15s',

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
@@ -118,13 +119,12 @@ function Avatar({ src, name }: { src: string | null | undefined; name: string | 
   const initial = name?.charAt(0).toUpperCase() ?? '?'
   if (src) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <Image
         src={src}
         alt={name ?? ''}
         width={36}
         height={36}
-        style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+        style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
       />
     )
   }
@@ -155,11 +155,9 @@ export default function NotificationsPage() {
     const supabase = createClient()
 
     ;(async () => {
-      // getSession() reads the cookie without an API round-trip — more reliable
-      // in the browser than getUser() which validates against the auth server.
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.user) { setLoading(false); return }
-      const uid = session.user.id
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setLoading(false); return }
+      const uid = user.id
       userIdRef.current = uid
       setUserId(uid)
 
@@ -181,7 +179,7 @@ export default function NotificationsPage() {
       ])
 
       if (notifError) {
-        console.error('[Notable] notifications fetch failed:', notifError.message)
+        if (process.env.NODE_ENV !== 'production') console.error('[Notable] notifications fetch failed:', notifError.message)
         setLoading(false)
         return
       }
@@ -212,16 +210,17 @@ export default function NotificationsPage() {
       setNotifications(prev => prev.map(n => ({ ...n, read: true })))
     })()
 
-    // Re-fetch when a new notification arrives while the page is open
+    // When a new notification arrives, fetch just that one row (with joins) and prepend it
     const channel = supabase
       .channel('notif-page')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'notifications' },
-        async () => {
-          const { data: { session } } = await supabase.auth.getSession()
-          if (!session?.user) return
-          const uid = session.user.id
+        async (payload) => {
+          const newRow = payload.new as { id: string; user_id: string; type: NotifType; actor_id: string | null }
+          if (newRow.user_id !== userIdRef.current) return
+          if (newRow.actor_id && blockedIdsRef.current.has(newRow.actor_id)) return
+
           const { data } = await supabase
             .from('notifications')
             .select(`
@@ -229,19 +228,39 @@ export default function NotificationsPage() {
               actor:profiles!actor_id(name, handle, avatar_url),
               rec:recommendations!rec_id(title, category)
             `)
-            .eq('user_id', uid)
-            .order('updated_at', { ascending: false })
-            .limit(60)
-          const allRows = ((data ?? []) as unknown as RawNotif[]).filter(n => !n.actor_id || !blockedIdsRef.current.has(n.actor_id))
-          const requests: FollowRequest[] = allRows
-            .filter(n => n.type === 'follow_request' && n.actor_id)
-            .map(n => {
-              const actor = resolveActor(n.actor)
-              return { actor_id: n.actor_id!, name: actor?.name ?? null, handle: actor?.handle ?? null, avatar_url: actor?.avatar_url ?? null }
+            .eq('id', newRow.id)
+            .single()
+
+          if (!data) return
+          const row = data as unknown as RawNotif
+          const actor = resolveActor(row.actor)
+
+          if (row.type === 'follow_request' && row.actor_id) {
+            setFollowRequests(prev => {
+              if (prev.some(r => r.actor_id === row.actor_id)) return prev
+              return [...prev, { actor_id: row.actor_id!, name: actor?.name ?? null, handle: actor?.handle ?? null, avatar_url: actor?.avatar_url ?? null }]
             })
-          setFollowRequests(requests)
-          setNotifications(groupNotifications(allRows.filter(n => n.type !== 'follow_request')).map(n => ({ ...n, read: true })))
-          await supabase.from('notifications').update({ read: true }).eq('user_id', uid).eq('read', false)
+            return
+          }
+
+          await supabase.from('notifications').update({ read: true }).eq('id', newRow.id)
+
+          setNotifications(prev => {
+            // For likes/bookmarks on the same rec, merge into the existing group
+            if ((row.type === 'like' || row.type === 'bookmark') && row.rec_id) {
+              const existingIdx = prev.findIndex(n => n.type === row.type && n.rec_id === row.rec_id)
+              if (existingIdx >= 0) {
+                const updated = [...prev]
+                updated[existingIdx] = { ...updated[existingIdx], count: updated[existingIdx].count + 1, ids: [...updated[existingIdx].ids, row.id], read: true }
+                return updated
+              }
+            }
+            const groupKey = (row.type === 'like' || row.type === 'bookmark') && row.rec_id
+              ? `${row.type}:${row.rec_id}`
+              : row.id
+            const newNotif: GroupedNotif = { key: groupKey, type: row.type, count: 1, ids: [row.id], rec_id: row.rec_id, read: true, updated_at: row.updated_at, actor_id: row.actor_id, actor, rec: row.rec }
+            return [newNotif, ...prev]
+          })
         },
       )
       .subscribe()

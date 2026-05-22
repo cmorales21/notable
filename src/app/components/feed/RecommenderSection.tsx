@@ -150,7 +150,7 @@ export function RecommenderSection({
       .insert({ user_id: currentUserId, recommendation_id: recId, text })
       .select('*')
       .single()
-    if (error) console.error('[Notable] comment insert error:', error.message)
+    if (error && process.env.NODE_ENV !== 'production') console.error('[Notable] comment insert error:', error.message)
     if (!error && inserted) {
       const newComment: Comment = { ...inserted, profiles: currentUserProfile, comment_likes: [] }
       setComments(prev => sortComments([...prev, newComment]))

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSearch } from '@/app/hooks/useSearch'
@@ -33,17 +34,18 @@ function RecThumbnail({ imageUrl, category }: { imageUrl: string | null; categor
 
   return (
     <div style={{
-      width: 48, height: 48, borderRadius: 8, overflow: 'hidden',
+      position: 'relative', width: 48, height: 48, borderRadius: 8, overflow: 'hidden',
       flexShrink: 0, background: showImage ? '#faf8f4' : `${color}26`,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       {showImage ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <Image
           src={imageUrl!}
           alt=""
+          fill
+          sizes="48px"
           onError={() => setImgError(true)}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          style={{ objectFit: 'cover' }}
         />
       ) : (
         <div style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
@@ -141,7 +143,7 @@ export default function SearchDropdown({ onClose, panelRef }: { onClose: () => v
           background: '#faf8f4',
           border: '1px solid rgba(0,0,0,0.1)',
           borderRadius: '12px',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.7), 0 4px 16px rgba(0,0,0,0.4)',
+          boxShadow: '0 20px 60px rgba(58,42,26,0.25), 0 4px 16px rgba(58,42,26,0.12)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',

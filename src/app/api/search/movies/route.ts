@@ -11,8 +11,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const [movieRes, tvRes] = await Promise.all([
-      fetch(`https://api.themoviedb.org/3/search/movie?query=${encodeURIComponent(q)}&page=1`, { headers, cache: 'no-store' }),
-      fetch(`https://api.themoviedb.org/3/search/tv?query=${encodeURIComponent(q)}&page=1`, { headers, cache: 'no-store' }),
+      fetch(`https://api.themoviedb.org/3/search/movie?query=${encodeURIComponent(q)}&page=1`, { headers }),
+      fetch(`https://api.themoviedb.org/3/search/tv?query=${encodeURIComponent(q)}&page=1`, { headers }),
     ])
 
     const [movieData, tvData] = await Promise.all([
@@ -48,7 +48,9 @@ export async function GET(req: NextRequest) {
       if (i < shows.length  && interleaved.length < 8) interleaved.push(shows[i])
     }
 
-    return NextResponse.json({ items: interleaved })
+    return NextResponse.json({ items: interleaved }, {
+      headers: { 'Cache-Control': 'public, max-age=300, stale-while-revalidate=600' },
+    })
   } catch {
     return NextResponse.json({ items: [] }, { status: 502 })
   }

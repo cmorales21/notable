@@ -100,6 +100,10 @@ export function useSearch({
         .map(r => ({ ...r, profiles: profileMap[r.user_id] ?? null }))
     }
 
+    // Note: Private profiles intentionally appear in search results so users
+    // can find them and send follow requests. The profile page handles the
+    // privacy gate — non-followers see only name, avatar, bio, and a Follow
+    // button. Content is hidden until the follow request is accepted.
     async function fetchPeople(): Promise<SearchPerson[]> {
       const { data } = await supabase
         .from('profiles')

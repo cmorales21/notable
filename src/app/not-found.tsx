@@ -18,6 +18,7 @@ export default function NotFound() {
       <div style={{ maxWidth: '400px' }}>
         <div style={{ fontSize: '2rem', marginBottom: '1rem', opacity: 0.4 }}>✦</div>
         <h1
+          className="font-display"
           style={{
             fontSize: '1.4rem',
             fontWeight: 600,

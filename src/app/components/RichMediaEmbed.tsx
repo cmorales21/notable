@@ -83,7 +83,8 @@ function AsyncEmbed({ url, platform, onFail }: { url: string; platform: AsyncPla
   onFailRef.current = onFail
 
   useEffect(() => {
-    fetch(`/api/embed/${platform}?url=${encodeURIComponent(url)}`)
+    const controller = new AbortController()
+    fetch(`/api/embed/${platform}?url=${encodeURIComponent(url)}`, { signal: controller.signal })
       .then(r => r.json())
       .then((data: { embedUrl?: string; height?: number }) => {
         if (data.embedUrl) {
@@ -93,7 +94,10 @@ function AsyncEmbed({ url, platform, onFail }: { url: string; platform: AsyncPla
           onFailRef.current?.()
         }
       })
-      .catch(() => { onFailRef.current?.() })
+      .catch((err: Error) => {
+        if (err.name !== 'AbortError') onFailRef.current?.()
+      })
+    return () => controller.abort()
   }, [url, platform])
 
   if (!embedUrl) return null
@@ -104,6 +108,7 @@ function AsyncEmbed({ url, platform, onFail }: { url: string; platform: AsyncPla
         src={embedUrl}
         style={{ ...BASE, height, overflow: 'hidden', background: 'transparent' }}
         allow="autoplay *; encrypted-media *; fullscreen *"
+        sandbox="allow-scripts allow-same-origin allow-popups"
         loading="lazy"
       />
     )
@@ -114,6 +119,7 @@ function AsyncEmbed({ url, platform, onFail }: { url: string; platform: AsyncPla
         src={embedUrl}
         style={{ ...BASE, height }}
         allow="autoplay"
+        sandbox="allow-scripts allow-same-origin allow-popups"
         loading="lazy"
       />
     )
@@ -123,6 +129,7 @@ function AsyncEmbed({ url, platform, onFail }: { url: string; platform: AsyncPla
     <iframe
       src={embedUrl}
       style={{ ...BASE, height }}
+      sandbox="allow-scripts allow-same-origin allow-popups"
       loading="lazy"
     />
   )
@@ -157,6 +164,7 @@ export function RichMediaEmbed({
         src={embedUrl}
         style={{ ...BASE, height }}
         allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+        sandbox="allow-scripts allow-same-origin allow-popups"
         loading="lazy"
       />
     )
@@ -170,6 +178,7 @@ export function RichMediaEmbed({
         src={embedUrl}
         style={{ ...BASE, height: 280 }}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        sandbox="allow-scripts allow-same-origin allow-popups"
         allowFullScreen
         loading="lazy"
       />
@@ -184,6 +193,7 @@ export function RichMediaEmbed({
         src={embedUrl}
         style={{ ...BASE, height: 280 }}
         allow="autoplay; fullscreen; picture-in-picture"
+        sandbox="allow-scripts allow-same-origin allow-popups"
         allowFullScreen
         loading="lazy"
       />
@@ -199,6 +209,7 @@ export function RichMediaEmbed({
       <iframe
         src={`https://www.google.com/maps/embed/v1/place?key=${mapsKey}&q=${query}`}
         style={{ ...BASE, height: 300, border: '0' }}
+        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         allowFullScreen
         loading="lazy"
         referrerPolicy="no-referrer-when-downgrade"
@@ -214,6 +225,7 @@ export function RichMediaEmbed({
         src={external_url}
         style={{ ...BASE, height: scHeight }}
         allow="autoplay"
+        sandbox="allow-scripts allow-same-origin allow-popups"
         loading="lazy"
       />
     )

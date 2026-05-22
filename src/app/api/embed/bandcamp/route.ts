@@ -7,7 +7,6 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(
       `https://bandcamp.com/oembed?url=${encodeURIComponent(url)}&format=json`,
-      { cache: 'no-store' },
     )
     if (!res.ok) return NextResponse.json({ error: 'oembed failed' }, { status: 502 })
 
@@ -18,7 +17,9 @@ export async function GET(req: NextRequest) {
     // Extract height from iframe html if present; fall back by content type
     const heightMatch = data.html?.match(/height[=:]["'\s]*(\d+)/)
     const height = heightMatch ? parseInt(heightMatch[1], 10) : (data.type === 'rich' ? 350 : 120)
-    return NextResponse.json({ embedUrl: srcMatch[1], height })
+    return NextResponse.json({ embedUrl: srcMatch[1], height }, {
+      headers: { 'Cache-Control': 'public, max-age=86400, stale-while-revalidate=3600' },
+    })
   } catch {
     return NextResponse.json({ error: 'fetch failed' }, { status: 502 })
   }

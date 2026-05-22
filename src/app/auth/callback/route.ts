@@ -15,7 +15,8 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   // `next` is the fallback destination for already-onboarded users
-  const next = searchParams.get('next') ?? '/lobby'
+  const rawNext = searchParams.get('next') ?? '/lobby'
+  const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/lobby'
 
   if (code) {
     const supabase = await createClient()
@@ -41,9 +42,8 @@ export async function GET(request: Request) {
           .eq('id', user.id)
           .maybeSingle()
 
-        // No profile yet (Google user) or not onboarded → show onboarding
         if (!profile?.is_onboarded) {
-          return NextResponse.redirect(`${origin}/onboarding`)
+          return NextResponse.redirect(`${origin}/lobby`)
         }
       }
 

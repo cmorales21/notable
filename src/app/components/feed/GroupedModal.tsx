@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { RichMediaEmbed, willEmbed } from '@/app/components/RichMediaEmbed'
 import type { Recommendation, RecComment, RecProfile } from '@/app/lib/types'
@@ -66,7 +67,11 @@ function SingleRecDetailModal({
       setLiked(true); setLikeCount(c => c + 1)
       await supabaseRef.current.from('likes').insert({ user_id: currentUserId, recommendation_id: recommender.recommendation_id })
       if (recommender.user_id !== currentUserId) {
-        void supabaseRef.current.from('notifications').insert({ user_id: recommender.user_id, actor_id: currentUserId, type: 'like', rec_id: recommender.recommendation_id, read: false })
+        const { data: recipientProfile } = await supabaseRef.current
+          .from('profiles').select('notify_likes').eq('id', recommender.user_id).single()
+        if (recipientProfile?.notify_likes !== false) {
+          void supabaseRef.current.from('notifications').insert({ user_id: recommender.user_id, actor_id: currentUserId, type: 'like', rec_id: recommender.recommendation_id, read: false })
+        }
       }
     }
   }
@@ -83,7 +88,11 @@ function SingleRecDetailModal({
       setBookmarked(true)
       await supabaseRef.current.from('bookmarks').insert({ user_id: currentUserId, recommendation_id: recommender.recommendation_id })
       if (recommender.user_id !== currentUserId) {
-        void supabaseRef.current.from('notifications').insert({ user_id: recommender.user_id, actor_id: currentUserId, type: 'bookmark', rec_id: recommender.recommendation_id, read: false })
+        const { data: recipientProfile } = await supabaseRef.current
+          .from('profiles').select('notify_bookmarks').eq('id', recommender.user_id).single()
+        if (recipientProfile?.notify_bookmarks !== false) {
+          void supabaseRef.current.from('notifications').insert({ user_id: recommender.user_id, actor_id: currentUserId, type: 'bookmark', rec_id: recommender.recommendation_id, read: false })
+        }
       }
     }
   }
@@ -98,13 +107,33 @@ function SingleRecDetailModal({
       .insert({ user_id: currentUserId, recommendation_id: recommender.recommendation_id, text })
       .select('*')
       .single()
-    if (error) console.error('[Notable] comment insert error:', error.message)
+    if (error && process.env.NODE_ENV !== 'production') console.error('[Notable] comment insert error:', error.message)
     if (!error && inserted) {
       const newComment: Comment = { ...inserted, profiles: currentUserProfile, comment_likes: [] }
       setComments(prev => sortComments([...prev, newComment]))
       setCommentCount(c => c + 1)
       if (recommender.user_id !== currentUserId) {
-        void supabaseRef.current.from('notifications').insert({ user_id: recommender.user_id, actor_id: currentUserId, type: 'comment', rec_id: recommender.recommendation_id, read: false })
+        const { data: recipientProfile } = await supabaseRef.current
+          .from('profiles').select('notify_comments').eq('id', recommender.user_id).single()
+        if (recipientProfile?.notify_comments !== false) {
+          void supabaseRef.current.from('notifications').insert({ user_id: recommender.user_id, actor_id: currentUserId, type: 'comment', rec_id: recommender.recommendation_id, read: false })
+        }
+      }
+      // Parse @mentions and notify mentioned users
+      const handles = [...new Set([...text.matchAll(/@([a-zA-Z0-9_]+)/g)].map(m => m[1]))]
+      if (handles.length > 0) {
+        supabaseRef.current.from('profiles').select('id, handle').in('handle', handles)
+          .then(({ data: mentioned }) => {
+            const rows = (mentioned ?? [])
+              .filter((p: { id: string }) => p.id !== currentUserId)
+              .map((p: { id: string }) => ({
+                user_id: p.id, actor_id: currentUserId, type: 'mention',
+                rec_id: recommender.recommendation_id, read: false,
+              }))
+            if (rows.length > 0) {
+              supabaseRef.current.from('notifications').insert(rows)
+            }
+          })
       }
     }
     setSubmittingComment(false)
@@ -258,7 +287,11 @@ export function GroupedModal({
       setLiked(true); setLikeCount(c => c + 1)
       await supabaseRef.current.from('likes').insert({ user_id: currentUserId, recommendation_id: leadRec.recommendation_id })
       if (leadRec.user_id !== currentUserId) {
-        void supabaseRef.current.from('notifications').insert({ user_id: leadRec.user_id, actor_id: currentUserId, type: 'like', rec_id: leadRec.recommendation_id, read: false })
+        const { data: recipientProfile } = await supabaseRef.current
+          .from('profiles').select('notify_likes').eq('id', leadRec.user_id).single()
+        if (recipientProfile?.notify_likes !== false) {
+          void supabaseRef.current.from('notifications').insert({ user_id: leadRec.user_id, actor_id: currentUserId, type: 'like', rec_id: leadRec.recommendation_id, read: false })
+        }
       }
     }
   }
@@ -275,7 +308,11 @@ export function GroupedModal({
       setBookmarked(true)
       await supabaseRef.current.from('bookmarks').insert({ user_id: currentUserId, recommendation_id: leadRec.recommendation_id })
       if (leadRec.user_id !== currentUserId) {
-        void supabaseRef.current.from('notifications').insert({ user_id: leadRec.user_id, actor_id: currentUserId, type: 'bookmark', rec_id: leadRec.recommendation_id, read: false })
+        const { data: recipientProfile } = await supabaseRef.current
+          .from('profiles').select('notify_bookmarks').eq('id', leadRec.user_id).single()
+        if (recipientProfile?.notify_bookmarks !== false) {
+          void supabaseRef.current.from('notifications').insert({ user_id: leadRec.user_id, actor_id: currentUserId, type: 'bookmark', rec_id: leadRec.recommendation_id, read: false })
+        }
       }
     }
   }
@@ -290,14 +327,34 @@ export function GroupedModal({
       .insert({ user_id: currentUserId, recommendation_id: leadRec.recommendation_id, text })
       .select('*')
       .single()
-    if (error) console.error('[Notable] comment insert error:', error.message)
+    if (error && process.env.NODE_ENV !== 'production') console.error('[Notable] comment insert error:', error.message)
     if (!error && inserted) {
       const newComment: Comment = { ...inserted, profiles: currentUserProfile, comment_likes: [] }
       setComments(prev => sortComments([...prev, newComment]))
       setCommentCount(c => c + 1)
       onCommentCountChange?.(leadRec.recommendation_id, 1)
       if (leadRec.user_id !== currentUserId) {
-        void supabaseRef.current.from('notifications').insert({ user_id: leadRec.user_id, actor_id: currentUserId, type: 'comment', rec_id: leadRec.recommendation_id, read: false })
+        const { data: recipientProfile } = await supabaseRef.current
+          .from('profiles').select('notify_comments').eq('id', leadRec.user_id).single()
+        if (recipientProfile?.notify_comments !== false) {
+          void supabaseRef.current.from('notifications').insert({ user_id: leadRec.user_id, actor_id: currentUserId, type: 'comment', rec_id: leadRec.recommendation_id, read: false })
+        }
+      }
+      // Parse @mentions and notify mentioned users
+      const handles = [...new Set([...text.matchAll(/@([a-zA-Z0-9_]+)/g)].map(m => m[1]))]
+      if (handles.length > 0) {
+        supabaseRef.current.from('profiles').select('id, handle').in('handle', handles)
+          .then(({ data: mentioned }) => {
+            const rows = (mentioned ?? [])
+              .filter((p: { id: string }) => p.id !== currentUserId)
+              .map((p: { id: string }) => ({
+                user_id: p.id, actor_id: currentUserId, type: 'mention',
+                rec_id: leadRec.recommendation_id, read: false,
+              }))
+            if (rows.length > 0) {
+              supabaseRef.current.from('notifications').insert(rows)
+            }
+          })
       }
     }
     setSubmittingComment(false)
@@ -386,7 +443,7 @@ export function GroupedModal({
                 {showCopied && (
                   <div style={{
                     position: 'absolute', bottom: '-30px', right: 0, zIndex: 10,
-                    background: '#1a1a1a', color: '#fff', fontSize: '12px',
+                    background: '#33261a', color: '#f5f0e8', fontSize: '12px',
                     padding: '4px 10px', borderRadius: '6px', whiteSpace: 'nowrap',
                     pointerEvents: 'none',
                   }}>
@@ -460,13 +517,16 @@ export function GroupedModal({
           <div ref={scrollableRef} style={{ overflowY: 'auto', flex: 1 }}>
             {(!willEmbed(group.external_url, group.category, 'feed') || embedFailed) && (
               group.image_url && !imgError ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={group.image_url}
-                  alt={group.title}
-                  onError={() => setImgError(true)}
-                  style={{ width: '100%', height: '200px', objectFit: 'contain', display: 'block', background: theme.colors.surface }}
-                />
+                <div style={{ position: 'relative', width: '100%', height: '200px', background: theme.colors.surface }}>
+                  <Image
+                    src={group.image_url}
+                    alt={group.title}
+                    fill
+                    sizes="500px"
+                    onError={() => setImgError(true)}
+                    style={{ objectFit: 'contain' }}
+                  />
+                </div>
               ) : (
                 <div style={{ width: '100%', height: '200px', background: `linear-gradient(135deg, ${accentColor}55, ${accentColor}22)` }} />
               )

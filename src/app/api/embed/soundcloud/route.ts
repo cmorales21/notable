@@ -7,7 +7,6 @@ export async function GET(req: NextRequest) {
   try {
     const res = await fetch(
       `https://soundcloud.com/oembed?url=${encodeURIComponent(url)}&format=json`,
-      { cache: 'no-store' },
     )
     if (!res.ok) return NextResponse.json({ error: 'oembed failed' }, { status: 502 })
 
@@ -17,7 +16,9 @@ export async function GET(req: NextRequest) {
 
     // /sets/ paths are playlists/albums; everything else is a single track
     const height = url.includes('/sets/') ? 350 : 166
-    return NextResponse.json({ embedUrl: srcMatch[1], height })
+    return NextResponse.json({ embedUrl: srcMatch[1], height }, {
+      headers: { 'Cache-Control': 'public, max-age=86400, stale-while-revalidate=3600' },
+    })
   } catch {
     return NextResponse.json({ error: 'fetch failed' }, { status: 502 })
   }

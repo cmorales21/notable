@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Whisper from '@/app/components/Whisper'
@@ -53,14 +54,12 @@ const CAT_ICON_SRC: Record<Category, string> = {
 
 function CatIcon({ id, selected = false }: { id: Category; selected?: boolean }) {
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <Image
       src={CAT_ICON_SRC[id]}
       alt={id}
       width={16}
       height={16}
       style={{
-        width: 16, height: 16,
         filter: selected ? 'brightness(0) invert(1)' : 'brightness(0)',
         opacity: selected ? 1 : 0.45,
       }}
@@ -83,11 +82,11 @@ function ResultRow({ item, onSelect }: { item: SearchResult; onSelect: (r: Searc
       }}
     >
       <div style={{
-        width: '40px', height: '40px', borderRadius: '7px',
+        position: 'relative', width: '40px', height: '40px', borderRadius: '7px',
         background: '#f5f0e8', flexShrink: 0, overflow: 'hidden',
       }}>
         {item.image
-          ? <img src={item.image} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> // eslint-disable-line @next/next/no-img-element
+          ? <Image src={item.image} alt={item.title} fill sizes="40px" style={{ objectFit: 'cover' }} />
           : <div style={{ width: '100%', height: '100%' }} />}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -265,6 +264,18 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [discardConfirm, duplicateWarning, requestClose])
+
+  // Clear all debounce timers on unmount
+  useEffect(() => {
+    return () => {
+      if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current)
+      if (urlTimerRef.current) clearTimeout(urlTimerRef.current)
+      if (manualTimerRef.current) clearTimeout(manualTimerRef.current)
+      if (emptyTimerRef.current) clearTimeout(emptyTimerRef.current)
+      if (noSignalTimerRef.current) clearTimeout(noSignalTimerRef.current)
+      if (mentionTimerRef.current) clearTimeout(mentionTimerRef.current)
+    }
+  }, [])
 
   // ── Search ────────────────────────────────────────────────────────────────
 
@@ -742,7 +753,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
               <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
                 <button onClick={onClose} className="font-body" style={{
                   padding: '10px 22px', borderRadius: '999px',
-                  background: '#dc4f5c', border: 'none', cursor: 'pointer',
+                  background: '#e05555', border: 'none', cursor: 'pointer',
                   color: 'white', fontSize: '14px', fontWeight: 600,
                 }}>
                   Discard
@@ -955,9 +966,8 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
                     }}
                   >
                     {p.avatar_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.avatar_url} alt={p.name ?? ''} width={32} height={32}
-                        style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                      <Image src={p.avatar_url} alt={p.name ?? ''} width={32} height={32}
+                        style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
                     ) : (
                       <div style={{
                         width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
@@ -1052,16 +1062,15 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
                 border: '1px solid rgba(0,0,0,0.08)',
               }}>
                 {confirmedItem.image && (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img
-                    src={confirmedItem.image}
-                    alt={confirmedItem.title}
-                    style={{
-                      width: '100%', display: 'block',
-                      maxHeight: '240px', objectFit: 'contain',
-                      background: '#faf8f4',
-                    }}
-                  />
+                  <div style={{ position: 'relative', width: '100%', height: '200px', background: '#faf8f4' }}>
+                    <Image
+                      src={confirmedItem.image}
+                      alt={confirmedItem.title}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 600px"
+                      style={{ objectFit: 'contain' }}
+                    />
+                  </div>
                 )}
                 <div style={{ padding: '12px 14px 14px' }}>
                   <p className="font-display" style={{
@@ -1104,8 +1113,9 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
                 background: '#faf8f4', position: 'relative',
                 border: '1px solid rgba(0,0,0,0.08)',
               }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={uploadedImage} alt="Photo" style={{ width: '100%', maxHeight: '240px', objectFit: 'contain', display: 'block', background: '#faf8f4' }} />
+                <div style={{ position: 'relative', width: '100%', height: '200px', background: '#faf8f4' }}>
+                  <Image src={uploadedImage} alt="Photo" fill sizes="(max-width: 768px) 100vw, 600px" style={{ objectFit: 'contain' }} />
+                </div>
                 <button
                   onClick={() => setUploadedImage(null)}
                   aria-label="Remove photo"
@@ -1273,7 +1283,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
                   background: 'rgba(212,99,107,0.12)',
                   border: '1px solid rgba(212,99,107,0.3)',
                   borderRadius: '10px', padding: '10px 14px',
-                  color: '#9055d0', fontSize: '13px', cursor: 'pointer', textAlign: 'left',
+                  color: '#e05555', fontSize: '13px', cursor: 'pointer', textAlign: 'left',
                 }}
               >
                 {error}

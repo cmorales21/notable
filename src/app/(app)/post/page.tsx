@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -101,13 +102,12 @@ function ResultRow({ result, onSelect, showBadge }: {
       }}
     >
       <div style={{
-        width: '52px', height: '52px', borderRadius: '8px',
+        position: 'relative', width: '52px', height: '52px', borderRadius: '8px',
         background: '#f5f0e8', flexShrink: 0, overflow: 'hidden',
         boxShadow: '0 2px 8px rgba(58,42,26,0.1)',
       }}>
         {result.image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={result.image} alt={result.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <Image src={result.image} alt={result.title} fill sizes="52px" style={{ objectFit: 'cover' }} />
         ) : (
           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>
             {CAT[result.category]?.emoji}
@@ -174,7 +174,14 @@ export default function PostPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const selectedCategoryRef = useRef<Category | null>(null)
 
-  const accentColor = selectedCategory ? CAT[selectedCategory].color : '#3a2a1a'
+  useEffect(() => {
+    return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current)
+      if (textareaTimer.current) clearTimeout(textareaTimer.current)
+    }
+  }, [])
+
+  const accentColor = selectedCategory ? CAT[selectedCategory].color : '#33261a'
   const canPost = !!selectedCategory && (!!selectedItem || description.trim().length > 0)
 
   const setCat = (cat: Category | null) => {
@@ -584,12 +591,13 @@ export default function PostPage() {
                   boxShadow: '0 8px 40px rgba(58,42,26,0.1), 0 0 0 1px rgba(0,0,0,0.03)',
                 }}>
                   {selectedItem.image && (
-                    <div style={{ width: '100%', height: '160px', overflow: 'hidden' }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
+                    <div style={{ position: 'relative', width: '100%', height: '160px', overflow: 'hidden' }}>
+                      <Image
                         src={selectedItem.image}
                         alt={selectedItem.title}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        fill
+                        sizes="(max-width: 768px) 100vw, 600px"
+                        style={{ objectFit: 'cover' }}
                       />
                     </div>
                   )}
@@ -645,6 +653,7 @@ export default function PostPage() {
                 onChange={handleTextareaChange}
                 placeholder="What made it special?"
                 rows={6}
+                maxLength={2000}
                 disabled={postSuccess}
                 className="font-body"
                 style={{
@@ -682,6 +691,14 @@ export default function PostPage() {
                 </div>
               )}
             </div>
+            {description.length > 0 && (
+              <p className="font-body" style={{
+                textAlign: 'right', fontSize: '11px', marginTop: '5px',
+                color: description.length >= 1800 ? '#e05555' : '#6b5d4f',
+              }}>
+                {description.length} / 2000
+              </p>
+            )}
 
           </div>
         </div>
@@ -733,7 +750,7 @@ export default function PostPage() {
               </div>
               {showCatMsg && (
                 <p className="cat-msg font-body" style={{
-                  color: '#d4636b', fontSize: '12px',
+                  color: '#e05555', fontSize: '12px',
                   textAlign: 'center', marginTop: '8px',
                 }}>
                   Pick a category
@@ -788,7 +805,7 @@ export default function PostPage() {
             onClick={() => setError(null)}
             style={{
               position: 'absolute', bottom: '200px', left: '50%', transform: 'translateX(-50%)',
-              background: '#d4636b', color: 'white', borderRadius: '10px',
+              background: '#e05555', color: 'white', borderRadius: '10px',
               padding: '10px 16px', fontSize: '14px', maxWidth: '320px', width: '90%',
               textAlign: 'center', zIndex: 400, cursor: 'pointer',
               boxShadow: '0 8px 28px rgba(212,99,107,0.5)',

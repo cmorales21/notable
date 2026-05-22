@@ -97,7 +97,7 @@ export default function AuthCard() {
         access_token: authData.session.access_token,
         refresh_token: authData.session.refresh_token,
       })
-      router.push('/onboarding')
+      router.push('/lobby')
     } else {
       // Email confirmation is required — tell user to check their inbox
       setEmailSent(true)
@@ -126,7 +126,7 @@ export default function AuthCard() {
     setGoogleLoading(true)
     setError(null)
 
-    const nextPath = isSignup ? '/onboarding' : '/lobby'
+    const nextPath = '/lobby'
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -213,7 +213,7 @@ export default function AuthCard() {
               style={{
                 background: 'rgba(212,99,107,0.12)',
                 border: '1px solid rgba(212,99,107,0.25)',
-                color: '#d4636b',
+                color: '#e05555',
                 borderRadius: '8px',
                 padding: '9px 12px',
                 fontSize: '0.8rem',

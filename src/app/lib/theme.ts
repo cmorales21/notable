@@ -1,3 +1,9 @@
+// Design system note: Pure white (#ffffff) is intentionally used for text
+// on category-colored backgrounds (pills, buttons, toggles). The warm
+// linen #f5f0e8 reads yellowish on saturated colors like #5271FF or #dc4f5c,
+// so #ffffff is the correct choice in those contexts. This is an intentional
+// exception to the "no pure white" rule.
+
 export const theme = {
   colors: {
     bg: '#f5f0e8',

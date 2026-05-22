@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import type { Recommendation } from '@/app/lib/types'
 import { Avatar, ActionButton, TeaserText } from './helpers'
 import { LikeIcon, BookmarkIcon, CommentIcon } from './icons'
@@ -84,8 +85,7 @@ export function RecommendationCard({
             style={{ display: 'block', height: '100%', position: 'relative' }}
           >
             {rec.image_url && !imgError ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={rec.image_url} alt={rec.title} loading="lazy" onError={() => setImgError(true)} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#faf8f4' }} />
+              <Image src={rec.image_url} alt={rec.title} fill onError={() => setImgError(true)} sizes="(max-width: 768px) 100vw, 50vw" style={{ objectFit: 'contain', background: '#faf8f4' }} />
             ) : (
               <div style={{ width: '100%', height: '100%', background: `linear-gradient(135deg, ${accentColor}55, ${accentColor}22)` }} />
             )}
@@ -104,8 +104,7 @@ export function RecommendationCard({
           </a>
         ) : (
           rec.image_url && !imgError ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={rec.image_url} alt={rec.title} loading="lazy" onError={() => setImgError(true)} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#faf8f4' }} />
+            <Image src={rec.image_url} alt={rec.title} fill onError={() => setImgError(true)} sizes="(max-width: 768px) 100vw, 50vw" style={{ objectFit: 'contain', background: '#faf8f4' }} />
           ) : (
             <div style={{ width: '100%', height: '100%', background: `linear-gradient(135deg, ${accentColor}55, ${accentColor}22)` }} />
           )

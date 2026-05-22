@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import WelcomeOverlay from './WelcomeOverlay'
@@ -30,18 +31,19 @@ function TileInner({ name, color, iconSrc, iconWidth }: { name: string; color: s
         paddingTop: '1rem',
         width: '100%',
       }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={iconSrc}
           alt={name}
           className="lobby-tile-icon"
+          width={120}
+          height={120}
           style={{ maxWidth: iconWidth, width: 'auto', height: 'auto', display: 'block', margin: '0 auto', filter: 'brightness(0) invert(1)', opacity: 0.95 }}
         />
       </div>
       <span
         className="font-body"
         style={{
-          color: '#f0ead8',
+          color: '#f5f0e8',
           fontSize: '0.9rem',
           fontWeight: 400,
           letterSpacing: '0.1em',

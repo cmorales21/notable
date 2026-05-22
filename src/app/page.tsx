@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import Image from 'next/image'
 import Navbar from './components/Navbar'
 import FadeIn from './components/FadeIn'
 import AuthCard from './components/AuthCard'
@@ -65,13 +66,13 @@ function StripRow({ images, offset = '0s' }: { images: StripImage[]; offset?: st
       >
         {/* Original set + duplicate — translateX(-50%) loops back to start seamlessly */}
         {[...images, ...images].map((img, i) => (
-          <div key={i} className="strip-box">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+          <div key={i} className="strip-box" style={{ position: 'relative' }}>
+            <Image
               src={img.src}
               alt={img.alt}
-              loading="lazy"
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              fill
+              sizes="(max-width: 768px) 25vw, 15vw"
+              style={{ objectFit: 'cover' }}
             />
           </div>
         ))}
@@ -94,17 +95,18 @@ function TileInner({ name, color, iconSrc, iconWidth }: {
       style={{ background: color, overflow: 'hidden' }}
     >
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: '1rem', width: '100%' }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={iconSrc}
           alt={name}
           className="lobby-tile-icon"
+          width={120}
+          height={120}
           style={{ maxWidth: iconWidth, width: 'auto', height: 'auto', display: 'block', margin: '0 auto', filter: 'brightness(0) invert(1)', opacity: 0.95 }}
         />
       </div>
       <span
         className="font-body"
-        style={{ color: '#f0ead8', fontSize: '0.9rem', fontWeight: 400, letterSpacing: '0.1em', textTransform: 'uppercase', paddingBottom: '0.875rem' }}
+        style={{ color: '#f5f0e8', fontSize: '0.9rem', fontWeight: 400, letterSpacing: '0.1em', textTransform: 'uppercase', paddingBottom: '0.875rem' }}
       >
         {name}
       </span>

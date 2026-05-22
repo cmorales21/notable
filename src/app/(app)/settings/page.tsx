@@ -46,7 +46,7 @@ function ToggleRow({
           width: '44px',
           height: '24px',
           borderRadius: '12px',
-          background: checked ? '#6db87a' : 'rgba(0,0,0,0.08)',
+          background: checked ? '#4aad4e' : 'rgba(0,0,0,0.08)',
           border: 'none',
           cursor: 'pointer',
           position: 'relative',
@@ -62,7 +62,7 @@ function ToggleRow({
             width: '18px',
             height: '18px',
             borderRadius: '50%',
-            background: '#fff',
+            background: '#faf8f4',
             transition: 'left 0.2s',
           }}
         />
