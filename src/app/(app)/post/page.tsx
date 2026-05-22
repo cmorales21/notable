@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import Image from 'next/image'
+import { RecommendationImage } from '@/app/components/RecommendationImage'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useToast } from '@/app/components/Toast'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -101,19 +102,7 @@ function ResultRow({ result, onSelect, showBadge }: {
         padding: '11px 16px', cursor: 'pointer', textAlign: 'left',
       }}
     >
-      <div style={{
-        position: 'relative', width: '52px', height: '52px', borderRadius: '8px',
-        background: '#f5f0e8', flexShrink: 0, overflow: 'hidden',
-        boxShadow: '0 2px 8px rgba(58,42,26,0.1)',
-      }}>
-        {result.image ? (
-          <Image src={result.image} alt={result.title} fill sizes="52px" style={{ objectFit: 'cover' }} />
-        ) : (
-          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>
-            {CAT[result.category]?.emoji}
-          </div>
-        )}
-      </div>
+      <RecommendationImage src={result.image} category={result.category} alt={result.title} width={52} height={52} style={{ borderRadius: '8px', boxShadow: '0 2px 8px rgba(58,42,26,0.1)' }} />
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -151,6 +140,7 @@ function ResultRow({ result, onSelect, showBadge }: {
 
 export default function PostPage() {
   const router = useRouter()
+  const toast = useToast()
   const supabase = useRef(createClient())
 
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
@@ -378,6 +368,7 @@ export default function PostPage() {
 
       setPosting(false)
       setPostSuccess(true)
+      toast('Recommendation posted!')
       setTimeout(() => router.push(`/${selectedCategory}`), 1500)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.')
@@ -590,30 +581,13 @@ export default function PostPage() {
                   border: '1px solid rgba(0,0,0,0.08)',
                   boxShadow: '0 8px 40px rgba(58,42,26,0.1), 0 0 0 1px rgba(0,0,0,0.03)',
                 }}>
-                  {selectedItem.image && (
-                    <div style={{ position: 'relative', width: '100%', height: '160px', overflow: 'hidden' }}>
-                      <Image
-                        src={selectedItem.image}
-                        alt={selectedItem.title}
-                        fill
-                        sizes="(max-width: 768px) 100vw, 600px"
-                        style={{ objectFit: 'cover' }}
-                      />
-                    </div>
-                  )}
+                  <div style={{ position: 'relative', width: '100%', height: '160px' }}>
+                    <RecommendationImage fill src={selectedItem.image} category={selectedItem.category} alt={selectedItem.title} sizes="(max-width: 768px) 100vw, 600px" style={{ objectFit: 'cover' }} />
+                  </div>
                   <div style={{
                     padding: '14px 16px 16px',
                     display: 'flex', alignItems: 'flex-start', gap: '12px',
                   }}>
-                    {!selectedItem.image && (
-                      <div style={{
-                        width: '44px', height: '44px', borderRadius: '8px',
-                        background: accentColor + '1a', flexShrink: 0,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px',
-                      }}>
-                        {CAT[selectedItem.category]?.emoji}
-                      </div>
-                    )}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p className="font-display" style={{
                         color: 'var(--color-text)', fontSize: '15px', fontWeight: 700,

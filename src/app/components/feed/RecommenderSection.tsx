@@ -1,6 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useCallback } from 'react'
+import { useToast } from '@/app/components/Toast'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { RichMediaEmbed, willEmbed } from '@/app/components/RichMediaEmbed'
@@ -24,6 +25,7 @@ export function RecommenderSection({
   onBookmarkToggle,
   onExpand,
   onIgnore,
+  onRecUpdated,
 }: {
   recommender: GroupedRecommender
   category: string
@@ -35,6 +37,7 @@ export function RecommenderSection({
   onBookmarkToggle: (recId: string, wasBookmarked: boolean) => void
   onExpand?: () => void
   onIgnore?: (userId: string, userName: string) => void
+  onRecUpdated?: (recId: string, newDescription: string) => void
 }) {
   const supabaseRef = useRef(createClient())
   const [liked, setLiked] = useState(recommender.is_liked_by_user)
@@ -52,6 +55,25 @@ export function RecommenderSection({
   const [deletedCommentIds, setDeletedCommentIds] = useState<Set<string>>(new Set())
   const [openRecMenu, setOpenRecMenu] = useState(false)
   const [ignoringUser, setIgnoringUser] = useState(false)
+  const [likeAnim, setLikeAnim] = useState<'pop' | 'shrink' | null>(null)
+  const [bookmarkAnim, setBookmarkAnim] = useState(false)
+  const [editingDesc, setEditingDesc] = useState(false)
+  const [editDescInput, setEditDescInput] = useState(recommender.description)
+  const [submittingEdit, setSubmittingEdit] = useState(false)
+  const [localDescription, setLocalDescription] = useState(recommender.description)
+  const toast = useToast()
+  const isAuthor = currentUserId === recommender.user_id
+
+  const saveDescEdit = useCallback(async () => {
+    if (!editDescInput.trim()) return
+    setSubmittingEdit(true)
+    await supabaseRef.current.from('recommendations').update({ description: editDescInput.trim() }).eq('id', recommender.recommendation_id)
+    setLocalDescription(editDescInput.trim())
+    onRecUpdated?.(recommender.recommendation_id, editDescInput.trim())
+    setEditingDesc(false)
+    setSubmittingEdit(false)
+    toast('Saved')
+  }, [editDescInput, recommender.recommendation_id, onRecUpdated, toast])
 
   const recId = recommender.recommendation_id
   const profile = recommender.profile
@@ -68,6 +90,8 @@ export function RecommenderSection({
   async function toggleLike(e: React.MouseEvent) {
     e.stopPropagation()
     if (!currentUserId) return
+    setLikeAnim(liked ? 'shrink' : 'pop')
+    setTimeout(() => setLikeAnim(null), liked ? 150 : 350)
     onLikeToggle(recId, liked)
     if (liked) {
       setLiked(false); setLikeCount(c => c - 1)
@@ -85,6 +109,7 @@ export function RecommenderSection({
   async function toggleBookmark(e: React.MouseEvent) {
     e.stopPropagation()
     if (!currentUserId) return
+    if (!bookmarked) { setBookmarkAnim(true); setTimeout(() => setBookmarkAnim(false), 250) }
     onBookmarkToggle(recId, bookmarked)
     if (bookmarked) {
       setBookmarked(false)
@@ -247,9 +272,68 @@ export function RecommenderSection({
         </div>
       </div>
 
-      <p className="font-body" style={{ fontSize: '14px', color: theme.colors.textPrimary, lineHeight: '1.65', marginBottom: '10px' }}>
-        {recommender.description}
-      </p>
+      {editingDesc ? (
+        <div onClick={e => e.stopPropagation()} style={{ marginBottom: '10px' }}>
+          <textarea
+            value={editDescInput}
+            onChange={e => setEditDescInput(e.target.value)}
+            maxLength={2000}
+            rows={3}
+            autoFocus
+            style={{
+              width: '100%', background: theme.colors.input, border: '1px solid rgba(0,0,0,0.12)',
+              borderRadius: '10px', padding: '9px 13px', color: theme.colors.textPrimary,
+              fontSize: '14px', fontFamily: theme.fonts.body,
+              lineHeight: '1.65', resize: 'none', outline: 'none', boxSizing: 'border-box',
+            }}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={saveDescEdit}
+                disabled={submittingEdit || !editDescInput.trim()}
+                className="font-body"
+                style={{ padding: '6px 16px', background: theme.colors.textPrimary, border: 'none', borderRadius: '8px', color: '#ffffff', fontSize: '13px', fontWeight: 600, cursor: submittingEdit ? 'default' : 'pointer', opacity: (!editDescInput.trim() || submittingEdit) ? 0.5 : 1 }}
+              >
+                {submittingEdit ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                onClick={() => setEditingDesc(false)}
+                className="font-body"
+                style={{ padding: '6px 12px', background: 'none', border: 'none', color: theme.colors.textMuted, fontSize: '13px', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+            </div>
+            <span className="font-body" style={{ fontSize: '11px', color: editDescInput.length > 1800 ? theme.colors.error : theme.colors.textMuted }}>
+              {editDescInput.length}/2000
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div style={{ position: 'relative', marginBottom: '10px' }}>
+          <p className="font-body" style={{ fontSize: '14px', color: theme.colors.textPrimary, lineHeight: '1.65', margin: 0, paddingRight: isAuthor ? '26px' : 0 }}>
+            {localDescription}
+          </p>
+          {isAuthor && (
+            <button
+              onClick={e => { e.stopPropagation(); setEditDescInput(localDescription); setEditingDesc(true) }}
+              aria-label="Edit description"
+              style={{
+                position: 'absolute', top: 0, right: 0,
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: theme.colors.textMuted, padding: '2px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                opacity: 0.55, transition: 'opacity 0.15s',
+              }}
+            >
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
 
       {recommender.external_url && (
         <div style={{ marginBottom: '10px' }}>
@@ -263,7 +347,9 @@ export function RecommenderSection({
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
         <ActionButton onClick={toggleLike} active={liked} activeColor={accentColor} label="Like">
-          <LikeIcon filled={liked} color={liked ? accentColor : theme.colors.textMuted} />
+          <span style={{ display: 'inline-flex' }} className={likeAnim === 'pop' ? 'like-pop' : likeAnim === 'shrink' ? 'like-shrink' : undefined}>
+            <LikeIcon filled={liked} color={liked ? accentColor : theme.colors.textMuted} />
+          </span>
           {likeCount > 0 && (
             <span style={{ fontSize: '12px', fontWeight: 500, color: liked ? accentColor : theme.colors.textMuted, transition: 'color 0.15s' }}>
               {likeCount}
@@ -271,7 +357,9 @@ export function RecommenderSection({
           )}
         </ActionButton>
         <ActionButton onClick={toggleBookmark} active={bookmarked} activeColor={accentColor} label="Bookmark">
-          <BookmarkIcon filled={bookmarked} color={bookmarked ? accentColor : theme.colors.textMuted} />
+          <span style={{ display: 'inline-flex' }} className={bookmarkAnim ? 'bm-bounce' : undefined}>
+            <BookmarkIcon filled={bookmarked} color={bookmarked ? accentColor : theme.colors.textMuted} />
+          </span>
         </ActionButton>
         <ActionButton onClick={handleExpandComments} active={commentsOpen} activeColor={accentColor} label="Comments">
           <CommentIcon filled={commentsOpen} color={commentsOpen ? accentColor : theme.colors.textMuted} />

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
+import { RecommendationImage } from '@/app/components/RecommendationImage'
 import type { Recommendation } from '@/app/lib/types'
 import { Avatar, ActionButton, TeaserText } from './helpers'
 import { LikeIcon, BookmarkIcon, CommentIcon } from './icons'
@@ -33,6 +33,8 @@ export function RecommendationCard({
   const profile = rec.profiles
   const [imageHovered, setImageHovered] = useState(false)
   const [imgError, setImgError] = useState(false)
+  const [likeAnim, setLikeAnim] = useState<'pop' | 'shrink' | null>(null)
+  const [bookmarkAnim, setBookmarkAnim] = useState(false)
 
   return (
     <div
@@ -84,17 +86,13 @@ export function RecommendationCard({
             onMouseLeave={() => setImageHovered(false)}
             style={{ display: 'block', height: '100%', position: 'relative' }}
           >
-            {rec.image_url && !imgError ? (
-              <Image src={rec.image_url} alt={rec.title} fill onError={() => setImgError(true)} sizes="(max-width: 768px) 100vw, 50vw" style={{ objectFit: 'contain', background: '#faf8f4' }} />
-            ) : (
-              <div style={{ width: '100%', height: '100%', background: `linear-gradient(135deg, ${accentColor}55, ${accentColor}22)` }} />
-            )}
+            <RecommendationImage fill src={rec.image_url} category={rec.category} alt={rec.title} sizes="(max-width: 768px) 100vw, 50vw" onError={() => setImgError(true)} style={{ objectFit: 'contain', background: '#faf8f4' }} />
             <div style={{
               position: 'absolute', top: '8px', right: '8px',
               background: 'rgba(0,0,0,0.55)', borderRadius: '7px',
               width: '28px', height: '28px',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              opacity: imageHovered ? 1 : 0, transition: 'opacity 0.15s',
+              opacity: imageHovered && !!rec.image_url && !imgError ? 1 : 0, transition: 'opacity 0.15s',
               backdropFilter: 'blur(4px)', pointerEvents: 'none',
             }}>
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -103,11 +101,7 @@ export function RecommendationCard({
             </div>
           </a>
         ) : (
-          rec.image_url && !imgError ? (
-            <Image src={rec.image_url} alt={rec.title} fill onError={() => setImgError(true)} sizes="(max-width: 768px) 100vw, 50vw" style={{ objectFit: 'contain', background: '#faf8f4' }} />
-          ) : (
-            <div style={{ width: '100%', height: '100%', background: `linear-gradient(135deg, ${accentColor}55, ${accentColor}22)` }} />
-          )
+          <RecommendationImage fill src={rec.image_url} category={rec.category} alt={rec.title} sizes="(max-width: 768px) 100vw, 50vw" onError={() => setImgError(true)} style={{ objectFit: 'contain', background: '#faf8f4' }} />
         )}
       </div>
 
@@ -120,14 +114,31 @@ export function RecommendationCard({
         </h2>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <ActionButton onClick={onLike} active={liked} activeColor={accentColor} label="Like">
-            <LikeIcon filled={liked} color={liked ? accentColor : '#6b5d4f'} />
+          <ActionButton
+            onClick={(e) => {
+              setLikeAnim(liked ? 'shrink' : 'pop')
+              setTimeout(() => setLikeAnim(null), liked ? 150 : 350)
+              onLike(e)
+            }}
+            active={liked} activeColor={accentColor} label="Like"
+          >
+            <span style={{ display: 'inline-flex' }} className={likeAnim === 'pop' ? 'like-pop' : likeAnim === 'shrink' ? 'like-shrink' : undefined}>
+              <LikeIcon filled={liked} color={liked ? accentColor : '#6b5d4f'} />
+            </span>
             <span style={{ fontSize: '13px', fontWeight: 500, color: liked ? accentColor : '#6b5d4f', transition: 'color 0.15s' }}>
               {likeCount > 0 ? likeCount : ''}
             </span>
           </ActionButton>
-          <ActionButton onClick={onBookmark} active={bookmarked} activeColor={accentColor} label="Bookmark">
-            <BookmarkIcon filled={bookmarked} color={bookmarked ? accentColor : '#6b5d4f'} />
+          <ActionButton
+            onClick={(e) => {
+              if (!bookmarked) { setBookmarkAnim(true); setTimeout(() => setBookmarkAnim(false), 250) }
+              onBookmark(e)
+            }}
+            active={bookmarked} activeColor={accentColor} label="Bookmark"
+          >
+            <span style={{ display: 'inline-flex' }} className={bookmarkAnim ? 'bm-bounce' : undefined}>
+              <BookmarkIcon filled={bookmarked} color={bookmarked ? accentColor : '#6b5d4f'} />
+            </span>
           </ActionButton>
           <ActionButton onClick={onCommentClick} active={false} activeColor={accentColor} label="Comments">
             <CommentIcon color="#6b5d4f" />

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useToast } from '@/app/components/Toast'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -192,6 +193,7 @@ function AccountSection({
   onSignOut: () => void
   onDeleteRequest: () => void
 }) {
+  const toast = useToast()
   const [displayName, setDisplayName] = useState(initialName ?? '')
   const [email, setEmail] = useState('')
   const [isEmailUser, setIsEmailUser] = useState(false)
@@ -213,12 +215,13 @@ function AccountSection({
     setDisplayName(val)
     const supabase = createClient()
     await supabase.from('profiles').update({ name: val }).eq('id', userId)
+    toast('Name saved')
   }
 
   const saveEmail = async (val: string) => {
     const supabase = createClient()
     const { error } = await supabase.auth.updateUser({ email: val })
-    if (!error) setEmail(val)
+    if (!error) { setEmail(val); toast('Confirmation sent to your new email') }
   }
 
   const changePassword = async () => {
@@ -232,7 +235,8 @@ function AccountSection({
     if (error) { setPwMsg({ text: error.message, ok: false }); return }
     setPwNew('')
     setPwConfirm('')
-    setPwMsg({ text: 'Password updated.', ok: true })
+    setPwMsg(null)
+    toast('Password updated')
   }
 
   const inputStyle: React.CSSProperties = {

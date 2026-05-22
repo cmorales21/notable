@@ -10,6 +10,7 @@ import { FeedSkeleton } from '@/app/components/skeletons'
 import { GroupedCard } from './feed/GroupedCard'
 import { GroupedModal } from './feed/GroupedModal'
 import { theme } from '@/app/lib/theme'
+import { useToast } from '@/app/components/Toast'
 
 // ─── Public re-exports (consumed by profile page, search page, hooks) ─────────
 
@@ -45,7 +46,7 @@ export default function CategoryFeed({ category }: { category: string }) {
   const [followCount, setFollowCount] = useState<number | null>(null)
 
   const [ignoredUserIds, setIgnoredUserIds] = useState<Set<string>>(new Set())
-  const [toast, setToast] = useState<string | null>(null)
+  const toast = useToast()
 
   const [selectedGroup, setSelectedGroup] = useState<GroupedRecommendation | null>(null)
   const [focusOnOpen, setFocusOnOpen] = useState(false)
@@ -246,6 +247,7 @@ export default function CategoryFeed({ category }: { category: string }) {
     const liked = userLikes.has(recId)
     setUserLikes((prev) => { const next = new Set(prev); if (liked) next.delete(recId); else next.add(recId); return next })
     setLikeCounts((prev) => ({ ...prev, [recId]: (prev[recId] ?? 0) + (liked ? -1 : 1) }))
+    toast(liked ? 'Unliked' : 'Liked')
     if (liked) {
       await supabase.from('likes').delete().eq('user_id', currentUserId).eq('recommendation_id', recId)
     } else {
@@ -266,6 +268,7 @@ export default function CategoryFeed({ category }: { category: string }) {
     if (!currentUserId) return
     const bookmarked = userBookmarks.has(recId)
     setUserBookmarks((prev) => { const next = new Set(prev); if (bookmarked) next.delete(recId); else next.add(recId); return next })
+    toast(bookmarked ? 'Removed from saved' : 'Saved')
     if (bookmarked) {
       await supabase.from('bookmarks').delete().eq('user_id', currentUserId).eq('recommendation_id', recId)
     } else {
@@ -324,8 +327,7 @@ export default function CategoryFeed({ category }: { category: string }) {
   async function handleIgnoreUser(targetUserId: string, targetUserName: string) {
     if (!currentUserId) return
     setIgnoredUserIds(prev => new Set([...prev, targetUserId]))
-    setToast(`${targetUserName} ignored`)
-    setTimeout(() => setToast(null), 3000)
+    toast(`${targetUserName} hidden from your feed`)
     await supabase.from('user_ignores').insert({ user_id: currentUserId, ignored_user_id: targetUserId })
   }
 
@@ -491,18 +493,6 @@ export default function CategoryFeed({ category }: { category: string }) {
           </div>
         )}
       </div>
-
-      {toast && (
-        <div style={{
-          position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
-          background: '#33261a', color: '#f5f0e8', fontSize: '14px', fontFamily: 'var(--font-body, "DM Sans", sans-serif)',
-          padding: '10px 20px', borderRadius: '999px', zIndex: 200,
-          pointerEvents: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-          whiteSpace: 'nowrap',
-        }}>
-          {toast}
-        </div>
-      )}
 
       {selectedGroup && (
         <GroupedModal

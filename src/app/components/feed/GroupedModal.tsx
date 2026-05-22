@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Image from 'next/image'
+import { RecommendationImage } from '@/app/components/RecommendationImage'
 import { createClient } from '@/lib/supabase/client'
 import { RichMediaEmbed, willEmbed } from '@/app/components/RichMediaEmbed'
 import type { Recommendation, RecComment, RecProfile } from '@/app/lib/types'
@@ -11,6 +11,7 @@ import { theme } from '@/app/lib/theme'
 import { RecModal } from './RecModal'
 import { RecommenderSection } from './RecommenderSection'
 import { ReportModal } from './ReportModal'
+import { useToast } from '@/app/components/Toast'
 
 type Profile = RecProfile
 type Comment = RecComment
@@ -25,6 +26,7 @@ function SingleRecDetailModal({
   onBookmarkToggle,
   onClose,
   onIgnore,
+  onRecUpdated,
 }: {
   recommender: GroupedRecommender
   group: GroupedRecommendation
@@ -35,6 +37,7 @@ function SingleRecDetailModal({
   onBookmarkToggle: (recId: string, wasBookmarked: boolean) => void
   onClose: () => void
   onIgnore?: (userId: string, userName: string) => void
+  onRecUpdated?: (recId: string, newDescription: string) => void
 }) {
   const supabaseRef = useRef(createClient())
   const commentInputRef = useRef<HTMLTextAreaElement>(null)
@@ -173,6 +176,7 @@ function SingleRecDetailModal({
       onCommentChange={setCommentInput}
       onCommentSubmit={handleComment}
       onIgnore={onIgnore}
+      onRecUpdated={onRecUpdated}
       zIndex={200}
     />
   )
@@ -210,10 +214,9 @@ export function GroupedModal({
   const supabaseRef = useRef(createClient())
   const scrollableRef = useRef<HTMLDivElement>(null)
   const commentInputRef = useRef<HTMLTextAreaElement>(null)
-  const [imgError, setImgError] = useState(false)
   const [embedFailed, setEmbedFailed] = useState(false)
   const [expandedRecommender, setExpandedRecommender] = useState<GroupedRecommender | null>(null)
-  const [showCopied, setShowCopied] = useState(false)
+  const toast = useToast()
   const [openRecMenu, setOpenRecMenu] = useState(false)
   const [reportingRec, setReportingRec] = useState(false)
 
@@ -263,8 +266,7 @@ export function GroupedModal({
     if (!primaryId) return
     const url = `${window.location.origin}/rec/${primaryId}`
     await navigator.clipboard.writeText(url)
-    setShowCopied(true)
-    setTimeout(() => setShowCopied(false), 2000)
+    toast('Link copied')
   }
 
   async function reportRec(reason: string, details: string) {
@@ -273,12 +275,14 @@ export function GroupedModal({
     if (!primaryId) return
     const fullReason = details ? `${reason} — ${details}` : reason
     await supabaseRef.current.from('recommendation_reports').insert({ recommendation_id: primaryId, reporter_id: currentUserId, reason: fullReason })
+    toast('Report submitted')
   }
 
   async function handleLike(e: React.MouseEvent) {
     e.stopPropagation()
     if (!currentUserId) return
     onLikeToggle(leadRec.recommendation_id, liked)
+    toast(liked ? 'Unliked' : 'Liked')
     if (liked) {
       setLiked(false); setLikeCount(c => c - 1)
       await supabaseRef.current.from('likes').delete()
@@ -300,6 +304,7 @@ export function GroupedModal({
     e.stopPropagation()
     if (!currentUserId) return
     onBookmarkToggle(leadRec.recommendation_id, bookmarked)
+    toast(bookmarked ? 'Removed from saved' : 'Saved')
     if (bookmarked) {
       setBookmarked(false)
       await supabaseRef.current.from('bookmarks').delete()
@@ -333,6 +338,7 @@ export function GroupedModal({
       setComments(prev => sortComments([...prev, newComment]))
       setCommentCount(c => c + 1)
       onCommentCountChange?.(leadRec.recommendation_id, 1)
+      toast('Comment posted')
       if (leadRec.user_id !== currentUserId) {
         const { data: recipientProfile } = await supabaseRef.current
           .from('profiles').select('notify_comments').eq('id', leadRec.user_id).single()
@@ -440,16 +446,6 @@ export function GroupedModal({
                     <line x1="12" y1="2" x2="12" y2="15" />
                   </svg>
                 </button>
-                {showCopied && (
-                  <div style={{
-                    position: 'absolute', bottom: '-30px', right: 0, zIndex: 10,
-                    background: '#33261a', color: '#f5f0e8', fontSize: '12px',
-                    padding: '4px 10px', borderRadius: '6px', whiteSpace: 'nowrap',
-                    pointerEvents: 'none',
-                  }}>
-                    Link copied!
-                  </div>
-                )}
               </div>
               {currentUserId && (
                 <div style={{ position: 'relative' }}>
@@ -516,20 +512,9 @@ export function GroupedModal({
 
           <div ref={scrollableRef} style={{ overflowY: 'auto', flex: 1 }}>
             {(!willEmbed(group.external_url, group.category, 'feed') || embedFailed) && (
-              group.image_url && !imgError ? (
-                <div style={{ position: 'relative', width: '100%', height: '200px', background: theme.colors.surface }}>
-                  <Image
-                    src={group.image_url}
-                    alt={group.title}
-                    fill
-                    sizes="500px"
-                    onError={() => setImgError(true)}
-                    style={{ objectFit: 'contain' }}
-                  />
-                </div>
-              ) : (
-                <div style={{ width: '100%', height: '200px', background: `linear-gradient(135deg, ${accentColor}55, ${accentColor}22)` }} />
-              )
+              <div style={{ position: 'relative', width: '100%', height: '200px', background: theme.colors.surface }}>
+                <RecommendationImage fill src={group.image_url} category={group.category} alt={group.title} sizes="500px" style={{ objectFit: 'contain' }} />
+              </div>
             )}
 
             <h2
@@ -572,6 +557,7 @@ export function GroupedModal({
                 onBookmarkToggle={onBookmarkToggle}
                 onExpand={() => setExpandedRecommender(recommender)}
                 onIgnore={onIgnore}
+                onRecUpdated={onRecUpdated}
               />
             ))}
 
@@ -591,6 +577,7 @@ export function GroupedModal({
           onBookmarkToggle={onBookmarkToggle}
           onClose={() => setExpandedRecommender(null)}
           onIgnore={onIgnore}
+          onRecUpdated={onRecUpdated}
         />
       )}
     </>

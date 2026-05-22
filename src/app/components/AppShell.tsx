@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useToast } from '@/app/components/Toast'
 
 const PostModal = dynamic(() => import('./PostModal'), { ssr: false })
 const SearchDropdown = dynamic(() => import('./SearchDropdown'), { ssr: false })
@@ -130,6 +131,7 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
   const [previewNotifs, setPreviewNotifs] = useState<DropdownNotif[]>([])
   const [previewLoading, setPreviewLoading] = useState(false)
 
+  const toast = useToast()
   // Stable client ref — created once, reused across effects
   const supabaseRef = useRef(createClient())
 
@@ -286,6 +288,7 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
     const { data } = await supabase.from('notifications').select('id').eq('user_id', userId).eq('read', false).limit(1)
     if (!data || data.length === 0) setHasUnread(false)
     window.dispatchEvent(new Event('follow-request-updated'))
+    toast('Follow request accepted')
   }
 
   async function declineFollowRequest(notif: DropdownNotif) {
@@ -296,6 +299,7 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
     await supabase.from('notifications').delete().in('id', notif.ids)
     setPreviewNotifs(prev => prev.filter(n => n.key !== notif.key))
     window.dispatchEvent(new Event('follow-request-updated'))
+    toast('Request declined')
   }
 
   return (
@@ -615,7 +619,9 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
         className={!isLobby ? 'md:pl-[72px] pb-16 md:pb-0' : 'pb-16 md:pb-0'}
         style={{ paddingTop: '56px' }}
       >
-        {children}
+        <div key={pathname} className={isLobby ? undefined : 'page-enter'}>
+          {children}
+        </div>
       </main>
 
       {/* ── Floating + button ─────────────────────────────────────── */}

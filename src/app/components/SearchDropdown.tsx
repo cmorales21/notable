@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
-import Image from 'next/image'
+import React, { useEffect, useRef } from 'react'
+import { RecommendationImage } from '@/app/components/RecommendationImage'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSearch } from '@/app/hooks/useSearch'
@@ -28,29 +28,15 @@ const CATEGORY_LABELS: Record<string, string> = {
 // ─── Rec thumbnail (48×48) ────────────────────────────────────────────────────
 
 function RecThumbnail({ imageUrl, category }: { imageUrl: string | null; category: string }) {
-  const [imgError, setImgError] = useState(false)
-  const color = CATEGORY_COLORS[category] ?? '#6b5d4f'
-  const showImage = !!imageUrl && !imgError
-
   return (
-    <div style={{
-      position: 'relative', width: 48, height: 48, borderRadius: 8, overflow: 'hidden',
-      flexShrink: 0, background: showImage ? '#faf8f4' : `${color}26`,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      {showImage ? (
-        <Image
-          src={imageUrl!}
-          alt=""
-          fill
-          sizes="48px"
-          onError={() => setImgError(true)}
-          style={{ objectFit: 'cover' }}
-        />
-      ) : (
-        <div style={{ width: 6, height: 6, borderRadius: '50%', background: color }} />
-      )}
-    </div>
+    <RecommendationImage
+      src={imageUrl}
+      category={category}
+      alt=""
+      width={48}
+      height={48}
+      style={{ borderRadius: 8 }}
+    />
   )
 }
 

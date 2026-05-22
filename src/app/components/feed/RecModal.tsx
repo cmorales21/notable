@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Image from 'next/image'
+import { RecommendationImage } from '@/app/components/RecommendationImage'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { RichMediaEmbed, willEmbed } from '@/app/components/RichMediaEmbed'
@@ -10,6 +10,7 @@ import { Avatar, ActionButton, ExternalLink, getExternalLinkLabel, formatRelativ
 import { LikeIcon, BookmarkIcon, CommentIcon } from './icons'
 import { theme } from '@/app/lib/theme'
 import { ReportModal } from './ReportModal'
+import { useToast } from '@/app/components/Toast'
 
 type Profile = RecProfile
 type Comment = RecComment
@@ -70,8 +71,9 @@ export function RecModal({
   const profile = rec.profiles
   const scrollableRef = useRef<HTMLDivElement>(null)
   const supabaseRef = useRef(createClient())
-  const [imgError, setImgError] = useState(false)
   const [embedFailed, setEmbedFailed] = useState(false)
+  const [likeAnim, setLikeAnim] = useState<'pop' | 'shrink' | null>(null)
+  const [bookmarkAnim, setBookmarkAnim] = useState(false)
   const [commentLikesMap, setCommentLikesMap] = useState<Record<string, { count: number; likedByMe: boolean }>>({})
   const [openMenuCommentId, setOpenMenuCommentId] = useState<string | null>(null)
   const [openRecMenu, setOpenRecMenu] = useState(false)
@@ -82,7 +84,7 @@ export function RecModal({
   const [ignoringUser, setIgnoringUser] = useState(false)
   const [localDescription, setLocalDescription] = useState(rec.description)
   const [deletedCommentIds, setDeletedCommentIds] = useState<Set<string>>(new Set())
-  const [showCopied, setShowCopied] = useState(false)
+  const toast = useToast()
   const [reportingRec, setReportingRec] = useState(false)
   const [reportingCommentId, setReportingCommentId] = useState<string | null>(null)
 
@@ -116,6 +118,7 @@ export function RecModal({
     setDeletedCommentIds(prev => new Set([...prev, commentId]))
     await supabaseRef.current.from('comments').delete().eq('id', commentId).eq('user_id', commentUserId)
     onCommentCountChange?.(rec.id, -1)
+    toast('Comment removed')
   }
 
   async function reportComment(commentId: string, reason: string, details: string) {
@@ -128,6 +131,7 @@ export function RecModal({
     if (!currentUserId) return
     const fullReason = details ? `${reason} — ${details}` : reason
     await supabaseRef.current.from('recommendation_reports').insert({ recommendation_id: rec.id, reporter_id: currentUserId, reason: fullReason })
+    toast('Report submitted')
   }
 
   async function saveDescEdit() {
@@ -139,6 +143,7 @@ export function RecModal({
     setEditingDesc(false)
     setSubmittingEdit(false)
     setOpenRecMenu(false)
+    toast('Saved')
   }
 
   async function deleteRec() {
@@ -146,13 +151,13 @@ export function RecModal({
     await supabaseRef.current.from('recommendations').delete().eq('id', rec.id).eq('user_id', currentUserId)
     onClose()
     onRecDeleted?.()
+    toast('Recommendation removed')
   }
 
   async function handleShare() {
     const url = `${window.location.origin}/rec/${rec.id}`
     await navigator.clipboard.writeText(url)
-    setShowCopied(true)
-    setTimeout(() => setShowCopied(false), 2000)
+    toast('Link copied')
   }
 
   const isRecAuthor = currentUserId === rec.user_id
@@ -176,13 +181,14 @@ export function RecModal({
       if (reportingRec) { setReportingRec(false); return }
       if (reportingCommentId) { setReportingCommentId(null); return }
       if (openRecMenu) { setOpenRecMenu(false); return }
+      if (editingDesc) { setEditingDesc(false); return }
       if (deletingRec) { setDeletingRec(false); return }
       if (ignoringUser) { setIgnoringUser(false); return }
       onClose()
     }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [reportingRec, reportingCommentId, openRecMenu, deletingRec, ignoringUser, onClose])
+  }, [reportingRec, reportingCommentId, openRecMenu, editingDesc, deletingRec, ignoringUser, onClose])
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
@@ -247,16 +253,6 @@ export function RecModal({
                   <line x1="12" y1="2" x2="12" y2="15" />
                 </svg>
               </button>
-              {showCopied && (
-                <div style={{
-                  position: 'absolute', bottom: '-30px', right: 0, zIndex: 10,
-                  background: '#33261a', color: '#f5f0e8', fontSize: '12px',
-                  padding: '4px 10px', borderRadius: '6px', whiteSpace: 'nowrap',
-                  pointerEvents: 'none',
-                }}>
-                  Link copied!
-                </div>
-              )}
             </div>
             {(isRecAuthor || (currentUserId && currentUserId !== rec.user_id)) && (
               <div style={{ position: 'relative' }}>
@@ -349,57 +345,72 @@ export function RecModal({
         {/* Scrollable content */}
         <div ref={scrollableRef} style={{ overflowY: 'auto', flex: 1 }}>
           {editingDesc ? (
-            <div style={{ padding: '14px 20px' }}>
+            <div onClick={e => e.stopPropagation()} style={{ padding: '14px 20px' }}>
               <textarea
                 value={editDescInput}
                 onChange={e => setEditDescInput(e.target.value)}
+                maxLength={2000}
                 rows={4}
+                autoFocus
                 style={{
                   width: '100%', background: theme.colors.input, border: '1px solid rgba(0,0,0,0.12)',
                   borderRadius: '10px', padding: '10px 14px', color: theme.colors.textPrimary,
-                  fontSize: '15px', fontFamily: 'var(--font-body, "DM Sans", sans-serif)',
+                  fontSize: '15px', fontFamily: theme.fonts.body,
                   lineHeight: '1.65', resize: 'none', outline: 'none', boxSizing: 'border-box',
                 }}
               />
-              <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                <button
-                  onClick={saveDescEdit}
-                  disabled={submittingEdit || !editDescInput.trim()}
-                  className="font-body"
-                  style={{ padding: '7px 16px', background: accentColor, border: 'none', borderRadius: '8px', color: '#ffffff', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
-                >
-                  {submittingEdit ? 'Saving…' : 'Save'}
-                </button>
-                <button
-                  onClick={() => { setEditingDesc(false); setOpenRecMenu(false) }}
-                  className="font-body"
-                  style={{ padding: '7px 16px', background: theme.colors.border, border: 'none', borderRadius: '8px', color: theme.colors.textMuted, fontSize: '13px', cursor: 'pointer' }}
-                >
-                  Cancel
-                </button>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={saveDescEdit}
+                    disabled={submittingEdit || !editDescInput.trim()}
+                    className="font-body"
+                    style={{ padding: '7px 18px', background: theme.colors.textPrimary, border: 'none', borderRadius: '8px', color: '#ffffff', fontSize: '13px', fontWeight: 600, cursor: submittingEdit ? 'default' : 'pointer', opacity: (!editDescInput.trim() || submittingEdit) ? 0.5 : 1 }}
+                  >
+                    {submittingEdit ? 'Saving…' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => { setEditingDesc(false); setOpenRecMenu(false) }}
+                    className="font-body"
+                    style={{ padding: '7px 14px', background: 'none', border: 'none', color: theme.colors.textMuted, fontSize: '13px', cursor: 'pointer' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <span className="font-body" style={{ fontSize: '12px', color: editDescInput.length > 1800 ? theme.colors.error : theme.colors.textMuted }}>
+                  {editDescInput.length}/2000
+                </span>
               </div>
             </div>
           ) : (
-            <p className="font-body" style={{ fontSize: '15px', color: theme.colors.textPrimary, lineHeight: '1.65', padding: '14px 20px 14px' }}>
-              {localDescription}
-            </p>
+            <div style={{ position: 'relative', padding: '14px 20px' }}>
+              <p className="font-body" style={{ fontSize: '15px', color: theme.colors.textPrimary, lineHeight: '1.65', margin: 0, paddingRight: isRecAuthor ? '28px' : 0 }}>
+                {localDescription}
+              </p>
+              {isRecAuthor && (
+                <button
+                  onClick={() => { setEditDescInput(localDescription); setEditingDesc(true) }}
+                  aria-label="Edit description"
+                  style={{
+                    position: 'absolute', top: '14px', right: '20px',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: theme.colors.textMuted, padding: '3px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    opacity: 0.55, transition: 'opacity 0.15s',
+                  }}
+                >
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                  </svg>
+                </button>
+              )}
+            </div>
           )}
 
           {(!willEmbed(rec.external_url, rec.category, context ?? 'feed') || embedFailed) && (
-            rec.image_url && !imgError ? (
-              <div style={{ position: 'relative', width: '100%', height: '200px', background: theme.colors.surface }}>
-                <Image
-                  src={rec.image_url}
-                  alt={rec.title}
-                  fill
-                  sizes="500px"
-                  onError={() => setImgError(true)}
-                  style={{ objectFit: 'contain' }}
-                />
-              </div>
-            ) : (
-              <div style={{ width: '100%', height: '200px', background: `linear-gradient(135deg, ${accentColor}55, ${accentColor}22)` }} />
-            )
+            <div style={{ position: 'relative', width: '100%', height: '200px', background: theme.colors.surface }}>
+              <RecommendationImage fill src={rec.image_url} category={rec.category} alt={rec.title} sizes="500px" style={{ objectFit: 'contain' }} />
+            </div>
           )}
 
           <h2
@@ -424,14 +435,31 @@ export function RecModal({
           )}
 
           <div style={{ display: 'flex', gap: '4px', padding: '0 14px', marginBottom: '20px' }}>
-            <ActionButton onClick={onLike} active={liked} activeColor={accentColor} label="Like">
-              <LikeIcon filled={liked} color={liked ? accentColor : theme.colors.textMuted} />
+            <ActionButton
+              onClick={(e) => {
+                setLikeAnim(liked ? 'shrink' : 'pop')
+                setTimeout(() => setLikeAnim(null), liked ? 150 : 350)
+                onLike(e)
+              }}
+              active={liked} activeColor={accentColor} label="Like"
+            >
+              <span style={{ display: 'inline-flex' }} className={likeAnim === 'pop' ? 'like-pop' : likeAnim === 'shrink' ? 'like-shrink' : undefined}>
+                <LikeIcon filled={liked} color={liked ? accentColor : theme.colors.textMuted} />
+              </span>
               <span style={{ fontSize: '14px', fontWeight: 500, color: liked ? accentColor : theme.colors.textMuted, transition: 'color 0.15s' }}>
                 {likeCount > 0 ? `${likeCount} ${likeCount === 1 ? 'like' : 'likes'}` : 'Like'}
               </span>
             </ActionButton>
-            <ActionButton onClick={onBookmark} active={bookmarked} activeColor={accentColor} label="Bookmark">
-              <BookmarkIcon filled={bookmarked} color={bookmarked ? accentColor : theme.colors.textMuted} />
+            <ActionButton
+              onClick={(e) => {
+                if (!bookmarked) { setBookmarkAnim(true); setTimeout(() => setBookmarkAnim(false), 250) }
+                onBookmark(e)
+              }}
+              active={bookmarked} activeColor={accentColor} label="Bookmark"
+            >
+              <span style={{ display: 'inline-flex' }} className={bookmarkAnim ? 'bm-bounce' : undefined}>
+                <BookmarkIcon filled={bookmarked} color={bookmarked ? accentColor : theme.colors.textMuted} />
+              </span>
               <span style={{ fontSize: '14px', fontWeight: 500, color: bookmarked ? accentColor : theme.colors.textMuted, transition: 'color 0.15s' }}>
                 {bookmarked ? 'Saved' : 'Save'}
               </span>

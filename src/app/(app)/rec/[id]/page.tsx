@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { cache } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { RecommendationImage } from '@/app/components/RecommendationImage'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { theme } from '@/app/lib/theme'
@@ -255,31 +256,9 @@ export default async function RecPage(
         }}>
 
           {/* Cover image or category-colored placeholder */}
-          {rec.image_url ? (
-            <div style={{ position: 'relative', width: '100%', height: '380px', background: theme.colors.input }}>
-              <Image
-                src={rec.image_url}
-                alt={rec.title}
-                fill
-                sizes="(max-width: 768px) 100vw, 680px"
-                style={{ objectFit: 'cover' }}
-              />
-            </div>
-          ) : (
-            <div style={{
-              width: '100%', height: '200px',
-              background: `linear-gradient(135deg, ${cat.color}40, ${cat.color}1a)`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Image
-                src={`/icons/${rec.category}-small.svg`}
-                alt=""
-                width={48}
-                height={48}
-                style={{ opacity: 0.3 }}
-              />
-            </div>
-          )}
+          <div style={{ position: 'relative', width: '100%', height: rec.image_url ? '380px' : '200px' }}>
+            <RecommendationImage fill src={rec.image_url} category={rec.category} alt={rec.title} sizes="(max-width: 768px) 100vw, 680px" style={{ objectFit: 'cover' }} />
+          </div>
 
           {/* Card body */}
           <div style={{ padding: '20px 24px 28px' }}>

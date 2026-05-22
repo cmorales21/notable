@@ -70,14 +70,16 @@ export function Avatar({
   name: string | null | undefined
   size: number
 }) {
+  const [imgErr, setImgErr] = useState(false)
   const initial = name ? name.charAt(0).toUpperCase() : '?'
-  if (url) {
+  if (url && !imgErr) {
     return (
       <Image
         src={url}
         alt={name ?? ''}
         width={size}
         height={size}
+        onError={() => setImgErr(true)}
         style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
       />
     )
@@ -98,8 +100,6 @@ export function Avatar({
 
 export function ActionButton({
   onClick,
-  active,
-  activeColor,
   label,
   children,
 }: {
@@ -120,9 +120,7 @@ export function ActionButton({
         display: 'flex', alignItems: 'center', gap: '5px',
         padding: '6px 10px', border: 'none', cursor: 'pointer',
         borderRadius: '8px', transition: 'background 0.15s',
-        background: active
-          ? hovered ? `${activeColor}22` : `${activeColor}14`
-          : hovered ? 'rgba(0,0,0,0.04)' : 'transparent',
+        background: hovered ? 'rgba(0,0,0,0.04)' : 'transparent',
       } as React.CSSProperties}
     >
       {children}

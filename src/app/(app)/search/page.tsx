@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Image from 'next/image'
+import { RecommendationImage } from '@/app/components/RecommendationImage'
 import { createClient } from '@/lib/supabase/client'
 import { useSearch } from '@/app/hooks/useSearch'
 import { Avatar } from '@/app/components/CategoryFeed'
@@ -44,29 +44,15 @@ const FILTERS: { id: FilterId; label: string }[] = [
 // ─── Image with fallback ──────────────────────────────────────────────────────
 
 function RecImage({ imageUrl, category, size }: { imageUrl: string | null; category: string; size: number }) {
-  const [imgError, setImgError] = useState(false)
-  const color = CATEGORY_COLORS[category] ?? '#6b5d4f'
-  const showImage = !!imageUrl && !imgError
-
   return (
-    <div style={{
-      position: 'relative', width: size, height: size, borderRadius: 10, overflow: 'hidden',
-      flexShrink: 0, background: showImage ? '#faf8f4' : `${color}26`,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
-      {showImage ? (
-        <Image
-          src={imageUrl!}
-          alt=""
-          fill
-          sizes={`${size}px`}
-          onError={() => setImgError(true)}
-          style={{ objectFit: 'cover' }}
-        />
-      ) : (
-        <div style={{ width: 8, height: 8, borderRadius: '50%', background: color }} />
-      )}
-    </div>
+    <RecommendationImage
+      src={imageUrl}
+      category={category}
+      alt=""
+      width={size}
+      height={size}
+      style={{ borderRadius: 10 }}
+    />
   )
 }
 

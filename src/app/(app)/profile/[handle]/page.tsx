@@ -3,12 +3,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Image from 'next/image'
+import { RecommendationImage } from '@/app/components/RecommendationImage'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar, RecModal, Recommendation, RecComment, RecProfile, sortComments } from '@/app/components/CategoryFeed'
 import EmptyState from '@/app/components/EmptyState'
 import { ReportModal } from '@/app/components/feed/ReportModal'
 import { ProfileSkeleton, ProfileGridSkeleton } from '@/app/components/skeletons'
+import { useToast } from '@/app/components/Toast'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -102,35 +104,15 @@ function GridTile({ rec, onClick }: { rec: Recommendation; onClick: () => void }
         transition: 'transform 0.2s ease',
       }}
     >
-      {showImage ? (
-        <Image
-          src={rec.image_url!}
-          alt={rec.title}
-          fill
-          sizes="(max-width: 768px) 33vw, 25vw"
-          onError={() => setImgError(true)}
-          style={{ objectFit: 'cover' }}
-        />
-      ) : (
-        <div style={{
-          width: '100%', height: '100%',
-          background: `${color}26`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '16px',
-          boxSizing: 'border-box',
-        }}>
-          <p className="font-display" style={{
-            fontSize: '0.95rem', fontWeight: 600, color: '#33261a',
-            textAlign: 'center', lineHeight: 1.35, letterSpacing: '-0.01em',
-            overflow: 'hidden',
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-          }}>
-            {rec.title}
-          </p>
-        </div>
-      )}
+      <RecommendationImage
+        fill
+        src={rec.image_url}
+        category={rec.category}
+        alt={rec.title}
+        sizes="(max-width: 768px) 33vw, 25vw"
+        onError={() => setImgError(true)}
+        style={{ objectFit: 'cover' }}
+      />
 
       {/* Category dot */}
       <div style={{
@@ -413,6 +395,7 @@ function EditProfileModal({
 }) {
   const supabase = useRef(createClient())
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const toast = useToast()
   const [name, setName] = useState(profile.name ?? '')
   const [bio, setBio] = useState(profile.bio ?? '')
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url)
@@ -457,6 +440,7 @@ function EditProfileModal({
         .update({ name: name.trim(), bio: bio.trim(), avatar_url: avatarUrl })
         .eq('id', currentUserId)
       if (updateErr) throw updateErr
+      toast('Profile saved')
       onSave({ name: name.trim(), bio: bio.trim(), avatar_url: avatarUrl })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')
@@ -624,7 +608,7 @@ export default function ProfilePage() {
   const [blockMenuOpen, setBlockMenuOpen] = useState(false)
   const [blockConfirm, setBlockConfirm] = useState(false)
   const [blockLoading, setBlockLoading] = useState(false)
-  const [profileToast, setProfileToast] = useState<string | null>(null)
+  const toast = useToast()
   const [reportOpen, setReportOpen] = useState(false)
 
   // Followers/following modal
@@ -778,18 +762,22 @@ export default function ProfilePage() {
       await supabase.current.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', profile.id)
       setIsFollowing(false)
       setFollowerCount(c => c - 1)
+      toast('Unfollowed')
     } else if (isPendingFollow) {
       await supabase.current.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', profile.id)
       await supabase.current.from('notifications').delete()
         .eq('user_id', profile.id).eq('actor_id', currentUserId).eq('type', 'follow_request')
       setIsPendingFollow(false)
+      toast('Follow request canceled')
     } else if (profile.profile_private) {
       await supabase.current.from('follows').insert({ follower_id: currentUserId, following_id: profile.id, status: 'pending' })
       setIsPendingFollow(true)
+      toast('Follow request sent')
     } else {
       await supabase.current.from('follows').insert({ follower_id: currentUserId, following_id: profile.id })
       setIsFollowing(true)
       setFollowerCount(c => c + 1)
+      toast(`Following ${profile.name ?? profile.handle ?? 'them'}`)
     }
     setFollowLoading(false)
   }
@@ -812,8 +800,7 @@ export default function ProfilePage() {
     setBlockConfirm(false)
     setBlockMenuOpen(false)
     const name = profile.name ?? `@${profile.handle}`
-    setProfileToast(`${name} blocked`)
-    setTimeout(() => setProfileToast(null), 3000)
+    toast(`${name} blocked`)
     setBlockLoading(false)
   }
 
@@ -824,8 +811,7 @@ export default function ProfilePage() {
     setIBlockedThem(false)
     setBlockMenuOpen(false)
     const name = profile.name ?? `@${profile.handle}`
-    setProfileToast(`${name} unblocked`)
-    setTimeout(() => setProfileToast(null), 3000)
+    toast(`${name} unblocked`)
   }
 
   // ── Avatar upload ───────────────────────────────────────────────────────────
@@ -845,6 +831,7 @@ export default function ProfilePage() {
       const { data: { publicUrl } } = supabase.current.storage.from('avatars').getPublicUrl(path)
       await supabase.current.from('profiles').update({ avatar_url: publicUrl }).eq('id', currentUserId)
       setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : prev)
+      toast('Photo updated')
     } catch (err) {
       if (process.env.NODE_ENV !== 'production') console.error('Avatar upload failed:', err)
     } finally {
@@ -1541,19 +1528,6 @@ export default function ProfilePage() {
         />
       )}
 
-      {/* ── Toast ──────────────────────────────────────────────────────── */}
-      {profileToast && (
-        <div style={{
-          position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
-          background: '#33261a', color: '#f5f0e8', fontSize: '14px',
-          fontFamily: 'var(--font-body, "DM Sans", sans-serif)',
-          padding: '10px 20px', borderRadius: '999px', zIndex: 500,
-          pointerEvents: 'none', boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-          whiteSpace: 'nowrap',
-        }}>
-          {profileToast}
-        </div>
-      )}
     </>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import Image from 'next/image'
+import { RecommendationImage } from '@/app/components/RecommendationImage'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { RichMediaEmbed, willEmbed } from '@/app/components/RichMediaEmbed'
@@ -10,6 +10,7 @@ import { Avatar, ActionButton, TeaserText } from './helpers'
 import { LikeIcon, BookmarkIcon, CommentIcon } from './icons'
 import { theme } from '@/app/lib/theme'
 import { ReportModal } from './ReportModal'
+import { useToast } from '@/app/components/Toast'
 
 function OverlappingAvatars({ recommenders }: { recommenders: GroupedRecommender[] }) {
   const shown = recommenders.slice(0, 3)
@@ -83,6 +84,7 @@ export function GroupedCard({
   onIgnore?: (userId: string, userName: string) => void
   onDelete?: (recId: string) => void
 }) {
+  const toast = useToast()
   const supabaseRef = useRef(createClient())
   const leadRec = group.recommenders[0]
   const isMulti = group.recommenders.length > 1
@@ -93,6 +95,8 @@ export function GroupedCard({
   const [ignoreConfirm, setIgnoreConfirm] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [showReport, setShowReport] = useState(false)
+  const [likeAnim, setLikeAnim] = useState<'pop' | 'shrink' | null>(null)
+  const [bookmarkAnim, setBookmarkAnim] = useState<boolean>(false)
 
   const liked = leadRec.is_liked_by_user
   const bookmarked = leadRec.is_bookmarked_by_user
@@ -109,6 +113,7 @@ export function GroupedCard({
       .eq('user_id', currentUserId)
     setDeleteConfirm(false)
     onDelete?.(leadRec.recommendation_id)
+    toast('Recommendation removed')
   }
 
   function doIgnoreConfirm(e: React.MouseEvent) {
@@ -140,6 +145,7 @@ export function GroupedCard({
       reporter_id: currentUserId,
       reason: fullReason,
     })
+    toast('Report submitted')
   }
 
   return (
@@ -276,17 +282,13 @@ export function GroupedCard({
               onMouseLeave={() => setImageHovered(false)}
               style={{ display: 'block', height: '100%', position: 'relative' }}
             >
-              {group.image_url && !imgError ? (
-                <Image src={group.image_url} alt={group.title} fill sizes="(max-width: 768px) 100vw, 50vw" onError={() => setImgError(true)} style={{ objectFit: 'contain', background: theme.colors.surface }} />
-              ) : (
-                <div style={{ width: '100%', height: '100%', background: `linear-gradient(135deg, ${accentColor}55, ${accentColor}22)` }} />
-              )}
+              <RecommendationImage fill src={group.image_url} category={group.category} alt={group.title} sizes="(max-width: 768px) 100vw, 50vw" onError={() => setImgError(true)} style={{ objectFit: 'contain', background: theme.colors.surface }} />
               <div style={{
                 position: 'absolute', top: '8px', right: '8px',
                 background: 'rgba(0,0,0,0.55)', borderRadius: '7px',
                 width: '28px', height: '28px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                opacity: imageHovered ? 1 : 0, transition: 'opacity 0.15s',
+                opacity: imageHovered && !!group.image_url && !imgError ? 1 : 0, transition: 'opacity 0.15s',
                 backdropFilter: 'blur(4px)', pointerEvents: 'none',
               }}>
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -295,11 +297,7 @@ export function GroupedCard({
               </div>
             </a>
           ) : (
-            group.image_url && !imgError ? (
-              <Image src={group.image_url} alt={group.title} fill sizes="(max-width: 768px) 100vw, 50vw" onError={() => setImgError(true)} style={{ objectFit: 'contain', background: theme.colors.surface }} />
-            ) : (
-              <div style={{ width: '100%', height: '100%', background: `linear-gradient(135deg, ${accentColor}55, ${accentColor}22)` }} />
-            )
+            <RecommendationImage fill src={group.image_url} category={group.category} alt={group.title} sizes="(max-width: 768px) 100vw, 50vw" onError={() => setImgError(true)} style={{ objectFit: 'contain', background: theme.colors.surface }} />
           )}
         </div>
       )}
@@ -317,14 +315,31 @@ export function GroupedCard({
         </h2>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <ActionButton onClick={onLike} active={liked} activeColor={accentColor} label="Like">
-            <LikeIcon filled={liked} color={liked ? accentColor : theme.colors.textMuted} />
+          <ActionButton
+            onClick={(e) => {
+              setLikeAnim(liked ? 'shrink' : 'pop')
+              setTimeout(() => setLikeAnim(null), liked ? 150 : 350)
+              onLike(e)
+            }}
+            active={liked} activeColor={accentColor} label="Like"
+          >
+            <span style={{ display: 'inline-flex' }} className={likeAnim === 'pop' ? 'like-pop' : likeAnim === 'shrink' ? 'like-shrink' : undefined}>
+              <LikeIcon filled={liked} color={liked ? accentColor : theme.colors.textMuted} />
+            </span>
             <span style={{ fontSize: '13px', fontWeight: 500, color: liked ? accentColor : theme.colors.textMuted, transition: 'color 0.15s' }}>
               {group.total_likes > 0 ? group.total_likes : ''}
             </span>
           </ActionButton>
-          <ActionButton onClick={onBookmark} active={bookmarked} activeColor={accentColor} label="Bookmark">
-            <BookmarkIcon filled={bookmarked} color={bookmarked ? accentColor : theme.colors.textMuted} />
+          <ActionButton
+            onClick={(e) => {
+              if (!bookmarked) { setBookmarkAnim(true); setTimeout(() => setBookmarkAnim(false), 250) }
+              onBookmark(e)
+            }}
+            active={bookmarked} activeColor={accentColor} label="Bookmark"
+          >
+            <span style={{ display: 'inline-flex' }} className={bookmarkAnim ? 'bm-bounce' : undefined}>
+              <BookmarkIcon filled={bookmarked} color={bookmarked ? accentColor : theme.colors.textMuted} />
+            </span>
           </ActionButton>
           <ActionButton onClick={onCommentClick} active={false} activeColor={accentColor} label="Comments">
             <CommentIcon color={theme.colors.textMuted} />

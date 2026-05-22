@@ -2,10 +2,12 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import Image from 'next/image'
+import { RecommendationImage } from '@/app/components/RecommendationImage'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Whisper from '@/app/components/Whisper'
 import { useWhispers } from '@/app/hooks/useWhispers'
+import { useToast } from '@/app/components/Toast'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,7 +71,7 @@ function CatIcon({ id, selected = false }: { id: Category; selected?: boolean })
 
 // ─── Result row ───────────────────────────────────────────────────────────────
 
-function ResultRow({ item, onSelect }: { item: SearchResult; onSelect: (r: SearchResult) => void }) {
+function ResultRow({ item, category, onSelect }: { item: SearchResult; category: string; onSelect: (r: SearchResult) => void }) {
   return (
     <button
       onClick={() => onSelect(item)}
@@ -81,14 +83,7 @@ function ResultRow({ item, onSelect }: { item: SearchResult; onSelect: (r: Searc
         padding: '10px 14px',
       }}
     >
-      <div style={{
-        position: 'relative', width: '40px', height: '40px', borderRadius: '7px',
-        background: '#f5f0e8', flexShrink: 0, overflow: 'hidden',
-      }}>
-        {item.image
-          ? <Image src={item.image} alt={item.title} fill sizes="40px" style={{ objectFit: 'cover' }} />
-          : <div style={{ width: '100%', height: '100%' }} />}
-      </div>
+      <RecommendationImage src={item.image} category={category} alt={item.title} width={40} height={40} style={{ borderRadius: '7px' }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{
           color: 'var(--color-text)', fontSize: '13px', fontWeight: 500,
@@ -230,6 +225,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
   const skipDupRef = useRef(false)
 
   const { dismiss: dismissWhisper } = useWhispers()
+  const toast = useToast()
 
   const accentColor = category ? CAT_CONFIG[category].color : '#6b9fd4'
   const canPost = !!category && (!!confirmedItem || !!uploadedImage || text.replace(URL_RE, '').trim().length > 5)
@@ -630,6 +626,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
       }
 
       setPostSuccess(true)
+      toast('Recommendation posted!')
       const postedCategory = category!
       window.dispatchEvent(new CustomEvent('notable:new-post', { detail: { category: postedCategory } }))
       setTimeout(() => {
@@ -1043,7 +1040,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
                   </button>
                 </div>
                 {dropdownItems.map(item => (
-                  <ResultRow key={item.id} item={item} onSelect={handleConfirm} />
+                  <ResultRow key={item.id} item={item} category={category ?? ''} onSelect={handleConfirm} />
                 ))}
                 <p className="font-body" style={{
                   color: '#6b5d4f', fontSize: '12px', textAlign: 'center',
@@ -1061,17 +1058,9 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
                 background: '#faf8f4', position: 'relative',
                 border: '1px solid rgba(0,0,0,0.08)',
               }}>
-                {confirmedItem.image && (
-                  <div style={{ position: 'relative', width: '100%', height: '200px', background: '#faf8f4' }}>
-                    <Image
-                      src={confirmedItem.image}
-                      alt={confirmedItem.title}
-                      fill
-                      sizes="(max-width: 768px) 100vw, 600px"
-                      style={{ objectFit: 'contain' }}
-                    />
-                  </div>
-                )}
+                <div style={{ position: 'relative', width: '100%', height: '200px', background: '#faf8f4' }}>
+                  <RecommendationImage fill src={confirmedItem.image} category={category ?? ''} alt={confirmedItem.title} sizes="(max-width: 768px) 100vw, 600px" style={{ objectFit: 'contain' }} />
+                </div>
                 <div style={{ padding: '12px 14px 14px' }}>
                   <p className="font-display" style={{
                     color: 'var(--color-text)', fontSize: '15px', fontWeight: 700,
@@ -1261,7 +1250,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
 
 
                 {dropdownItems.length > 0 && dropdownItems.map(item => (
-                  <ResultRow key={item.id} item={item} onSelect={handleConfirm} />
+                  <ResultRow key={item.id} item={item} category={category ?? ''} onSelect={handleConfirm} />
                 ))}
 
                 {manualQuery.length > 0 && !manualSearching && dropdownItems.length === 0 && (
