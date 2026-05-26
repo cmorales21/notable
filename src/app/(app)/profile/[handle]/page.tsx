@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { RecommendationImage } from '@/app/components/RecommendationImage'
 import Link from 'next/link'
@@ -38,8 +38,7 @@ interface Collection {
   position: number
   created_at: string
   updated_at: string
-  collection_items: { count: number }[]
-  cover_rec: { image_url: string | null; category: string } | null
+  collection_items: { recommendation_id: string; recommendations: { image_url: string | null } | null }[]
 }
 
 interface FollowUser {
@@ -586,11 +585,13 @@ function FollowListModal({
 
 function CollectionCard({ collection }: { collection: Collection }) {
   const [hovered, setHovered] = useState(false)
-  const [imgError, setImgError] = useState(false)
-  const coverImage = collection.cover_rec?.image_url ?? null
-  const showImage = !!coverImage && !imgError
-  const itemCount = collection.collection_items?.[0]?.count ?? 0
+  const itemCount = collection.collection_items?.length ?? 0
   const accentColor = CATEGORY_COLORS[collection.category] ?? '#6b5d4f'
+  const mosaicUrls = (collection.collection_items ?? [])
+    .map(ci => ci.recommendations?.image_url ?? null)
+    .filter((u): u is string => !!u)
+    .slice(0, 4)
+  const hasMosaic = mosaicUrls.length > 0
 
   return (
     <Link href={`/collections/${collection.id}`} style={{ textDecoration: 'none', display: 'block' }}>
@@ -599,29 +600,47 @@ function CollectionCard({ collection }: { collection: Collection }) {
         onMouseLeave={() => setHovered(false)}
         style={{
           position: 'relative',
-          aspectRatio: '1/1',
-          borderRadius: '12px',
+          aspectRatio: '3/4',
+          borderRadius: '10px',
           overflow: 'hidden',
           cursor: 'pointer',
-          background: showImage ? '#faf8f4' : `${accentColor}18`,
-          transform: hovered ? 'scale(1.02)' : 'scale(1)',
+          background: hasMosaic ? '#faf8f4' : `${accentColor}18`,
+          transform: hovered ? 'scale(1.03)' : 'scale(1)',
           transition: 'transform 0.2s ease',
-          border: `1px solid ${accentColor}22`,
         }}
       >
-        {showImage && (
-          <Image
-            src={coverImage!}
-            alt={collection.name}
-            fill
-            sizes="(max-width: 768px) 50vw, 33vw"
-            style={{ objectFit: 'cover' }}
-            onError={() => setImgError(true)}
-          />
+        {/* Mosaic image grid */}
+        {hasMosaic && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'grid',
+            gridTemplateColumns: mosaicUrls.length >= 2 ? '1fr 1fr' : '1fr',
+            gridTemplateRows: mosaicUrls.length >= 3 ? '1fr 1fr' : '1fr',
+            gap: '1px',
+            background: '#e8e0d4',
+          }}>
+            {mosaicUrls.map((url, i) => (
+              <div
+                key={i}
+                style={{
+                  position: 'relative', overflow: 'hidden',
+                  gridColumn: mosaicUrls.length === 3 && i === 2 ? 'span 2' : undefined,
+                }}
+              >
+                <Image
+                  src={url}
+                  alt=""
+                  fill
+                  sizes="(max-width: 480px) 25vw, 16vw"
+                  style={{ objectFit: 'cover' }}
+                />
+              </div>
+            ))}
+          </div>
         )}
 
         {/* Gradient overlay */}
-        {showImage && (
+        {hasMosaic && (
           <div style={{
             position: 'absolute', inset: 0,
             background: 'linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.1) 55%, transparent 100%)',
@@ -630,22 +649,22 @@ function CollectionCard({ collection }: { collection: Collection }) {
 
         {/* Top row: category badge + lock */}
         <div style={{
-          position: 'absolute', top: '9px', left: '9px', right: '9px',
+          position: 'absolute', top: '8px', left: '8px', right: '8px',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <span className="font-body" style={{
             fontSize: '10px', fontWeight: 600,
-            color: showImage ? '#ffffff' : accentColor,
-            background: showImage ? 'rgba(0,0,0,0.38)' : `${accentColor}22`,
+            color: hasMosaic ? '#ffffff' : accentColor,
+            background: hasMosaic ? 'rgba(0,0,0,0.38)' : `${accentColor}22`,
             borderRadius: '20px', padding: '2px 7px',
             letterSpacing: '0.03em',
-            backdropFilter: showImage ? 'blur(4px)' : 'none',
+            backdropFilter: hasMosaic ? 'blur(4px)' : 'none',
           }}>
             {CATEGORY_LABELS[collection.category]}
           </span>
           {collection.is_private && (
             <svg viewBox="0 0 24 24" fill="none"
-              stroke={showImage ? 'rgba(255,255,255,0.85)' : accentColor}
+              stroke={hasMosaic ? 'rgba(255,255,255,0.85)' : accentColor}
               strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="13" height="13">
               <rect x="3" y="11" width="18" height="11" rx="2" />
               <path d="M7 11V7a5 5 0 0110 0v4" />
@@ -654,13 +673,14 @@ function CollectionCard({ collection }: { collection: Collection }) {
         </div>
 
         {/* Name + count */}
-        {showImage ? (
-          <div style={{ position: 'absolute', bottom: '11px', left: '12px', right: '12px' }}>
+        {hasMosaic ? (
+          <div style={{ position: 'absolute', bottom: '10px', left: '10px', right: '10px' }}>
             <p className="font-display" style={{
-              fontSize: '0.88rem', fontWeight: 600, color: '#ffffff',
+              fontSize: '0.82rem', fontWeight: 600, color: '#ffffff',
               lineHeight: 1.3, marginBottom: '3px',
               overflow: 'hidden', display: '-webkit-box',
               WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+              letterSpacing: '-0.01em',
             }}>
               {collection.name}
             </p>
@@ -676,8 +696,7 @@ function CollectionCard({ collection }: { collection: Collection }) {
             padding: '16px', gap: '6px',
           }}>
             <p className="font-display" style={{
-              fontSize: '0.9rem', fontWeight: 600,
-              color: accentColor,
+              fontSize: '0.9rem', fontWeight: 600, color: accentColor,
               textAlign: 'center', lineHeight: 1.35,
               overflow: 'hidden', display: '-webkit-box',
               WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
@@ -735,7 +754,7 @@ function NewCollectionModal({
         is_private: isPrivate,
         position: 0,
       })
-      .select('*, collection_items(count), cover_rec:recommendations!cover_recommendation_id(image_url, category)')
+      .select('*, collection_items(recommendation_id, recommendations(image_url))')
       .single()
     if (insertErr) {
       setError(insertErr.message)
@@ -1147,6 +1166,7 @@ function EditProfileModal({
 
 export default function ProfilePage() {
   const { handle } = useParams<{ handle: string }>()
+  const router = useRouter()
   const supabase = useRef(createClient())
 
   const [profile, setProfile] = useState<FullProfile | null>(null)
@@ -1196,6 +1216,8 @@ export default function ProfilePage() {
   const [menuRec, setMenuRec] = useState<Recommendation | null>(null)
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null)
   const [menuNewCollectionOpen, setMenuNewCollectionOpen] = useState(false)
+
+  const [collectionsFilter, setCollectionsFilter] = useState<CollectionCategory | 'all'>('all')
 
   const [savedCollections, setSavedCollections] = useState<SavedCollection[]>([])
   const [savedCollectionsLoaded, setSavedCollectionsLoaded] = useState(false)
@@ -1334,7 +1356,7 @@ export default function ProfilePage() {
     try {
       const { data } = await supabase.current
         .from('collections')
-        .select('*, collection_items(count), cover_rec:recommendations!cover_recommendation_id(image_url, category)')
+        .select('*, collection_items(recommendation_id, recommendations(image_url))')
         .eq('user_id', profileId)
         .order('position', { ascending: true })
         .order('created_at', { ascending: false })
@@ -1358,7 +1380,7 @@ export default function ProfilePage() {
     async function loadOwnerCollections() {
       const { data } = await supabase.current
         .from('collections')
-        .select('*, collection_items(count), cover_rec:recommendations!cover_recommendation_id(image_url, category)')
+        .select('*, collection_items(recommendation_id, recommendations(image_url))')
         .eq('user_id', currentUserId!)
         .order('position', { ascending: true })
         .order('created_at', { ascending: false })
@@ -1475,7 +1497,7 @@ export default function ProfilePage() {
       }
       setUserCollections(prev => prev.map(c =>
         c.id === collectionId
-          ? { ...c, collection_items: [{ count: (c.collection_items?.[0]?.count ?? 0) + 1 }] }
+          ? { ...c, collection_items: [...(c.collection_items ?? []), { recommendation_id: recId, recommendations: null }] }
           : c
       ))
     }
@@ -2089,6 +2111,36 @@ export default function ProfilePage() {
             {/* ── Grid ────────────────────────────────────────────────── */}
             {activeTab === 'collections' ? (
               <>
+                {/* ── Category filter pills ────────────────────────────── */}
+                {(collections.length > 0 || collectionsLoading) && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: '2px' }}>
+                      {(['all', ...COLLECTION_CATEGORIES] as (CollectionCategory | 'all')[]).map(cat => {
+                        const active = collectionsFilter === cat
+                        const color = cat === 'all' ? '#6b5d4f' : CATEGORY_COLORS[cat]
+                        return (
+                          <button
+                            key={cat}
+                            onClick={() => setCollectionsFilter(cat)}
+                            className="font-body"
+                            style={{
+                              background: active ? (cat === 'all' ? 'rgba(0,0,0,0.1)' : color) : 'transparent',
+                              border: `1px solid ${active ? (cat === 'all' ? 'rgba(0,0,0,0.15)' : color) : 'rgba(0,0,0,0.1)'}`,
+                              borderRadius: '20px', padding: '4px 11px',
+                              fontSize: '12px', fontWeight: active ? 600 : 400,
+                              color: active ? (cat === 'all' ? '#33261a' : '#ffffff') : '#6b5d4f',
+                              cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                              transition: 'all 0.13s',
+                            }}
+                          >
+                            {cat === 'all' ? 'All' : CATEGORY_LABELS[cat]}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {isOwnProfile && (
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px' }}>
                     <button
@@ -2164,55 +2216,71 @@ export default function ProfilePage() {
                   </div>
                 )}
                 {collectionsLoading ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
-                    {[1, 2, 3, 4].map(i => (
-                      <div key={i} className="skeleton-pulse" style={{ aspectRatio: '1/1', borderRadius: '12px', background: '#efe9e0' }} />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                    {[1, 2, 3, 4, 5, 6].map(i => (
+                      <div key={i} className="skeleton-pulse" style={{ aspectRatio: '3/4', borderRadius: '10px', background: '#efe9e0' }} />
                     ))}
                   </div>
-                ) : collections.length === 0 ? (
-                  isOwnProfile ? (
-                    <EmptyState
-                      title="No collections yet"
-                      description="Group your recommendations into collections. Tap + New Collection to get started."
-                    />
-                  ) : (
-                    <EmptyState
-                      title="No collections yet"
-                      description={`${profile?.name ?? 'This person'} hasn't created any collections yet.`}
-                    />
+                ) : (() => {
+                  const filteredCollections = collectionsFilter === 'all'
+                    ? collections
+                    : collections.filter(c => c.category === collectionsFilter)
+                  const visibleCats = COLLECTION_CATEGORIES.filter(cat =>
+                    filteredCollections.some(c => c.category === cat)
                   )
-                ) : (
-                  <>
-                    <style>{`@media (max-width: 360px) { .collections-grid { grid-template-columns: repeat(1, 1fr) !important; } }`}</style>
-                    {COLLECTION_CATEGORIES.filter(cat => collections.some(c => c.category === cat)).map(cat => {
-                      const catCollections = collections.filter(c => c.category === cat)
-                      const color = CATEGORY_COLORS[cat]
-                      return (
-                        <div key={cat} style={{ marginBottom: '24px' }}>
-                          {/* Category header */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, flexShrink: 0 }} />
-                            <h3 className="font-display" style={{
-                              fontSize: '0.9rem', fontWeight: 600,
-                              color: '#33261a', letterSpacing: '-0.01em',
-                            }}>
-                              {CATEGORY_LABELS[cat]}
-                            </h3>
-                            <span className="font-body" style={{ fontSize: '12px', color: '#a09278' }}>
-                              {catCollections.length}
-                            </span>
-                          </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}
-                            className="collections-grid">
-                            {catCollections.map(col => (
-                              <CollectionCard key={col.id} collection={col} />
-                            ))}
-                          </div>
-                        </div>
+                  return filteredCollections.length === 0 ? (
+                    collections.length === 0 ? (
+                      isOwnProfile ? (
+                        <EmptyState
+                          title="No collections yet"
+                          description="Group your recommendations into collections. Tap + New Collection to get started."
+                        />
+                      ) : (
+                        <EmptyState
+                          title="No collections yet"
+                          description={`${profile?.name ?? 'This person'} hasn't created any collections yet.`}
+                        />
                       )
-                    })}
-                  </>
-                )}
+                    ) : (
+                      <EmptyState
+                        title={`No ${CATEGORY_LABELS[collectionsFilter as CollectionCategory]} collections`}
+                        description=""
+                      />
+                    )
+                  ) : (
+                    <>
+                      <style>{`
+                        @media (max-width: 480px) { .collections-grid { grid-template-columns: repeat(2, 1fr) !important; } }
+                        @media (max-width: 320px) { .collections-grid { grid-template-columns: repeat(1, 1fr) !important; } }
+                      `}</style>
+                      {visibleCats.map(cat => {
+                        const catCollections = filteredCollections.filter(c => c.category === cat)
+                        const color = CATEGORY_COLORS[cat]
+                        return (
+                          <div key={cat} style={{ marginBottom: '24px' }}>
+                            {collectionsFilter === 'all' && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, flexShrink: 0 }} />
+                                <h3 className="font-display" style={{ fontSize: '0.9rem', fontWeight: 600, color: '#33261a', letterSpacing: '-0.01em' }}>
+                                  {CATEGORY_LABELS[cat]}
+                                </h3>
+                                <span className="font-body" style={{ fontSize: '12px', color: '#a09278' }}>
+                                  {catCollections.length}
+                                </span>
+                              </div>
+                            )}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}
+                              className="collections-grid">
+                              {catCollections.map(col => (
+                                <CollectionCard key={col.id} collection={col} />
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </>
+                  )
+                })()}
               </>
             ) : recsLoading ? (
               <ProfileGridSkeleton />
@@ -2395,6 +2463,7 @@ export default function ProfilePage() {
             setCollections(prev => [col, ...prev])
             setUserCollections(prev => [col, ...prev])
             setNewCollectionOpen(false)
+            router.push(`/collections/${col.id}`)
           }}
         />
       )}
@@ -2423,7 +2492,7 @@ export default function ProfilePage() {
             }).eq('id', col.id)
             // Reflect cover and count in local state
             setUserCollections(prev => prev.map(c =>
-              c.id === col.id ? { ...c, cover_recommendation_id: rec.id, collection_items: [{ count: 1 }] } : c
+              c.id === col.id ? { ...c, cover_recommendation_id: rec.id, collection_items: [{ recommendation_id: rec.id, recommendations: { image_url: rec.image_url ?? null } }] } : c
             ))
             setMenuNewCollectionOpen(false)
           }}

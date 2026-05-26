@@ -380,6 +380,92 @@ function AddItemsPicker({
   )
 }
 
+// ─── Collection grid tile ─────────────────────────────────────────────────────
+
+function CollectionGridTile({
+  rec, accentColor, onRemove, onClick,
+}: {
+  rec: Recommendation
+  accentColor: string
+  onRemove?: () => void
+  onClick: () => void
+}) {
+  const [hovered, setHovered] = useState(false)
+  const [imgError, setImgError] = useState(false)
+  const showImage = !!rec.image_url && !imgError
+
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        position: 'relative', aspectRatio: '3/4', borderRadius: '10px',
+        overflow: 'hidden', cursor: 'pointer',
+        background: showImage ? '#faf8f4' : `${accentColor}18`,
+        transform: hovered ? 'scale(1.03)' : 'scale(1)',
+        transition: 'transform 0.2s ease',
+      }}
+    >
+      {showImage && (
+        <RecommendationImage
+          fill src={rec.image_url} category={rec.category} alt={rec.title}
+          sizes="(max-width: 768px) 33vw, 25vw"
+          onFallback={() => setImgError(true)}
+          style={{ objectFit: 'cover' }}
+        />
+      )}
+
+      {onRemove && (
+        <button
+          onClick={e => { e.stopPropagation(); onRemove() }}
+          aria-label="Remove from collection"
+          style={{
+            position: 'absolute', top: '6px', right: '6px', zIndex: 10,
+            width: '22px', height: '22px', borderRadius: '50%',
+            background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+            border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            opacity: hovered ? 1 : 0, transition: 'opacity 0.15s',
+          }}
+        >
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="white" strokeWidth="2.8" strokeLinecap="round">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      )}
+
+      {showImage ? (
+        <>
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.1) 55%, transparent 100%)',
+          }} />
+          <p className="font-display" style={{
+            position: 'absolute', bottom: '10px', left: '10px', right: '10px',
+            fontSize: '0.82rem', fontWeight: 600, color: '#ffffff', lineHeight: 1.3,
+            overflow: 'hidden', display: '-webkit-box',
+            WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', letterSpacing: '-0.01em',
+          }}>
+            {rec.title}
+          </p>
+        </>
+      ) : (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <p className="font-display" style={{
+            fontSize: '0.88rem', fontWeight: 600, color: accentColor,
+            textAlign: 'center', lineHeight: 1.35,
+            overflow: 'hidden', display: '-webkit-box',
+            WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', letterSpacing: '-0.01em',
+          }}>
+            {rec.title}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Edit Collection Modal ────────────────────────────────────────────────────
 
 function EditCollectionModal({
@@ -810,7 +896,8 @@ export default function CollectionPage() {
       setCollection(colData as CollectionData)
 
       // Fetch items + collection like/bookmark in parallel
-      const [{ data: itemsData }, { count: likeCount }, myLikeRes, myBmRes] = await Promise.all([
+      // Note: no FK exists between recommendations→profiles in PostgREST, so profiles are fetched separately
+      const [itemsResult, { count: likeCount }, myLikeRes, myBmRes] = await Promise.all([
         supabase.current
           .from('collection_items')
           .select(`
@@ -818,8 +905,7 @@ export default function CollectionPage() {
             recommendation_id,
             added_at,
             recommendations(
-              id, user_id, category, title, description, image_url, external_url, item_id, created_at,
-              profiles(name, handle, avatar_url)
+              id, user_id, category, title, description, image_url, external_url, item_id, created_at
             )
           `)
           .eq('collection_id', id)
@@ -837,7 +923,27 @@ export default function CollectionPage() {
       setCollectionLiked(!!myLikeRes.data)
       setCollectionBookmarked(!!myBmRes.data)
 
-      const rows: CollectionItemRow[] = (itemsData ?? []).map((row: Record<string, unknown>) => {
+      const { data: itemsData, error: itemsErr } = itemsResult
+      if (itemsErr) console.error('[collection_items]', itemsErr)
+
+      const validRows = (itemsData ?? []).filter(
+        (row: Record<string, unknown>) => row.recommendations != null
+      )
+
+      // Batch-fetch profiles (no FK join exists between recommendations and profiles)
+      const userIds = [...new Set(validRows.map((row: Record<string, unknown>) =>
+        (row.recommendations as Record<string, unknown>).user_id as string
+      ))]
+      const profileMap: Record<string, RecProfile> = {}
+      if (userIds.length > 0) {
+        const { data: profilesData } = await supabase.current
+          .from('profiles').select('id, name, handle, avatar_url').in('id', userIds)
+        for (const p of (profilesData ?? []) as Array<{ id: string } & RecProfile>) {
+          profileMap[p.id] = { name: p.name, handle: p.handle, avatar_url: p.avatar_url }
+        }
+      }
+
+      const rows: CollectionItemRow[] = validRows.map((row: Record<string, unknown>) => {
         const r = row.recommendations as Record<string, unknown>
         return {
           id: row.id as string,
@@ -853,7 +959,7 @@ export default function CollectionPage() {
             external_url: r.external_url as string | null,
             item_id: r.item_id as string | null,
             created_at: r.created_at as string,
-            profiles: r.profiles as RecProfile | null,
+            profiles: profileMap[r.user_id as string] ?? null,
           } satisfies Recommendation,
         }
       })
@@ -1060,14 +1166,9 @@ export default function CollectionPage() {
         </div>
         <div className="skeleton-pulse" style={{ height: 36, width: '60%', borderRadius: 8, background: '#efe9e0', marginBottom: '10px' }} />
         <div className="skeleton-pulse" style={{ height: 16, width: '80%', borderRadius: 6, background: '#efe9e0', marginBottom: '24px' }} />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {[1, 2, 3].map(i => (
-            <div key={i} style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(0,0,0,0.08)' }}>
-              <div className="skeleton-pulse" style={{ height: '220px', background: '#efe9e0' }} />
-              <div style={{ padding: '12px 16px 16px' }}>
-                <div className="skeleton-pulse" style={{ height: 18, width: '70%', borderRadius: 6, background: '#efe9e0' }} />
-              </div>
-            </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="skeleton-pulse" style={{ aspectRatio: '3/4', borderRadius: '10px', background: '#efe9e0' }} />
           ))}
         </div>
       </div>
@@ -1375,17 +1476,22 @@ export default function CollectionPage() {
             </p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {items.map((item, i) => (
-              <div key={item.id} style={{ animationDelay: `${Math.min(i * 50, 250)}ms` }}>
-                <CollectionItemCard
+          <>
+            <style>{`
+              @media (max-width: 480px) { .coll-items-grid { grid-template-columns: repeat(2, 1fr) !important; } }
+            `}</style>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }} className="coll-items-grid">
+              {items.map(item => (
+                <CollectionGridTile
+                  key={item.id}
                   rec={item.rec}
+                  accentColor={accentColor}
                   onRemove={isOwnCollection ? () => handleRemoveItem(item.id) : undefined}
                   onClick={() => openRecModal(item.rec)}
                 />
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
