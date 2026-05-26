@@ -15,6 +15,7 @@ export interface GroupedRecommender {
   is_liked_by_user: boolean
   is_bookmarked_by_user: boolean
   external_url: string | null
+  item_id?: string | null
 }
 
 export interface GroupedRecommendation {
@@ -67,6 +68,7 @@ export function groupRecommendations(
       is_liked_by_user: userLikes.has(rec.id),
       is_bookmarked_by_user: userBookmarks.has(rec.id),
       external_url: rec.external_url,
+      item_id: rec.item_id,
     }
 
     const existing = groupMap.get(key)

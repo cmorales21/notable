@@ -7,6 +7,7 @@ import { RichMediaEmbed, willEmbed } from '@/app/components/RichMediaEmbed'
 import type { Recommendation, RecComment, RecProfile } from '@/app/lib/types'
 import type { GroupedRecommendation, GroupedRecommender } from '@/lib/groupRecommendations'
 import { ExternalLink, getExternalLinkLabel, fetchComments, sortComments } from './helpers'
+import { trackClick } from '@/lib/items'
 import { theme } from '@/app/lib/theme'
 import { RecModal } from './RecModal'
 import { RecommenderSection } from './RecommenderSection'
@@ -150,6 +151,7 @@ function SingleRecDetailModal({
     description: recommender.description,
     image_url: group.image_url,
     external_url: recommender.external_url,
+    item_id: recommender.item_id,
     created_at: recommender.created_at,
     profiles: recommender.profile,
   }
@@ -375,6 +377,7 @@ export function GroupedModal({
     description: leadRec.description,
     image_url: group.image_url,
     external_url: leadRec.external_url,
+    item_id: leadRec.item_id,
     created_at: leadRec.created_at,
     profiles: leadRec.profile,
   }
@@ -534,7 +537,12 @@ export function GroupedModal({
                 {willEmbed(group.external_url, group.category, 'feed') && !embedFailed ? (
                   <RichMediaEmbed external_url={group.external_url} category={group.category} context="feed" title={group.title} onEmbedFail={() => setEmbedFailed(true)} />
                 ) : (
-                  <ExternalLink href={group.external_url} label={getExternalLinkLabel(group.category, group.external_url)} color={accentColor} />
+                  <ExternalLink
+                    href={group.external_url}
+                    label={getExternalLinkLabel(group.category, group.external_url)}
+                    color={accentColor}
+                    onTrackClick={leadRec.item_id && currentUserId ? () => trackClick({ itemId: leadRec.item_id!, userId: currentUserId!, category: group.category, source: 'modal' }) : undefined}
+                  />
                 )}
               </div>
             )}

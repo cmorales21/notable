@@ -12,6 +12,7 @@ export interface Recommendation {
   description: string
   image_url: string | null
   external_url: string | null
+  item_id?: string | null
   created_at: string
   profiles: RecProfile | null
 }

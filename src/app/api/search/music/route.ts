@@ -5,7 +5,7 @@ export async function GET(req: NextRequest) {
   if (!q) return NextResponse.json({ items: [] })
 
   try {
-    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&limit=10`
+    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=music&entity=song&limit=10&country=US&lang=en`
     const res = await fetch(url)
     if (!res.ok) return NextResponse.json({ items: [] }, { status: 502 })
 

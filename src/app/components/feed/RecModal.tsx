@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { RichMediaEmbed, willEmbed } from '@/app/components/RichMediaEmbed'
 import type { Recommendation, RecComment, RecProfile } from '@/app/lib/types'
 import { Avatar, ActionButton, ExternalLink, getExternalLinkLabel, formatRelativeTime } from './helpers'
+import { trackClick } from '@/lib/items'
 import { LikeIcon, BookmarkIcon, CommentIcon } from './icons'
 import { theme } from '@/app/lib/theme'
 import { ReportModal } from './ReportModal'
@@ -431,7 +432,12 @@ export function RecModal({
               {willEmbed(rec.external_url, rec.category, context ?? 'feed') && !embedFailed ? (
                 <RichMediaEmbed external_url={rec.external_url} category={rec.category} context={context ?? 'feed'} title={rec.title} onEmbedFail={() => setEmbedFailed(true)} />
               ) : (
-                <ExternalLink href={rec.external_url} label={getExternalLinkLabel(rec.category, rec.external_url)} color={accentColor} />
+                <ExternalLink
+                  href={rec.external_url}
+                  label={getExternalLinkLabel(rec.category, rec.external_url)}
+                  color={accentColor}
+                  onTrackClick={rec.item_id && currentUserId ? () => trackClick({ itemId: rec.item_id!, userId: currentUserId!, category: rec.category, source: 'modal' }) : undefined}
+                />
               )}
             </div>
           )}

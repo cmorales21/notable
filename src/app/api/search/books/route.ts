@@ -5,7 +5,7 @@ export async function GET(req: NextRequest) {
   if (!q) return NextResponse.json({ items: [] })
 
   try {
-    const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=8&fields=key,title,author_name,cover_i`
+    const url = `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=8&fields=key,title,author_name,cover_i&language=eng`
     const res = await fetch(url)
     if (!res.ok) return NextResponse.json({ items: [] }, { status: 502 })
 

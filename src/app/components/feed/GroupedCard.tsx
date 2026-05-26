@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { RecommendationImage } from '@/app/components/RecommendationImage'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
@@ -11,6 +11,10 @@ import { LikeIcon, BookmarkIcon, CommentIcon } from './icons'
 import { theme } from '@/app/lib/theme'
 import { ReportModal } from './ReportModal'
 import { useToast } from '@/app/components/Toast'
+import { trackImpression, trackExpand } from '@/lib/items'
+
+const loggedImpressions = new Set<string>()
+const loggedExpands = new Set<string>()
 
 function OverlappingAvatars({ recommenders }: { recommenders: GroupedRecommender[] }) {
   const shown = recommenders.slice(0, 3)
@@ -86,6 +90,7 @@ export function GroupedCard({
 }) {
   const toast = useToast()
   const supabaseRef = useRef(createClient())
+  const cardRef = useRef<HTMLDivElement>(null)
   const leadRec = group.recommenders[0]
   const isMulti = group.recommenders.length > 1
   const [imageHovered, setImageHovered] = useState(false)
@@ -137,6 +142,24 @@ export function GroupedCard({
 
   const leadName = leadRec.profile?.name ?? leadRec.profile?.handle ?? 'this person'
 
+  useEffect(() => {
+    if (!leadRec.item_id || !currentUserId) return
+    const el = cardRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !loggedImpressions.has(leadRec.item_id!)) {
+          loggedImpressions.add(leadRec.item_id!)
+          trackImpression(leadRec.item_id!, currentUserId, group.category)
+        }
+        observer.disconnect()
+      },
+      { threshold: 0.5 },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [leadRec.item_id, currentUserId, group.category])
+
   async function reportRec(reason: string, details: string) {
     if (!currentUserId) return
     const fullReason = details ? `${reason} — ${details}` : reason
@@ -149,9 +172,15 @@ export function GroupedCard({
   }
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div ref={cardRef} style={{ position: 'relative' }}>
     <div
-      onClick={onClick}
+      onClick={() => {
+        if (leadRec.item_id && currentUserId && !loggedExpands.has(leadRec.item_id)) {
+          loggedExpands.add(leadRec.item_id)
+          trackExpand(leadRec.item_id, currentUserId, group.category)
+        }
+        onClick()
+      }}
       style={{
         background: theme.colors.surface, borderRadius: '16px',
         border: `1px solid ${theme.colors.border}`, overflow: 'hidden',

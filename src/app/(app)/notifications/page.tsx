@@ -7,17 +7,19 @@ import { createClient } from '@/lib/supabase/client'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type NotifType = 'follow' | 'follow_request' | 'follow_request_accepted' | 'like' | 'bookmark' | 'comment' | 'mention'
+type NotifType = 'follow' | 'follow_request' | 'follow_request_accepted' | 'like' | 'bookmark' | 'comment' | 'mention' | 'collection_like' | 'collection_bookmark'
 
 type RawNotif = {
   id: string
   type: NotifType
   rec_id: string | null
+  collection_id: string | null
   read: boolean
   updated_at: string
   actor_id: string | null
   actor: { name: string | null; handle: string | null; avatar_url: string | null } | { name: string | null; handle: string | null; avatar_url: string | null }[] | null
   rec: { title: string; category: string } | null
+  collection: { name: string; category: string } | null
 }
 
 type GroupedNotif = {
@@ -26,11 +28,13 @@ type GroupedNotif = {
   count: number
   ids: string[]
   rec_id: string | null
+  collection_id: string | null
   read: boolean
   updated_at: string
   actor_id: string | null
   actor: { name: string | null; handle: string | null; avatar_url: string | null } | null
   rec: { title: string; category: string } | null
+  collection: { name: string; category: string } | null
 }
 
 interface FollowRequest {
@@ -53,10 +57,12 @@ function groupNotifications(rows: RawNotif[]): GroupedNotif[] {
   for (const row of rows) {
     const key = (row.type === 'like' || row.type === 'bookmark') && row.rec_id
       ? `${row.type}:${row.rec_id}`
-      : row.id
+      : (row.type === 'collection_like' || row.type === 'collection_bookmark') && row.collection_id
+        ? `${row.type}:${row.collection_id}`
+        : row.id
     const actor = resolveActor(row.actor)
     if (!map.has(key)) {
-      map.set(key, { key, type: row.type, count: 1, ids: [row.id], rec_id: row.rec_id, read: row.read, updated_at: row.updated_at, actor_id: row.actor_id, actor, rec: row.rec })
+      map.set(key, { key, type: row.type, count: 1, ids: [row.id], rec_id: row.rec_id, collection_id: row.collection_id ?? null, read: row.read, updated_at: row.updated_at, actor_id: row.actor_id, actor, rec: row.rec, collection: row.collection ?? null })
     } else {
       const g = map.get(key)!
       g.count++
@@ -90,6 +96,8 @@ function notificationText(n: GroupedNotif): string {
     case 'bookmark':                 return `${name}${suffix} bookmarked your recommendation`
     case 'comment':                  return `${name} commented on your recommendation`
     case 'mention':                  return `${name} mentioned you in a recommendation`
+    case 'collection_like':          return n.collection ? `${name}${suffix} liked "${n.collection.name}"` : `${name}${suffix} liked your collection`
+    case 'collection_bookmark':      return n.collection ? `${name}${suffix} saved "${n.collection.name}"` : `${name}${suffix} saved your collection`
   }
 }
 
@@ -98,8 +106,8 @@ function TypeIcon({ type }: { type: NotifType }) {
   const stroke = '#6b5d4f'
   const w = { fill: 'none', stroke, strokeWidth: '1.8', strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, width: size, height: size }
   if (type === 'follow' || type === 'follow_request' || type === 'follow_request_accepted') return <svg viewBox="0 0 24 24" {...w}><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
-  if (type === 'like') return <svg viewBox="0 0 24 24" {...w}><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
-  if (type === 'bookmark') return <svg viewBox="0 0 24 24" {...w}><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+  if (type === 'like' || type === 'collection_like') return <svg viewBox="0 0 24 24" {...w}><path d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14z"/><path d="M7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3"/></svg>
+  if (type === 'bookmark' || type === 'collection_bookmark') return <svg viewBox="0 0 24 24" {...w}><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
   if (type === 'comment') return <svg viewBox="0 0 24 24" {...w}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
   return <svg viewBox="0 0 24 24" {...w}><circle cx="12" cy="12" r="10"/><path d="M12 8h.01M12 12v4"/></svg>
 }
@@ -108,6 +116,7 @@ function notifHref(n: GroupedNotif): string | null {
   if (n.type === 'follow') return n.actor?.handle ? `/profile/${n.actor.handle}` : null
   if (n.type === 'follow_request') return null
   if (n.type === 'follow_request_accepted') return n.actor?.handle ? `/profile/${n.actor.handle}` : null
+  if (n.type === 'collection_like' || n.type === 'collection_bookmark') return n.collection_id ? `/collections/${n.collection_id}` : null
   if (n.rec?.category && n.rec_id) return `/${n.rec.category}?rec=${n.rec_id}`
   if (n.rec?.category) return `/${n.rec.category}`
   return null
@@ -224,9 +233,10 @@ export default function NotificationsPage() {
           const { data } = await supabase
             .from('notifications')
             .select(`
-              id, type, rec_id, read, updated_at, actor_id,
+              id, type, rec_id, collection_id, read, updated_at, actor_id,
               actor:profiles!actor_id(name, handle, avatar_url),
-              rec:recommendations!rec_id(title, category)
+              rec:recommendations!rec_id(title, category),
+              collection:collections!collection_id(name, category)
             `)
             .eq('id', newRow.id)
             .single()
@@ -246,7 +256,7 @@ export default function NotificationsPage() {
           await supabase.from('notifications').update({ read: true }).eq('id', newRow.id)
 
           setNotifications(prev => {
-            // For likes/bookmarks on the same rec, merge into the existing group
+            // For likes/bookmarks on the same rec or collection, merge into the existing group
             if ((row.type === 'like' || row.type === 'bookmark') && row.rec_id) {
               const existingIdx = prev.findIndex(n => n.type === row.type && n.rec_id === row.rec_id)
               if (existingIdx >= 0) {
@@ -255,10 +265,20 @@ export default function NotificationsPage() {
                 return updated
               }
             }
+            if ((row.type === 'collection_like' || row.type === 'collection_bookmark') && row.collection_id) {
+              const existingIdx = prev.findIndex(n => n.type === row.type && n.collection_id === row.collection_id)
+              if (existingIdx >= 0) {
+                const updated = [...prev]
+                updated[existingIdx] = { ...updated[existingIdx], count: updated[existingIdx].count + 1, ids: [...updated[existingIdx].ids, row.id], read: true }
+                return updated
+              }
+            }
             const groupKey = (row.type === 'like' || row.type === 'bookmark') && row.rec_id
               ? `${row.type}:${row.rec_id}`
-              : row.id
-            const newNotif: GroupedNotif = { key: groupKey, type: row.type, count: 1, ids: [row.id], rec_id: row.rec_id, read: true, updated_at: row.updated_at, actor_id: row.actor_id, actor, rec: row.rec }
+              : (row.type === 'collection_like' || row.type === 'collection_bookmark') && row.collection_id
+                ? `${row.type}:${row.collection_id}`
+                : row.id
+            const newNotif: GroupedNotif = { key: groupKey, type: row.type, count: 1, ids: [row.id], rec_id: row.rec_id, collection_id: row.collection_id ?? null, read: true, updated_at: row.updated_at, actor_id: row.actor_id, actor, rec: row.rec, collection: row.collection ?? null }
             return [newNotif, ...prev]
           })
         },

@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import Whisper from '@/app/components/Whisper'
 import { useWhispers } from '@/app/hooks/useWhispers'
 import { useToast } from '@/app/components/Toast'
+import { createOrMatchItem } from '@/lib/items'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -20,10 +21,32 @@ interface SearchResult {
   image: string | null
   year?: string
   external_url?: string | null
+  itemId?: string
+  fromNotable?: boolean
 }
 
 interface ConfirmedItem extends SearchResult {
   fromExternal?: boolean
+}
+
+interface NotableItem {
+  id: string
+  title: string
+  category: string
+  image_url: string | null
+  author_or_creator: string | null
+  year: number | null
+  outbound_url: string | null
+  outbound_partner: string | null
+  external_source: string | null
+  similarity: number
+}
+
+const EXTERNAL_SOURCE: Record<string, string> = {
+  books:    'google_books',
+  movies:   'tmdb',
+  music:    'itunes',
+  podcasts: 'itunes',
 }
 
 interface MentionResult {
@@ -64,6 +87,8 @@ function CatIcon({ id, selected = false }: { id: Category; selected?: boolean })
       style={{
         filter: selected ? 'brightness(0) invert(1)' : 'brightness(0)',
         opacity: selected ? 1 : 0.45,
+        width: '16px',
+        height: '16px',
       }}
     />
   )
@@ -191,6 +216,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
 
   const [dropdownItems, setDropdownItems] = useState<SearchResult[]>([])
+  const [notableItems, setNotableItems] = useState<SearchResult[]>([])
   const [dropdownVisible, setDropdownVisible] = useState(false)
   const [searching, setSearching] = useState(false)
   const [searchEmpty, setSearchEmpty] = useState(false)
@@ -279,14 +305,39 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
     if (cat === 'restaurants') return
     const id = ++searchIdRef.current
     setSearching(true)
+    setNotableItems([])
     try {
-      let apiUrl = `/api/search/${cat}?q=${encodeURIComponent(query)}`
-      if (cat === 'podcasts') apiUrl += `&type=${podcastTypeRef.current}`
-      const res = await fetch(apiUrl)
-      const data = await res.json() as { items: SearchResult[] }
+      let externalUrl = `/api/search/${cat}?q=${encodeURIComponent(query)}`
+      if (cat === 'podcasts') externalUrl += `&type=${podcastTypeRef.current}`
+      const notableUrl = `/api/search/items?q=${encodeURIComponent(query)}&category=${cat}&limit=4`
+
+      const [notableResult, externalResult] = await Promise.allSettled([
+        fetch(notableUrl).then(r => r.json()),
+        fetch(externalUrl).then(r => r.json()),
+      ])
+
       if (id !== searchIdRef.current) return
-      if (data.items?.length) {
-        setDropdownItems(data.items.slice(0, 8))
+
+      const notable: SearchResult[] = notableResult.status === 'fulfilled'
+        ? ((notableResult.value.items ?? []) as NotableItem[]).map(item => ({
+            id: item.id,
+            title: item.title,
+            subtitle: item.author_or_creator ?? undefined,
+            image: item.image_url,
+            year: item.year != null ? String(item.year) : undefined,
+            external_url: item.outbound_url ?? null,
+            itemId: item.id,
+            fromNotable: true,
+          }))
+        : []
+
+      const external: SearchResult[] = externalResult.status === 'fulfilled'
+        ? ((externalResult.value.items ?? []) as SearchResult[]).slice(0, 8)
+        : []
+
+      if (notable.length > 0 || external.length > 0) {
+        setNotableItems(notable)
+        setDropdownItems(external)
         setDropdownVisible(true)
         setSearchEmpty(false)
       } else {
@@ -496,7 +547,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
     const next = category === cat ? null : cat
     syncCategory(next)
     if (next) dismissWhisper('post-category-hint')
-    if (!next) { setDropdownItems([]); setDropdownVisible(false); return }
+    if (!next) { setDropdownItems([]); setNotableItems([]); setDropdownVisible(false); return }
     if (!confirmedItem && next !== 'restaurants') {
       const trimmed = text.replace(URL_RE, '').trim()
       if (trimmed) {
@@ -510,11 +561,12 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
   // ── Confirm result ────────────────────────────────────────────────────────
 
   const handleConfirm = (item: SearchResult) => {
-    setConfirmedItem({ ...item, fromExternal: true })
+    setConfirmedItem({ ...item, fromExternal: !item.fromNotable })
     setDropdownVisible(false)
     setManualMode(false)
     setManualQuery('')
     setDropdownItems([])
+    setNotableItems([])
   }
 
   // ── Manual search ─────────────────────────────────────────────────────────
@@ -524,18 +576,40 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
     setManualQuery(val)
     if (manualTimerRef.current) clearTimeout(manualTimerRef.current)
     const cat = categoryRef.current
-    if (!val.trim() || !cat || cat === 'restaurants') { setDropdownItems([]); return }
+    if (!val.trim() || !cat || cat === 'restaurants') { setDropdownItems([]); setNotableItems([]); return }
     manualTimerRef.current = setTimeout(async () => {
-      // If input looks like a sentence, try to extract the title
       const query = val.trim().split(/\s+/).length >= 4 ? ((await extractTitle(val)) ?? val) : val
       setManualSearching(true)
       try {
-        let apiUrl = `/api/search/${cat}?q=${encodeURIComponent(query)}`
-        if (cat === 'podcasts') apiUrl += `&type=${podcastTypeRef.current}`
-        const res = await fetch(apiUrl)
-        const data = await res.json() as { items: SearchResult[] }
-        setDropdownItems(data.items?.slice(0, 8) ?? [])
-      } catch { setDropdownItems([]) }
+        let externalUrl = `/api/search/${cat}?q=${encodeURIComponent(query)}`
+        if (cat === 'podcasts') externalUrl += `&type=${podcastTypeRef.current}`
+        const notableUrl = `/api/search/items?q=${encodeURIComponent(query)}&category=${cat}&limit=4`
+
+        const [notableResult, externalResult] = await Promise.allSettled([
+          fetch(notableUrl).then(r => r.json()),
+          fetch(externalUrl).then(r => r.json()),
+        ])
+
+        const notable: SearchResult[] = notableResult.status === 'fulfilled'
+          ? ((notableResult.value.items ?? []) as NotableItem[]).map(item => ({
+              id: item.id,
+              title: item.title,
+              subtitle: item.author_or_creator ?? undefined,
+              image: item.image_url,
+              year: item.year != null ? String(item.year) : undefined,
+              external_url: item.outbound_url ?? null,
+              itemId: item.id,
+              fromNotable: true,
+            }))
+          : []
+
+        const external: SearchResult[] = externalResult.status === 'fulfilled'
+          ? ((externalResult.value.items ?? []) as SearchResult[]).slice(0, 8)
+          : []
+
+        setNotableItems(notable)
+        setDropdownItems(external)
+      } catch { setDropdownItems([]); setNotableItems([]) }
       finally { setManualSearching(false) }
     }, 300)
   }
@@ -584,6 +658,27 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
       }
       skipDupRef.current = false
 
+      // Create or match item in Notable DB (fire before insert; non-blocking on failure)
+      let recItemId: string | null = null
+      if (category !== 'restaurants') {
+        try {
+          if (confirmedItem?.itemId) {
+            recItemId = confirmedItem.itemId
+          } else {
+            recItemId = await createOrMatchItem({
+              title,
+              category: category!,
+              imageUrl:        confirmedItem?.image ?? undefined,
+              authorOrCreator: confirmedItem?.subtitle ?? undefined,
+              year:            confirmedItem?.year ? parseInt(confirmedItem.year, 10) : undefined,
+              externalId:      confirmedItem?.fromNotable ? undefined : (confirmedItem?.id ?? undefined),
+              externalSource:  EXTERNAL_SOURCE[category!] ?? undefined,
+              externalUrl:     confirmedItem?.external_url ?? undefined,
+            })
+          }
+        } catch { /* non-fatal */ }
+      }
+
       const { data: newRec, error: insertError } = await supabase.current
         .from('recommendations')
         .insert({
@@ -593,6 +688,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
           description: cleanedText || null,
           image_url: uploadedImage ?? confirmedItem?.image ?? null,
           external_url: confirmedItem?.external_url ?? null,
+          item_id: recItemId,
         })
         .select('id')
         .single()
@@ -661,6 +757,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
     setDropdownVisible(false)
     setManualQuery('')
     setDropdownItems([])
+    setNotableItems([])
   }
 
   const handlePodcastTypeToggle = async (type: 'show' | 'episode') => {
@@ -989,7 +1086,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
             )}
 
             {/* Auto-search dropdown — immediately below textarea */}
-            {dropdownVisible && !manualMode && dropdownItems.length > 0 && !mentionActive && (
+            {dropdownVisible && !manualMode && (notableItems.length > 0 || dropdownItems.length > 0) && !mentionActive && (
               <div className="pm-dropdown" style={{
                 marginTop: '6px',
                 background: '#faf8f4',
@@ -1027,7 +1124,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
                     </div>
                   ) : <span />}
                   <button
-                    onClick={() => { setDropdownVisible(false); editorRef.current?.focus() }}
+                    onClick={() => { setDropdownVisible(false); setNotableItems([]); editorRef.current?.focus() }}
                     aria-label="Close suggestions"
                     style={{
                       background: 'transparent', border: 'none', cursor: 'pointer',
@@ -1039,9 +1136,34 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
                     </svg>
                   </button>
                 </div>
+
+                {/* Notable items section */}
+                {notableItems.length > 0 && (
+                  <>
+                    <div style={{ padding: '6px 14px 4px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
+                      <span className="font-body" style={{
+                        fontSize: '10px', color: '#9a8d7f',
+                        letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 500,
+                      }}>
+                        From Notable
+                      </span>
+                    </div>
+                    {notableItems.map(item => (
+                      <ResultRow key={item.id} item={item} category={category ?? ''} onSelect={handleConfirm} />
+                    ))}
+                  </>
+                )}
+
+                {/* Divider between sections */}
+                {notableItems.length > 0 && dropdownItems.length > 0 && (
+                  <div style={{ height: '1px', background: 'rgba(0,0,0,0.06)' }} />
+                )}
+
+                {/* External items */}
                 {dropdownItems.map(item => (
                   <ResultRow key={item.id} item={item} category={category ?? ''} onSelect={handleConfirm} />
                 ))}
+
                 <p className="font-body" style={{
                   color: '#6b5d4f', fontSize: '12px', textAlign: 'center',
                   padding: '10px 14px',
@@ -1249,11 +1371,34 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
                 )}
 
 
+                {/* Notable items section */}
+                {notableItems.length > 0 && (
+                  <>
+                    <div style={{ padding: '6px 14px 4px', borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
+                      <span className="font-body" style={{
+                        fontSize: '10px', color: '#9a8d7f',
+                        letterSpacing: '0.07em', textTransform: 'uppercase', fontWeight: 500,
+                      }}>
+                        From Notable
+                      </span>
+                    </div>
+                    {notableItems.map(item => (
+                      <ResultRow key={item.id} item={item} category={category ?? ''} onSelect={handleConfirm} />
+                    ))}
+                  </>
+                )}
+
+                {/* Divider */}
+                {notableItems.length > 0 && dropdownItems.length > 0 && (
+                  <div style={{ height: '1px', background: 'rgba(0,0,0,0.06)' }} />
+                )}
+
+                {/* External items */}
                 {dropdownItems.length > 0 && dropdownItems.map(item => (
                   <ResultRow key={item.id} item={item} category={category ?? ''} onSelect={handleConfirm} />
                 ))}
 
-                {manualQuery.length > 0 && !manualSearching && dropdownItems.length === 0 && (
+                {manualQuery.length > 0 && !manualSearching && dropdownItems.length === 0 && notableItems.length === 0 && (
                   <div style={{ padding: '18px 16px', textAlign: 'center' }}>
                     <p className="font-body" style={{ color: '#6b5d4f', fontSize: '12px' }}>No results found</p>
                   </div>

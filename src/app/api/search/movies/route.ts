@@ -11,8 +11,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const [movieRes, tvRes] = await Promise.all([
-      fetch(`https://api.themoviedb.org/3/search/movie?query=${encodeURIComponent(q)}&page=1`, { headers }),
-      fetch(`https://api.themoviedb.org/3/search/tv?query=${encodeURIComponent(q)}&page=1`, { headers }),
+      fetch(`https://api.themoviedb.org/3/search/movie?query=${encodeURIComponent(q)}&page=1&language=en-US`, { headers }),
+      fetch(`https://api.themoviedb.org/3/search/tv?query=${encodeURIComponent(q)}&page=1&language=en-US`, { headers }),
     ])
 
     const [movieData, tvData] = await Promise.all([

@@ -190,14 +190,14 @@ export function TeaserText({
   )
 }
 
-export function ExternalLink({ href, label, color }: { href: string; label: string; color: string }) {
+export function ExternalLink({ href, label, color, onTrackClick }: { href: string; label: string; color: string; onTrackClick?: () => void }) {
   const [hovered, setHovered] = useState(false)
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      onClick={e => e.stopPropagation()}
+      onClick={e => { e.stopPropagation(); onTrackClick?.() }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className="font-body"

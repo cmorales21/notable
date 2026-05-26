@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   const entity = type === 'episode' ? 'podcastEpisode' : 'podcast'
 
   try {
-    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=podcast&entity=${entity}&limit=8`
+    const url = `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&media=podcast&entity=${entity}&limit=8&country=US&lang=en`
     const res = await fetch(url)
     if (!res.ok) return NextResponse.json({ items: [] }, { status: 502 })
 

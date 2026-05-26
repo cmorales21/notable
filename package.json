@@ -6,7 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:movies": "npx tsx scripts/seed/seed-movies.ts",
+    "seed:books": "npx tsx scripts/seed/seed-books.ts",
+    "seed:music": "npx tsx scripts/seed/seed-music.ts",
+    "seed:podcasts": "npx tsx scripts/seed/seed-podcasts.ts",
+    "seed:carlos": "npx tsx scripts/seed/seed-carlos-list.ts",
+    "seed:all": "npx tsx scripts/seed/run-all.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",
@@ -23,10 +29,12 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^16.0.0",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "15.5.15",
     "tailwindcss": "^4",
+    "tsx": "^4.19.0",
     "typescript": "^5"
   }
 }

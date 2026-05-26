@@ -1,11 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { RecommendationImage } from '@/app/components/RecommendationImage'
 import type { Recommendation } from '@/app/lib/types'
 import { Avatar, ActionButton, TeaserText } from './helpers'
 import { LikeIcon, BookmarkIcon, CommentIcon } from './icons'
+import { trackImpression, trackExpand } from '@/lib/items'
+
+const loggedImpressions = new Set<string>()
+const loggedExpands = new Set<string>()
 
 export function RecommendationCard({
   rec,
@@ -14,6 +18,7 @@ export function RecommendationCard({
   bookmarked,
   likeCount,
   commentCount,
+  currentUserId,
   onLike,
   onBookmark,
   onClick,
@@ -25,20 +30,47 @@ export function RecommendationCard({
   bookmarked: boolean
   likeCount: number
   commentCount: number
+  currentUserId?: string | null
   onLike: (e: React.MouseEvent) => void
   onBookmark: (e: React.MouseEvent) => void
   onClick: () => void
   onCommentClick: (e: React.MouseEvent) => void
 }) {
   const profile = rec.profiles
+  const cardRef = useRef<HTMLDivElement>(null)
   const [imageHovered, setImageHovered] = useState(false)
   const [imgError, setImgError] = useState(false)
   const [likeAnim, setLikeAnim] = useState<'pop' | 'shrink' | null>(null)
   const [bookmarkAnim, setBookmarkAnim] = useState(false)
 
+  useEffect(() => {
+    if (!rec.item_id || !currentUserId) return
+    const el = cardRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !loggedImpressions.has(rec.item_id!)) {
+          loggedImpressions.add(rec.item_id!)
+          trackImpression(rec.item_id!, currentUserId, rec.category)
+        }
+        observer.disconnect()
+      },
+      { threshold: 0.5 },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [rec.item_id, currentUserId, rec.category])
+
   return (
     <div
-      onClick={onClick}
+      ref={cardRef}
+      onClick={() => {
+        if (rec.item_id && currentUserId && !loggedExpands.has(rec.item_id)) {
+          loggedExpands.add(rec.item_id)
+          trackExpand(rec.item_id, currentUserId, rec.category)
+        }
+        onClick()
+      }}
       style={{
         background: '#faf8f4', borderRadius: '16px',
         border: '1px solid rgba(0,0,0,0.08)', overflow: 'hidden',

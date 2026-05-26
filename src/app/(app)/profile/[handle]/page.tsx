@@ -22,6 +22,24 @@ interface FullProfile {
   avatar_url: string | null
   bookmarks_private?: boolean | null
   profile_private?: boolean | null
+  collections_private?: boolean | null
+}
+
+type CollectionCategory = 'books' | 'movies' | 'music' | 'restaurants' | 'podcasts'
+
+interface Collection {
+  id: string
+  user_id: string
+  name: string
+  description: string | null
+  is_private: boolean
+  category: CollectionCategory
+  cover_recommendation_id: string | null
+  position: number
+  created_at: string
+  updated_at: string
+  collection_items: { count: number }[]
+  cover_rec: { image_url: string | null; category: string } | null
 }
 
 interface FollowUser {
@@ -32,8 +50,17 @@ interface FollowUser {
   profile_private?: boolean | null
 }
 
-type TabId = 'posted' | 'liked' | 'bookmarked'
+type TabId = 'posted' | 'liked' | 'bookmarked' | 'collections'
 type CategoryFilter = 'all' | 'books' | 'movies' | 'music' | 'restaurants' | 'podcasts'
+
+interface SavedCollection {
+  id: string
+  name: string
+  category: string
+  item_count: number
+  owner_name: string | null
+  owner_handle: string | null
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -59,6 +86,7 @@ const TAB_LABELS: Record<TabId, string> = {
   posted: 'Posted',
   liked: 'Liked',
   bookmarked: 'Bookmarked',
+  collections: 'Collections',
 }
 
 // ─── Initials avatar (profile header only) ────────────────────────────────────
@@ -82,7 +110,7 @@ function InitialsAvatar({ name, size }: { name: string | null; size: number }) {
 
 // ─── Grid tile ────────────────────────────────────────────────────────────────
 
-function GridTile({ rec, onClick }: { rec: Recommendation; onClick: () => void }) {
+function GridTile({ rec, onClick, onMenu }: { rec: Recommendation; onClick: () => void; onMenu?: (rect: DOMRect) => void }) {
   const [hovered, setHovered] = useState(false)
   const [imgError, setImgError] = useState(false)
   const color = CATEGORY_COLORS[rec.category] ?? '#6b5d4f'
@@ -123,6 +151,27 @@ function GridTile({ rec, onClick }: { rec: Recommendation; onClick: () => void }
         background: color,
         boxShadow: `0 0 6px ${color}88`,
       }} />
+
+      {/* Three-dot menu button */}
+      {onMenu && (
+        <button
+          onClick={e => { e.stopPropagation(); onMenu(e.currentTarget.getBoundingClientRect()) }}
+          aria-label="Add to collection"
+          style={{
+            position: 'absolute', top: '6px', right: '6px',
+            width: '24px', height: '24px', borderRadius: '50%',
+            background: 'rgba(0,0,0,0.5)',
+            border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#ffffff', fontSize: '15px', letterSpacing: '1px',
+            opacity: hovered ? 1 : 0,
+            transition: 'opacity 0.15s',
+            zIndex: 10, lineHeight: 1, paddingBottom: '2px',
+          }}
+        >
+          ···
+        </button>
+      )}
 
       {showImage ? (
         <>
@@ -165,6 +214,136 @@ function GridTile({ rec, onClick }: { rec: Recommendation; onClick: () => void }
           </p>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Add-to-collection menu ───────────────────────────────────────────────────
+
+function AddToCollectionMenu({
+  rec,
+  userCollections,
+  membership,
+  position,
+  onToggle,
+  onNewCollection,
+  onClose,
+}: {
+  rec: Recommendation
+  userCollections: Collection[]
+  membership: Set<string>
+  position: { top: number; right: number }
+  onToggle: (collectionId: string) => void
+  onNewCollection: () => void
+  onClose: () => void
+}) {
+  const menuRef = useRef<HTMLDivElement>(null)
+  const filtered = userCollections.filter(c => c.category === rec.category)
+  const accentColor = CATEGORY_COLORS[rec.category] ?? '#6b5d4f'
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [onClose])
+
+  return (
+    <div
+      ref={menuRef}
+      style={{
+        position: 'fixed',
+        top: position.top,
+        right: position.right,
+        zIndex: 500,
+        background: '#faf8f4',
+        borderRadius: '12px',
+        border: '1px solid rgba(0,0,0,0.1)',
+        boxShadow: '0 8px 32px rgba(58,42,26,0.28)',
+        width: '224px',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Header */}
+      <div style={{ padding: '10px 14px 9px', borderBottom: '1px solid rgba(0,0,0,0.07)' }}>
+        <p className="font-body" style={{ fontSize: '10px', color: '#a09278', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '2px' }}>
+          Add to Collection
+        </p>
+        <p className="font-display" style={{ fontSize: '12px', color: accentColor, fontWeight: 600 }}>
+          {CATEGORY_LABELS[rec.category]}
+        </p>
+      </div>
+
+      {/* Collection list */}
+      <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
+        {filtered.length === 0 ? (
+          <p className="font-body" style={{ padding: '12px 14px', fontSize: '13px', color: '#a09278', fontStyle: 'italic' }}>
+            No {CATEGORY_LABELS[rec.category].toLowerCase()} collections yet
+          </p>
+        ) : (
+          filtered.map(col => {
+            const inCollection = membership.has(col.id)
+            return (
+              <button
+                key={col.id}
+                onClick={() => onToggle(col.id)}
+                className="font-body"
+                style={{
+                  width: '100%', textAlign: 'left',
+                  padding: '8px 14px',
+                  background: 'none', border: 'none',
+                  cursor: 'pointer', display: 'flex',
+                  alignItems: 'center', gap: '10px',
+                  fontSize: '13px', color: '#33261a',
+                }}
+              >
+                {/* Checkbox */}
+                <span style={{
+                  width: '16px', height: '16px', borderRadius: '4px', flexShrink: 0,
+                  border: `1.5px solid ${inCollection ? accentColor : 'rgba(0,0,0,0.2)'}`,
+                  background: inCollection ? accentColor : 'transparent',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 0.15s',
+                }}>
+                  {inCollection && (
+                    <svg viewBox="0 0 12 12" fill="none" width="10" height="10">
+                      <path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                  {col.name}
+                </span>
+                {col.is_private && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    width="12" height="12" style={{ color: '#a09278', flexShrink: 0 }}>
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                )}
+              </button>
+            )
+          })
+        )}
+      </div>
+
+      {/* New Collection */}
+      <div style={{ borderTop: '1px solid rgba(0,0,0,0.07)', padding: '5px' }}>
+        <button
+          onClick={onNewCollection}
+          className="font-body"
+          style={{
+            width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+            padding: '8px 9px', borderRadius: '8px',
+            display: 'flex', alignItems: 'center', gap: '8px',
+            fontSize: '13px', color: accentColor, fontWeight: 500,
+          }}
+        >
+          <span style={{ fontSize: '17px', lineHeight: 1, marginTop: '-1px' }}>+</span>
+          New {CATEGORY_LABELS[rec.category]} Collection
+        </button>
+      </div>
     </div>
   )
 }
@@ -397,6 +576,368 @@ function FollowListModal({
               ))}
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Collection card ─────────────────────────────────────────────────────────
+
+function CollectionCard({ collection }: { collection: Collection }) {
+  const [hovered, setHovered] = useState(false)
+  const [imgError, setImgError] = useState(false)
+  const coverImage = collection.cover_rec?.image_url ?? null
+  const showImage = !!coverImage && !imgError
+  const itemCount = collection.collection_items?.[0]?.count ?? 0
+  const accentColor = CATEGORY_COLORS[collection.category] ?? '#6b5d4f'
+
+  return (
+    <Link href={`/collections/${collection.id}`} style={{ textDecoration: 'none', display: 'block' }}>
+      <div
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          position: 'relative',
+          aspectRatio: '1/1',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          cursor: 'pointer',
+          background: showImage ? '#faf8f4' : `${accentColor}18`,
+          transform: hovered ? 'scale(1.02)' : 'scale(1)',
+          transition: 'transform 0.2s ease',
+          border: `1px solid ${accentColor}22`,
+        }}
+      >
+        {showImage && (
+          <Image
+            src={coverImage!}
+            alt={collection.name}
+            fill
+            sizes="(max-width: 768px) 50vw, 33vw"
+            style={{ objectFit: 'cover' }}
+            onError={() => setImgError(true)}
+          />
+        )}
+
+        {/* Gradient overlay */}
+        {showImage && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.1) 55%, transparent 100%)',
+          }} />
+        )}
+
+        {/* Top row: category badge + lock */}
+        <div style={{
+          position: 'absolute', top: '9px', left: '9px', right: '9px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <span className="font-body" style={{
+            fontSize: '10px', fontWeight: 600,
+            color: showImage ? '#ffffff' : accentColor,
+            background: showImage ? 'rgba(0,0,0,0.38)' : `${accentColor}22`,
+            borderRadius: '20px', padding: '2px 7px',
+            letterSpacing: '0.03em',
+            backdropFilter: showImage ? 'blur(4px)' : 'none',
+          }}>
+            {CATEGORY_LABELS[collection.category]}
+          </span>
+          {collection.is_private && (
+            <svg viewBox="0 0 24 24" fill="none"
+              stroke={showImage ? 'rgba(255,255,255,0.85)' : accentColor}
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="13" height="13">
+              <rect x="3" y="11" width="18" height="11" rx="2" />
+              <path d="M7 11V7a5 5 0 0110 0v4" />
+            </svg>
+          )}
+        </div>
+
+        {/* Name + count */}
+        {showImage ? (
+          <div style={{ position: 'absolute', bottom: '11px', left: '12px', right: '12px' }}>
+            <p className="font-display" style={{
+              fontSize: '0.88rem', fontWeight: 600, color: '#ffffff',
+              lineHeight: 1.3, marginBottom: '3px',
+              overflow: 'hidden', display: '-webkit-box',
+              WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+            }}>
+              {collection.name}
+            </p>
+            <p className="font-body" style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.7)' }}>
+              {itemCount} {itemCount === 1 ? 'item' : 'items'}
+            </p>
+          </div>
+        ) : (
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            padding: '16px', gap: '6px',
+          }}>
+            <p className="font-display" style={{
+              fontSize: '0.9rem', fontWeight: 600,
+              color: accentColor,
+              textAlign: 'center', lineHeight: 1.35,
+              overflow: 'hidden', display: '-webkit-box',
+              WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
+              filter: 'brightness(0.75)',
+            }}>
+              {collection.name}
+            </p>
+            <p className="font-body" style={{ fontSize: '0.72rem', color: accentColor, opacity: 0.6 }}>
+              {itemCount} {itemCount === 1 ? 'item' : 'items'}
+            </p>
+          </div>
+        )}
+      </div>
+    </Link>
+  )
+}
+
+// ─── New Collection modal ─────────────────────────────────────────────────────
+
+const COLLECTION_CATEGORIES: CollectionCategory[] = ['books', 'movies', 'music', 'restaurants', 'podcasts']
+
+function NewCollectionModal({
+  currentUserId,
+  onClose,
+  onCreate,
+  prefilledCategory,
+}: {
+  currentUserId: string
+  onClose: () => void
+  onCreate: (collection: Collection) => void
+  prefilledCategory?: CollectionCategory | null
+}) {
+  const supabase = useRef(createClient())
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [category, setCategory] = useState<CollectionCategory | null>(prefilledCategory ?? null)
+  const [isPrivate, setIsPrivate] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const accentColor = category ? CATEGORY_COLORS[category] : '#33261a'
+  const canCreate = !!name.trim() && !!category && !saving
+
+  async function handleCreate() {
+    if (!canCreate || !category) return
+    setSaving(true)
+    setError(null)
+    const { data, error: insertErr } = await supabase.current
+      .from('collections')
+      .insert({
+        user_id: currentUserId,
+        name: name.trim(),
+        description: description.trim() || null,
+        category,
+        is_private: isPrivate,
+        position: 0,
+      })
+      .select('*, collection_items(count), cover_rec:recommendations!cover_recommendation_id(image_url, category)')
+      .single()
+    if (insertErr) {
+      setError(insertErr.message)
+      setSaving(false)
+      return
+    }
+    onCreate(data as unknown as Collection)
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 400,
+        background: 'rgba(0,0,0,0.65)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '16px',
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%', maxWidth: '440px',
+          background: '#faf8f4', borderRadius: '16px',
+          border: `1px solid ${category ? `${accentColor}30` : 'rgba(0,0,0,0.08)'}`,
+          overflow: 'hidden',
+          boxShadow: '0 32px 80px rgba(58,42,26,0.5)',
+          transition: 'border-color 0.2s',
+        }}
+      >
+        {/* Accent header strip */}
+        <div style={{
+          height: '4px',
+          background: category ? accentColor : 'rgba(0,0,0,0.08)',
+          transition: 'background 0.25s',
+        }} />
+
+        <div style={{ padding: '22px 24px 24px' }}>
+          {/* Title row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+            <h2 className="font-display" style={{ fontSize: '1.1rem', fontWeight: 600, color: '#33261a' }}>
+              New Collection
+            </h2>
+            <button
+              onClick={onClose}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b5d4f', display: 'flex', padding: '4px' }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+                strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Category picker / locked badge */}
+          <div style={{ marginBottom: '16px' }}>
+            <label className="font-body" style={{ display: 'block', color: '#6b5d4f', fontSize: '11px', marginBottom: '8px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+              Category
+            </label>
+            {prefilledCategory ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="font-body" style={{
+                  padding: '5px 13px', borderRadius: '20px',
+                  background: CATEGORY_COLORS[prefilledCategory],
+                  color: '#ffffff', fontSize: '12px', fontWeight: 600,
+                }}>
+                  {CATEGORY_LABELS[prefilledCategory]}
+                </span>
+                <span className="font-body" style={{ fontSize: '12px', color: '#a09278' }}>locked</span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>
+                {COLLECTION_CATEGORIES.map(cat => {
+                  const color = CATEGORY_COLORS[cat]
+                  const selected = category === cat
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => setCategory(cat)}
+                      className="font-body"
+                      style={{
+                        padding: '5px 12px',
+                        borderRadius: '20px',
+                        border: `1.5px solid ${selected ? color : 'rgba(0,0,0,0.1)'}`,
+                        background: selected ? color : 'transparent',
+                        color: selected ? '#ffffff' : '#6b5d4f',
+                        fontSize: '12px', fontWeight: selected ? 600 : 400,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      {CATEGORY_LABELS[cat]}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Name */}
+          <div style={{ marginBottom: '14px' }}>
+            <label className="font-body" style={{ display: 'block', color: '#6b5d4f', fontSize: '11px', marginBottom: '5px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+              Name
+            </label>
+            <input
+              value={name}
+              onChange={e => setName(e.target.value)}
+              maxLength={80}
+              placeholder="My collection"
+              autoFocus
+              className="font-body"
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                background: '#f5f0e8', border: '1px solid rgba(0,0,0,0.1)',
+                borderRadius: '10px', padding: '9px 13px',
+                color: '#33261a', fontSize: '14px', outline: 'none',
+              }}
+            />
+          </div>
+
+          {/* Description */}
+          <div style={{ marginBottom: '18px' }}>
+            <label className="font-body" style={{ display: 'block', color: '#6b5d4f', fontSize: '11px', marginBottom: '5px', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+              Description <span style={{ color: '#a09278', textTransform: 'none' }}>(optional)</span>
+            </label>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value.slice(0, 300))}
+              rows={2}
+              placeholder="What's this collection about?"
+              className="font-body"
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                background: '#f5f0e8', border: '1px solid rgba(0,0,0,0.1)',
+                borderRadius: '10px', padding: '9px 13px',
+                color: '#33261a', fontSize: '14px', outline: 'none',
+                resize: 'none', lineHeight: 1.6,
+              }}
+            />
+          </div>
+
+          {/* Private toggle */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            marginBottom: '22px', padding: '12px 14px',
+            background: '#f5f0e8', borderRadius: '10px',
+          }}>
+            <div>
+              <p className="font-body" style={{ color: '#33261a', fontSize: '13px', fontWeight: 500, marginBottom: '2px' }}>Private</p>
+              <p className="font-body" style={{ color: '#6b5d4f', fontSize: '12px' }}>Only visible to you</p>
+            </div>
+            <button
+              onClick={() => setIsPrivate(p => !p)}
+              style={{
+                width: '42px', height: '24px', borderRadius: '12px', border: 'none',
+                cursor: 'pointer', position: 'relative', flexShrink: 0,
+                background: isPrivate ? (category ? accentColor : '#33261a') : 'rgba(0,0,0,0.15)',
+                transition: 'background 0.2s',
+              }}
+            >
+              <div style={{
+                position: 'absolute', top: '3px',
+                left: isPrivate ? '21px' : '3px',
+                width: '18px', height: '18px', borderRadius: '50%',
+                background: '#ffffff', transition: 'left 0.2s',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              }} />
+            </button>
+          </div>
+
+          {error && (
+            <p className="font-body" style={{ color: '#e05555', fontSize: '13px', marginBottom: '12px' }}>{error}</p>
+          )}
+
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+            <button
+              onClick={onClose}
+              className="font-body"
+              style={{
+                background: 'transparent', border: '1px solid rgba(0,0,0,0.1)',
+                borderRadius: '20px', padding: '7px 18px',
+                color: '#6b5d4f', fontSize: '13px', cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCreate}
+              disabled={!canCreate}
+              className="font-body"
+              style={{
+                background: canCreate ? accentColor : '#e8e0d4',
+                border: 'none', borderRadius: '20px', padding: '7px 18px',
+                color: canCreate ? '#ffffff' : '#a09278',
+                fontSize: '13px', fontWeight: 600,
+                cursor: canCreate ? 'pointer' : 'default',
+                transition: 'background 0.2s',
+              }}
+            >
+              {saving ? 'Creating…' : 'Create'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -646,6 +1187,19 @@ export default function ProfilePage() {
 
   const [editOpen, setEditOpen] = useState(false)
 
+  const [collections, setCollections] = useState<Collection[]>([])
+  const [collectionsLoading, setCollectionsLoading] = useState(false)
+  const [newCollectionOpen, setNewCollectionOpen] = useState(false)
+
+  const [userCollections, setUserCollections] = useState<Collection[]>([])
+  const [collectionMembership, setCollectionMembership] = useState<Map<string, Set<string>>>(new Map())
+  const [menuRec, setMenuRec] = useState<Recommendation | null>(null)
+  const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null)
+  const [menuNewCollectionOpen, setMenuNewCollectionOpen] = useState(false)
+
+  const [savedCollections, setSavedCollections] = useState<SavedCollection[]>([])
+  const [savedCollectionsLoaded, setSavedCollectionsLoaded] = useState(false)
+
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null)
   const [modalComments, setModalComments] = useState<RecComment[]>([])
   const [modalLoadingComments, setModalLoadingComments] = useState(false)
@@ -664,7 +1218,7 @@ export default function ProfilePage() {
       try {
         const [{ data: profileData }, { data: { user } }] = await Promise.all([
           supabase.current.from('profiles')
-            .select('id, name, handle, bio, avatar_url, bookmarks_private, profile_private')
+            .select('id, name, handle, bio, avatar_url, bookmarks_private, profile_private, collections_private')
             .eq('handle', handle).maybeSingle(),
           supabase.current.auth.getUser(),
         ])
@@ -761,6 +1315,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!profile) return
+    if (activeTab === 'collections') return
     const gated = (profile.profile_private === true && !isOwnProfile && !isFollowing) || iBlockedThem || theyBlockedMe
     if (gated) { setRecs([]); setRecsLoading(false); return }
     // Likes are always public — no per-tab gate needed.
@@ -772,6 +1327,159 @@ export default function ProfilePage() {
     loadRecs(activeTab, profile.id)
     setCategoryFilter('all')
   }, [activeTab, profile, isOwnProfile, isFollowing, iBlockedThem, theyBlockedMe, loadRecs])
+
+  const loadCollections = useCallback(async (profileId: string) => {
+    setCollectionsLoading(true)
+    setCollections([])
+    try {
+      const { data } = await supabase.current
+        .from('collections')
+        .select('*, collection_items(count), cover_rec:recommendations!cover_recommendation_id(image_url, category)')
+        .eq('user_id', profileId)
+        .order('position', { ascending: true })
+        .order('created_at', { ascending: false })
+      setCollections((data ?? []) as unknown as Collection[])
+    } finally {
+      setCollectionsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!profile || activeTab !== 'collections') return
+    const gated = (profile.profile_private === true && !isOwnProfile && !isFollowing && !iBlockedThem) || (theyBlockedMe && !isOwnProfile)
+    if (gated) { setCollections([]); setCollectionsLoading(false); return }
+    loadCollections(profile.id)
+  }, [activeTab, profile, isOwnProfile, isFollowing, iBlockedThem, theyBlockedMe, loadCollections])
+
+  // ── Load own collections for add-to-collection menu ─────────────────────────
+
+  useEffect(() => {
+    if (!isOwnProfile || !currentUserId) return
+    async function loadOwnerCollections() {
+      const { data } = await supabase.current
+        .from('collections')
+        .select('*, collection_items(count), cover_rec:recommendations!cover_recommendation_id(image_url, category)')
+        .eq('user_id', currentUserId!)
+        .order('position', { ascending: true })
+        .order('created_at', { ascending: false })
+      setUserCollections((data ?? []) as unknown as Collection[])
+    }
+    loadOwnerCollections()
+  }, [isOwnProfile, currentUserId])
+
+  // ── Load rec-to-collection membership for visible grid items ─────────────────
+
+  useEffect(() => {
+    if (!isOwnProfile || recs.length === 0 || userCollections.length === 0) return
+    const collectionIds = userCollections.map(c => c.id)
+    const recIds = recs.map(r => r.id)
+    async function loadMembership() {
+      const { data } = await supabase.current
+        .from('collection_items')
+        .select('collection_id, recommendation_id')
+        .in('collection_id', collectionIds)
+        .in('recommendation_id', recIds)
+      const map = new Map<string, Set<string>>()
+      for (const row of (data ?? []) as { collection_id: string; recommendation_id: string }[]) {
+        const s = map.get(row.recommendation_id) ?? new Set<string>()
+        s.add(row.collection_id)
+        map.set(row.recommendation_id, s)
+      }
+      setCollectionMembership(map)
+    }
+    loadMembership()
+  }, [isOwnProfile, recs, userCollections])
+
+  // ── Load bookmarked collections (saved from others) ─────────────────────────
+
+  useEffect(() => {
+    if (!isOwnProfile || activeTab !== 'collections' || !currentUserId || savedCollectionsLoaded) return
+    async function loadSavedCollections() {
+      const { data: bmData } = await supabase.current
+        .from('collection_bookmarks').select('collection_id').eq('user_id', currentUserId!)
+      const ids = (bmData ?? []).map((b: { collection_id: string }) => b.collection_id)
+      if (ids.length === 0) { setSavedCollectionsLoaded(true); return }
+
+      const { data: colData } = await supabase.current
+        .from('collections')
+        .select('id, name, category, is_private, user_id, collection_items(count)')
+        .in('id', ids)
+        .eq('is_private', false)
+        .neq('user_id', currentUserId!)
+
+      if (!colData || colData.length === 0) { setSavedCollectionsLoaded(true); return }
+
+      const ownerIds = [...new Set(colData.map((c: { user_id: string }) => c.user_id))]
+      const { data: ownersData } = await supabase.current
+        .from('profiles').select('id, name, handle').in('id', ownerIds)
+
+      const ownerMap: Record<string, { name: string | null; handle: string | null }> = {}
+      for (const o of (ownersData ?? []) as { id: string; name: string | null; handle: string | null }[]) {
+        ownerMap[o.id] = o
+      }
+
+      setSavedCollections(colData.map((c: { id: string; name: string; category: string; user_id: string; collection_items: { count: number }[] }) => ({
+        id: c.id,
+        name: c.name,
+        category: c.category,
+        item_count: c.collection_items?.[0]?.count ?? 0,
+        owner_name: ownerMap[c.user_id]?.name ?? null,
+        owner_handle: ownerMap[c.user_id]?.handle ?? null,
+      })))
+      setSavedCollectionsLoaded(true)
+    }
+    loadSavedCollections()
+  }, [isOwnProfile, activeTab, currentUserId, savedCollectionsLoaded])
+
+  // ── Open rec menu ───────────────────────────────────────────────────────────
+
+  function openRecMenu(rec: Recommendation, buttonRect: DOMRect) {
+    setMenuRec(rec)
+    const right = Math.max(8, window.innerWidth - buttonRect.right - 4)
+    const top = Math.min(buttonRect.bottom + 6, window.innerHeight - 320)
+    setMenuPosition({ top, right })
+  }
+
+  // ── Toggle collection membership ────────────────────────────────────────────
+
+  async function handleToggleCollection(recId: string, collectionId: string) {
+    const currentSet = collectionMembership.get(recId) ?? new Set<string>()
+    const isIn = currentSet.has(collectionId)
+
+    // Optimistic update
+    const nextSet = new Set(currentSet)
+    if (isIn) { nextSet.delete(collectionId) } else { nextSet.add(collectionId) }
+    setCollectionMembership(prev => { const n = new Map(prev); n.set(recId, nextSet); return n })
+
+    if (isIn) {
+      const { error } = await supabase.current
+        .from('collection_items').delete()
+        .eq('collection_id', collectionId).eq('recommendation_id', recId)
+      if (error) setCollectionMembership(prev => { const n = new Map(prev); n.set(recId, currentSet); return n })
+    } else {
+      const { error } = await supabase.current
+        .from('collection_items').insert({ collection_id: collectionId, recommendation_id: recId })
+      if (error) {
+        setCollectionMembership(prev => { const n = new Map(prev); n.set(recId, currentSet); return n })
+        return
+      }
+      // Auto-set cover if collection has none
+      const col = userCollections.find(c => c.id === collectionId)
+      if (col && !col.cover_recommendation_id) {
+        await supabase.current.from('collections').update({
+          cover_recommendation_id: recId, updated_at: new Date().toISOString(),
+        }).eq('id', collectionId)
+        setUserCollections(prev => prev.map(c =>
+          c.id === collectionId ? { ...c, cover_recommendation_id: recId } : c
+        ))
+      }
+      setUserCollections(prev => prev.map(c =>
+        c.id === collectionId
+          ? { ...c, collection_items: [{ count: (c.collection_items?.[0]?.count ?? 0) + 1 }] }
+          : c
+      ))
+    }
+  }
 
   // ── Follow / Unfollow ───────────────────────────────────────────────────────
 
@@ -981,9 +1689,9 @@ export default function ProfilePage() {
   // ── Scroll lock ─────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    document.body.style.overflow = (selectedRec || followListModal || blockConfirm) ? 'hidden' : ''
+    document.body.style.overflow = (selectedRec || followListModal || blockConfirm || newCollectionOpen) ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
-  }, [selectedRec, followListModal, blockConfirm])
+  }, [selectedRec, followListModal, blockConfirm, newCollectionOpen])
 
   // ── Derived values ──────────────────────────────────────────────────────────
 
@@ -991,7 +1699,13 @@ export default function ProfilePage() {
   const accentColor = selectedRec ? (CATEGORY_COLORS[selectedRec.category] ?? '#6b5d4f') : '#6b5d4f'
   // Liked is always public. Bookmarked is shown only to owner or when explicitly public.
   const showBookmarked = isOwnProfile || profile?.bookmarks_private === false
-  const tabs: TabId[] = ['posted', 'liked', ...(showBookmarked ? ['bookmarked' as TabId] : [])]
+  const showCollections = isOwnProfile || !profile?.collections_private || isFollowing
+  const tabs: TabId[] = [
+    'posted',
+    'liked',
+    ...(showBookmarked ? ['bookmarked' as TabId] : []),
+    ...(showCollections ? ['collections' as TabId] : []),
+  ]
   const isPrivateAndGated = (profile?.profile_private === true && !isOwnProfile && !isFollowing && !iBlockedThem) || (theyBlockedMe && !isOwnProfile)
   const privateGateMessage = isPendingFollow
     ? `Your follow request is pending. ${profile?.name ?? `@${profile?.handle}`} needs to approve it.`
@@ -1342,34 +2056,165 @@ export default function ProfilePage() {
               })}
             </div>
 
-            {/* ── Category filter ─────────────────────────────────────── */}
-            <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', scrollbarWidth: 'none', marginBottom: '16px', paddingBottom: '2px' }}>
-              {CATEGORIES.map(cat => {
-                const active = categoryFilter === cat
-                const color = cat === 'all' ? '#6b5d4f' : CATEGORY_COLORS[cat]
-                return (
-                  <button
-                    key={cat}
-                    onClick={() => setCategoryFilter(cat)}
-                    className="font-body"
-                    style={{
-                      background: active ? (cat === 'all' ? 'rgba(0,0,0,0.1)' : color) : 'transparent',
-                      border: `1px solid ${active ? (cat === 'all' ? 'rgba(0,0,0,0.15)' : color) : 'rgba(0,0,0,0.1)'}`,
-                      borderRadius: '20px', padding: '4px 11px',
-                      fontSize: '12px', fontWeight: active ? 600 : 400,
-                      color: active ? (cat === 'all' ? '#33261a' : '#ffffff') : '#6b5d4f',
-                      cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                      transition: 'all 0.13s',
-                    }}
-                  >
-                    {cat === 'all' ? 'All' : CATEGORY_LABELS[cat]}
-                  </button>
-                )
-              })}
-            </div>
+            {/* ── Category filter ──────────────────────────────────────── */}
+            {activeTab !== 'collections' && (
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: '2px' }}>
+                  {CATEGORIES.map(cat => {
+                    const active = categoryFilter === cat
+                    const color = cat === 'all' ? '#6b5d4f' : CATEGORY_COLORS[cat]
+                    return (
+                      <button
+                        key={cat}
+                        onClick={() => setCategoryFilter(cat)}
+                        className="font-body"
+                        style={{
+                          background: active ? (cat === 'all' ? 'rgba(0,0,0,0.1)' : color) : 'transparent',
+                          border: `1px solid ${active ? (cat === 'all' ? 'rgba(0,0,0,0.15)' : color) : 'rgba(0,0,0,0.1)'}`,
+                          borderRadius: '20px', padding: '4px 11px',
+                          fontSize: '12px', fontWeight: active ? 600 : 400,
+                          color: active ? (cat === 'all' ? '#33261a' : '#ffffff') : '#6b5d4f',
+                          cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                          transition: 'all 0.13s',
+                        }}
+                      >
+                        {cat === 'all' ? 'All' : CATEGORY_LABELS[cat]}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* ── Grid ────────────────────────────────────────────────── */}
-            {recsLoading ? (
+            {activeTab === 'collections' ? (
+              <>
+                {isOwnProfile && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '14px' }}>
+                    <button
+                      onClick={() => setNewCollectionOpen(true)}
+                      className="font-body"
+                      style={{
+                        background: 'transparent',
+                        border: '1px solid rgba(0,0,0,0.15)',
+                        borderRadius: '20px', padding: '5px 14px',
+                        color: '#33261a', fontSize: '12px', fontWeight: 500,
+                        cursor: 'pointer', transition: 'border-color 0.15s',
+                      }}
+                    >
+                      + New Collection
+                    </button>
+                  </div>
+                )}
+
+                {/* ── Saved from others ─────────────────────────────────── */}
+                {isOwnProfile && savedCollections.length > 0 && (
+                  <div style={{ marginBottom: '28px' }}>
+                    <p className="font-body" style={{ fontSize: '11px', color: '#a09278', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '10px' }}>
+                      Saved from others
+                    </p>
+                    <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: '4px' }}>
+                      {savedCollections.map(col => {
+                        const color = CATEGORY_COLORS[col.category] ?? '#6b5d4f'
+                        return (
+                          <Link
+                            key={col.id}
+                            href={`/collections/${col.id}`}
+                            style={{ textDecoration: 'none', flexShrink: 0 }}
+                          >
+                            <div style={{
+                              width: '140px',
+                              background: `${color}10`,
+                              border: `1px solid ${color}28`,
+                              borderRadius: '12px',
+                              padding: '10px 11px',
+                              transition: 'box-shadow 0.15s',
+                            }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 12px rgba(58,42,26,0.12)' }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = 'none' }}
+                            >
+                              {/* Category dot + label */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '7px' }}>
+                                <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: color, flexShrink: 0 }} />
+                                <span className="font-body" style={{ fontSize: '10px', color, fontWeight: 600, letterSpacing: '0.04em' }}>
+                                  {CATEGORY_LABELS[col.category]}
+                                </span>
+                              </div>
+                              {/* Collection name */}
+                              <p className="font-display" style={{
+                                fontSize: '13px', fontWeight: 600, color: '#33261a',
+                                lineHeight: 1.3, marginBottom: '6px',
+                                overflow: 'hidden', display: '-webkit-box',
+                                WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                              }}>
+                                {col.name}
+                              </p>
+                              {/* Owner + count */}
+                              <p className="font-body" style={{ fontSize: '11px', color: '#a09278', lineHeight: 1.3 }}>
+                                {col.owner_name ?? (col.owner_handle ? `@${col.owner_handle}` : 'Unknown')}
+                              </p>
+                              <p className="font-body" style={{ fontSize: '11px', color: '#a09278' }}>
+                                {col.item_count} {col.item_count === 1 ? 'item' : 'items'}
+                              </p>
+                            </div>
+                          </Link>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+                {collectionsLoading ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                    {[1, 2, 3, 4].map(i => (
+                      <div key={i} className="skeleton-pulse" style={{ aspectRatio: '1/1', borderRadius: '12px', background: '#efe9e0' }} />
+                    ))}
+                  </div>
+                ) : collections.length === 0 ? (
+                  isOwnProfile ? (
+                    <EmptyState
+                      title="No collections yet"
+                      description="Group your recommendations into collections. Tap + New Collection to get started."
+                    />
+                  ) : (
+                    <EmptyState
+                      title="No collections yet"
+                      description={`${profile?.name ?? 'This person'} hasn't created any collections yet.`}
+                    />
+                  )
+                ) : (
+                  <>
+                    <style>{`@media (max-width: 360px) { .collections-grid { grid-template-columns: repeat(1, 1fr) !important; } }`}</style>
+                    {COLLECTION_CATEGORIES.filter(cat => collections.some(c => c.category === cat)).map(cat => {
+                      const catCollections = collections.filter(c => c.category === cat)
+                      const color = CATEGORY_COLORS[cat]
+                      return (
+                        <div key={cat} style={{ marginBottom: '24px' }}>
+                          {/* Category header */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, flexShrink: 0 }} />
+                            <h3 className="font-display" style={{
+                              fontSize: '0.9rem', fontWeight: 600,
+                              color: '#33261a', letterSpacing: '-0.01em',
+                            }}>
+                              {CATEGORY_LABELS[cat]}
+                            </h3>
+                            <span className="font-body" style={{ fontSize: '12px', color: '#a09278' }}>
+                              {catCollections.length}
+                            </span>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}
+                            className="collections-grid">
+                            {catCollections.map(col => (
+                              <CollectionCard key={col.id} collection={col} />
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </>
+                )}
+              </>
+            ) : recsLoading ? (
               <ProfileGridSkeleton />
             ) : filteredRecs.length === 0 ? (
               activeTab === 'posted' ? (
@@ -1412,8 +2257,18 @@ export default function ProfilePage() {
                 className="profile-grid">
                 <style>{`@media (max-width: 480px) { .profile-grid { grid-template-columns: repeat(2, 1fr) !important; } }`}</style>
                 {filteredRecs.map((rec, i) => (
-                  <div key={rec.id} className="grid-tile-anim" style={{ animationDelay: `${Math.min(i * 40, 200)}ms` }}>
-                    <GridTile rec={rec} onClick={() => openRecModal(rec)} />
+                  <div
+                    key={rec.id}
+                    className="grid-tile-anim"
+                    style={{ animationDelay: `${Math.min(i * 40, 200)}ms` }}
+                  >
+                    <GridTile
+                      rec={rec}
+                      onClick={() => openRecModal(rec)}
+                      onMenu={isOwnProfile && (activeTab === 'posted' || activeTab === 'bookmarked')
+                        ? (rect) => openRecMenu(rec, rect)
+                        : undefined}
+                    />
                   </div>
                 ))}
               </div>
@@ -1529,6 +2384,67 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── New collection modal ───────────────────────────────────────── */}
+      {newCollectionOpen && currentUserId && (
+        <NewCollectionModal
+          currentUserId={currentUserId}
+          onClose={() => setNewCollectionOpen(false)}
+          onCreate={col => {
+            setCollections(prev => [col, ...prev])
+            setUserCollections(prev => [col, ...prev])
+            setNewCollectionOpen(false)
+          }}
+        />
+      )}
+
+      {/* ── New collection modal (from add-to-collection menu) ─────────────── */}
+      {menuNewCollectionOpen && currentUserId && menuRec && (
+        <NewCollectionModal
+          currentUserId={currentUserId}
+          prefilledCategory={menuRec.category as CollectionCategory}
+          onClose={() => setMenuNewCollectionOpen(false)}
+          onCreate={async col => {
+            const rec = menuRec
+            // Optimistically add to state and mark membership
+            setUserCollections(prev => [col, ...prev])
+            setCollectionMembership(prev => {
+              const n = new Map(prev)
+              const s = new Set(n.get(rec.id) ?? [])
+              s.add(col.id)
+              n.set(rec.id, s)
+              return n
+            })
+            // Write to DB: add item + set as cover
+            await supabase.current.from('collection_items').insert({ collection_id: col.id, recommendation_id: rec.id })
+            await supabase.current.from('collections').update({
+              cover_recommendation_id: rec.id, updated_at: new Date().toISOString(),
+            }).eq('id', col.id)
+            // Reflect cover and count in local state
+            setUserCollections(prev => prev.map(c =>
+              c.id === col.id ? { ...c, cover_recommendation_id: rec.id, collection_items: [{ count: 1 }] } : c
+            ))
+            setMenuNewCollectionOpen(false)
+          }}
+        />
+      )}
+
+      {/* ── Add-to-collection menu ────────────────────────────────────────── */}
+      {menuRec && menuPosition && (
+        <AddToCollectionMenu
+          rec={menuRec}
+          userCollections={userCollections}
+          membership={collectionMembership.get(menuRec.id) ?? new Set()}
+          position={menuPosition}
+          onToggle={colId => handleToggleCollection(menuRec.id, colId)}
+          onNewCollection={() => {
+            setMenuNewCollectionOpen(true)
+            setMenuRec(menuRec)
+            setMenuPosition(null)
+          }}
+          onClose={() => { setMenuRec(null); setMenuPosition(null) }}
+        />
       )}
 
       {/* ── Report user modal ─────────────────────────────────────────── */}

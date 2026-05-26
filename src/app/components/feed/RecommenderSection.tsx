@@ -8,6 +8,7 @@ import { RichMediaEmbed, willEmbed } from '@/app/components/RichMediaEmbed'
 import type { RecComment, RecProfile } from '@/app/lib/types'
 import type { GroupedRecommender } from '@/lib/groupRecommendations'
 import { Avatar, ActionButton, ExternalLink, getExternalLinkLabel, formatRelativeTime, sortComments, fetchComments } from './helpers'
+import { trackClick } from '@/lib/items'
 import { LikeIcon, BookmarkIcon, CommentIcon } from './icons'
 import { theme } from '@/app/lib/theme'
 
@@ -343,7 +344,12 @@ export function RecommenderSection({
           {willEmbed(recommender.external_url, category, 'feed') && !embedFailed ? (
             <RichMediaEmbed external_url={recommender.external_url} category={category} context="feed" title={title} onEmbedFail={() => setEmbedFailed(true)} />
           ) : (
-            <ExternalLink href={recommender.external_url} label={getExternalLinkLabel(category, recommender.external_url)} color={accentColor} />
+            <ExternalLink
+              href={recommender.external_url}
+              label={getExternalLinkLabel(category, recommender.external_url)}
+              color={accentColor}
+              onTrackClick={recommender.item_id && currentUserId ? () => trackClick({ itemId: recommender.item_id!, userId: currentUserId!, category, source: 'section' }) : undefined}
+            />
           )}
         </div>
       )}

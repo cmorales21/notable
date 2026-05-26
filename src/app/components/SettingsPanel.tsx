@@ -445,18 +445,20 @@ function NotificationsSection({ userId }: { userId: string }) {
 function PrivacySection({ userId }: { userId: string }) {
   const [profilePrivate, setProfilePrivate] = useState(false)
   const [bookmarksPrivate, setBookmarksPrivate] = useState(false)
+  const [collectionsPrivate, setCollectionsPrivate] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
     supabase
       .from('profiles')
-      .select('profile_private, bookmarks_private')
+      .select('profile_private, bookmarks_private, collections_private')
       .eq('id', userId)
       .maybeSingle()
       .then(({ data }) => {
         if (!data) return
         setProfilePrivate(data.profile_private ?? false)
         setBookmarksPrivate(data.bookmarks_private ?? false)
+        setCollectionsPrivate(data.collections_private ?? false)
       })
   }, [userId])
 
@@ -472,6 +474,13 @@ function PrivacySection({ userId }: { userId: string }) {
     setBookmarksPrivate(next)
     const supabase = createClient()
     supabase.from('profiles').update({ bookmarks_private: next }).eq('id', userId).then(() => {})
+  }
+
+  const toggleCollectionsPrivate = () => {
+    const next = !collectionsPrivate
+    setCollectionsPrivate(next)
+    const supabase = createClient()
+    supabase.from('profiles').update({ collections_private: next }).eq('id', userId).then(() => {})
   }
 
   return (
@@ -491,10 +500,20 @@ function PrivacySection({ userId }: { userId: string }) {
         checked={bookmarksPrivate}
         onChange={toggleBookmarksPrivate}
       />
-      <p className="font-body" style={{ fontSize: '12px', color: '#6b5d4f', lineHeight: '1.55', padding: '6px 0 0' }}>
+      <p className="font-body" style={{ fontSize: '12px', color: '#6b5d4f', lineHeight: '1.55', padding: '6px 0 18px' }}>
         {bookmarksPrivate
           ? 'Your Bookmarked tab is hidden from other users.'
           : 'Your Bookmarked tab is visible on your profile.'}
+      </p>
+      <ToggleRow
+        label="Make all collections private"
+        checked={collectionsPrivate}
+        onChange={toggleCollectionsPrivate}
+      />
+      <p className="font-body" style={{ fontSize: '12px', color: '#6b5d4f', lineHeight: '1.55', padding: '6px 0 0' }}>
+        {collectionsPrivate
+          ? 'Your Collections tab is hidden from all other users, regardless of individual collection settings.'
+          : 'Collection visibility follows each collection\'s own privacy setting.'}
       </p>
     </div>
   )
