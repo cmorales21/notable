@@ -355,7 +355,7 @@ export function RecommenderSection({
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-        <ActionButton onClick={toggleLike} active={liked} activeColor={accentColor} label="Like">
+        <ActionButton onClick={toggleLike} label="Like">
           <span style={{ display: 'inline-flex' }} className={likeAnim === 'pop' ? 'like-pop' : likeAnim === 'shrink' ? 'like-shrink' : undefined}>
             <LikeIcon filled={liked} color={liked ? accentColor : theme.colors.textMuted} />
           </span>
@@ -365,12 +365,12 @@ export function RecommenderSection({
             </span>
           )}
         </ActionButton>
-        <ActionButton onClick={toggleBookmark} active={bookmarked} activeColor={accentColor} label="Bookmark">
+        <ActionButton onClick={toggleBookmark} label="Bookmark">
           <span style={{ display: 'inline-flex' }} className={bookmarkAnim ? 'bm-bounce' : undefined}>
             <BookmarkIcon filled={bookmarked} color={bookmarked ? accentColor : theme.colors.textMuted} />
           </span>
         </ActionButton>
-        <ActionButton onClick={handleExpandComments} active={commentsOpen} activeColor={accentColor} label="Comments">
+        <ActionButton onClick={handleExpandComments} label="Comments">
           <CommentIcon filled={commentsOpen} color={commentsOpen ? accentColor : theme.colors.textMuted} />
           <span style={{ fontSize: '12px', fontWeight: 500, color: commentsOpen ? accentColor : theme.colors.textMuted }}>
             {commentCount > 0 ? commentCount : ''}

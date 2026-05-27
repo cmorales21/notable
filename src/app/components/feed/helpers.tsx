@@ -104,8 +104,6 @@ export function ActionButton({
   children,
 }: {
   onClick: (e: React.MouseEvent) => void
-  active: boolean
-  activeColor: string
   label: string
   children: React.ReactNode
 }) {

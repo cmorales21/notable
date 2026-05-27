@@ -449,7 +449,7 @@ export function RecModal({
                 setTimeout(() => setLikeAnim(null), liked ? 150 : 350)
                 onLike(e)
               }}
-              active={liked} activeColor={accentColor} label="Like"
+              label="Like"
             >
               <span style={{ display: 'inline-flex' }} className={likeAnim === 'pop' ? 'like-pop' : likeAnim === 'shrink' ? 'like-shrink' : undefined}>
                 <LikeIcon filled={liked} color={liked ? accentColor : theme.colors.textMuted} />
@@ -463,7 +463,7 @@ export function RecModal({
                 if (!bookmarked) { setBookmarkAnim(true); setTimeout(() => setBookmarkAnim(false), 250) }
                 onBookmark(e)
               }}
-              active={bookmarked} activeColor={accentColor} label="Bookmark"
+              label="Bookmark"
             >
               <span style={{ display: 'inline-flex' }} className={bookmarkAnim ? 'bm-bounce' : undefined}>
                 <BookmarkIcon filled={bookmarked} color={bookmarked ? accentColor : theme.colors.textMuted} />
@@ -478,8 +478,6 @@ export function RecModal({
                 commentInputRef.current?.focus()
                 if (scrollableRef.current) scrollableRef.current.scrollTop = scrollableRef.current.scrollHeight
               }}
-              active={false}
-              activeColor={accentColor}
               label="Comment"
             >
               <CommentIcon color={theme.colors.textMuted} />

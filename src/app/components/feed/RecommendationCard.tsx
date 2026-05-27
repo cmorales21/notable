@@ -154,7 +154,7 @@ export function RecommendationCard({
               setTimeout(() => setLikeAnim(null), liked ? 150 : 350)
               onLike(e)
             }}
-            active={liked} activeColor={accentColor} label="Like"
+            label="Like"
           >
             <span style={{ display: 'inline-flex' }} className={likeAnim === 'pop' ? 'like-pop' : likeAnim === 'shrink' ? 'like-shrink' : undefined}>
               <LikeIcon filled={liked} color={liked ? accentColor : '#6b5d4f'} />
@@ -168,13 +168,13 @@ export function RecommendationCard({
               if (!bookmarked) { setBookmarkAnim(true); setTimeout(() => setBookmarkAnim(false), 250) }
               onBookmark(e)
             }}
-            active={bookmarked} activeColor={accentColor} label="Bookmark"
+            label="Bookmark"
           >
             <span style={{ display: 'inline-flex' }} className={bookmarkAnim ? 'bm-bounce' : undefined}>
               <BookmarkIcon filled={bookmarked} color={bookmarked ? accentColor : '#6b5d4f'} />
             </span>
           </ActionButton>
-          <ActionButton onClick={onCommentClick} active={false} activeColor={accentColor} label="Comments">
+          <ActionButton onClick={onCommentClick} label="Comments">
             <CommentIcon color="#6b5d4f" />
             <span style={{ fontSize: '13px', fontWeight: 500, color: '#6b5d4f' }}>
               {commentCount > 0 ? commentCount : ''}

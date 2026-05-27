@@ -350,7 +350,7 @@ export function GroupedCard({
               setTimeout(() => setLikeAnim(null), liked ? 150 : 350)
               onLike(e)
             }}
-            active={liked} activeColor={accentColor} label="Like"
+            label="Like"
           >
             <span style={{ display: 'inline-flex' }} className={likeAnim === 'pop' ? 'like-pop' : likeAnim === 'shrink' ? 'like-shrink' : undefined}>
               <LikeIcon filled={liked} color={liked ? accentColor : theme.colors.textMuted} />
@@ -364,13 +364,13 @@ export function GroupedCard({
               if (!bookmarked) { setBookmarkAnim(true); setTimeout(() => setBookmarkAnim(false), 250) }
               onBookmark(e)
             }}
-            active={bookmarked} activeColor={accentColor} label="Bookmark"
+            label="Bookmark"
           >
             <span style={{ display: 'inline-flex' }} className={bookmarkAnim ? 'bm-bounce' : undefined}>
               <BookmarkIcon filled={bookmarked} color={bookmarked ? accentColor : theme.colors.textMuted} />
             </span>
           </ActionButton>
-          <ActionButton onClick={onCommentClick} active={false} activeColor={accentColor} label="Comments">
+          <ActionButton onClick={onCommentClick} label="Comments">
             <CommentIcon color={theme.colors.textMuted} />
             <span style={{ fontSize: '13px', fontWeight: 500, color: theme.colors.textMuted }}>
               {group.total_comments > 0 ? group.total_comments : ''}

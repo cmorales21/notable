@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import AppShell from '../components/AppShell'
 import ClientProviders from '../components/ClientProviders'
+import ErrorBoundary from '../components/ErrorBoundary'
 
 export default async function AppLayout({
   children,
@@ -22,7 +23,9 @@ export default async function AppLayout({
   return (
     <ClientProviders>
       <AppShell profile={profile} userId={user.id}>
-        {children}
+        <ErrorBoundary>
+          {children}
+        </ErrorBoundary>
       </AppShell>
     </ClientProviders>
   )

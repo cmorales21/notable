@@ -26,12 +26,13 @@ interface AppShellProps {
 
 // ─── Notification types ───────────────────────────────────────────────────────
 
-type NotifType = 'follow' | 'follow_request' | 'follow_request_accepted' | 'like' | 'bookmark' | 'comment' | 'mention'
+type NotifType = 'follow' | 'follow_request' | 'follow_request_accepted' | 'like' | 'bookmark' | 'comment' | 'mention' | 'collection_like' | 'collection_bookmark'
 
 type RawNotif = {
   id: string
   type: NotifType
   rec_id: string | null
+  collection_id: string | null
   read: boolean
   updated_at: string
   actor_id: string | null
@@ -45,6 +46,7 @@ type DropdownNotif = {
   count: number
   ids: string[]
   rec_id: string | null
+  collection_id: string | null
   read: boolean
   updated_at: string
   actor_id: string | null
@@ -55,11 +57,16 @@ type DropdownNotif = {
 function groupNotifs(rows: RawNotif[]): DropdownNotif[] {
   const map = new Map<string, DropdownNotif>()
   for (const row of rows) {
-    const key = (row.type === 'like' || row.type === 'bookmark') && row.rec_id
-      ? `${row.type}:${row.rec_id}`
-      : row.id
+    let key: string
+    if ((row.type === 'like' || row.type === 'bookmark') && row.rec_id) {
+      key = `${row.type}:${row.rec_id}`
+    } else if ((row.type === 'collection_like' || row.type === 'collection_bookmark') && row.collection_id) {
+      key = `${row.type}:${row.collection_id}`
+    } else {
+      key = row.id
+    }
     if (!map.has(key)) {
-      map.set(key, { key, type: row.type, count: 1, ids: [row.id], rec_id: row.rec_id, read: row.read, updated_at: row.updated_at, actor_id: row.actor_id, actor: row.actor, rec: row.rec })
+      map.set(key, { key, type: row.type, count: 1, ids: [row.id], rec_id: row.rec_id, collection_id: row.collection_id, read: row.read, updated_at: row.updated_at, actor_id: row.actor_id, actor: row.actor, rec: row.rec })
     } else {
       const g = map.get(key)!
       g.count++
@@ -82,6 +89,8 @@ function notifText(n: DropdownNotif): string {
     case 'bookmark':                 return `${name}${suffix} bookmarked your recommendation`
     case 'comment':                  return `${name} commented on your recommendation`
     case 'mention':                  return `${name} mentioned you in a recommendation`
+    case 'collection_like':          return `${name}${suffix} liked your collection`
+    case 'collection_bookmark':      return `${name}${suffix} bookmarked your collection`
   }
 }
 
@@ -100,6 +109,7 @@ function notifHref(n: DropdownNotif): string | null {
   if (n.type === 'follow') return n.actor?.handle ? `/profile/${n.actor.handle}` : null
   if (n.type === 'follow_request') return null
   if (n.type === 'follow_request_accepted') return n.actor?.handle ? `/profile/${n.actor.handle}` : null
+  if (n.type === 'collection_like' || n.type === 'collection_bookmark') return n.collection_id ? `/collections/${n.collection_id}` : null
   if (n.rec?.category && n.rec_id) return `/${n.rec.category}?rec=${n.rec_id}`
   if (n.rec?.category) return `/${n.rec.category}`
   return null
@@ -197,7 +207,7 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
       supabase
         .from('notifications')
         .select(`
-          id, type, rec_id, read, updated_at, actor_id,
+          id, type, rec_id, collection_id, read, updated_at, actor_id,
           actor:profiles!actor_id(name, handle, avatar_url),
           rec:recommendations!rec_id(title, category)
         `)
