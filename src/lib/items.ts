@@ -49,13 +49,19 @@ export async function createOrMatchItem({
   }
 
   // 2. Similarity search
-  const { data: similar } = await supabase.rpc('search_items', {
-    p_query: title,
-    p_category: category,
-    p_limit: 1,
-  })
-  if (similar && similar.length > 0 && similar[0].similarity > 0.85) {
-    return similar[0].id as string
+  try {
+    const { data: similar, error: rpcError } = await supabase.rpc('search_items', {
+      p_query: title,
+      p_category: category,
+      p_limit: 1,
+    })
+    if (rpcError) {
+      console.warn('[items] search_items RPC unavailable:', rpcError.message)
+    } else if (similar && similar.length > 0 && similar[0].similarity > 0.85) {
+      return similar[0].id as string
+    }
+  } catch {
+    console.warn('[items] search_items RPC threw unexpectedly')
   }
 
   // 3. Insert new item

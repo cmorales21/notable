@@ -54,23 +54,25 @@ export default function CategoryFeed({ category }: { category: string }) {
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
-  const fetchFeed = useCallback(async () => {
+  const fetchFeed = useCallback(async (signal: AbortSignal) => {
     setLoading(true)
     setRecs([])
     setHasMore(false)
     setFollowCount(null)
     try {
       const { data: { user } } = await supabase.auth.getUser()
+      if (signal.aborted) return
       const uid = user?.id ?? null
       setCurrentUserId(uid)
 
       if (uid) {
         const [{ data: profileData }, { data: ignoreData }, { data: blockedByMe }, { data: blockingMe }] = await Promise.all([
-          supabase.from('profiles').select('name, handle, avatar_url').eq('id', uid).maybeSingle(),
-          supabase.from('user_ignores').select('ignored_user_id').eq('user_id', uid),
-          supabase.from('user_blocks').select('blocked_id').eq('blocker_id', uid),
-          supabase.from('user_blocks').select('blocker_id').eq('blocked_id', uid),
+          supabase.from('profiles').select('name, handle, avatar_url').eq('id', uid).abortSignal(signal).maybeSingle(),
+          supabase.from('user_ignores').select('ignored_user_id').eq('user_id', uid).abortSignal(signal),
+          supabase.from('user_blocks').select('blocked_id').eq('blocker_id', uid).abortSignal(signal),
+          supabase.from('user_blocks').select('blocker_id').eq('blocked_id', uid).abortSignal(signal),
         ])
+        if (signal.aborted) return
         setCurrentUserProfile(profileData)
         setIgnoredUserIds(new Set([
           ...(ignoreData ?? []).map((r: { ignored_user_id: string }) => r.ignored_user_id),
@@ -83,7 +85,8 @@ export default function CategoryFeed({ category }: { category: string }) {
       if (activeTab === 'following') {
         if (!uid) return
         const { data: followData } = await supabase
-          .from('follows').select('following_id').eq('follower_id', uid).eq('status', 'accepted')
+          .from('follows').select('following_id').eq('follower_id', uid).eq('status', 'accepted').abortSignal(signal)
+        if (signal.aborted) return
         followedUserIds = (followData ?? []).map((f: { following_id: string }) => f.following_id)
         setFollowCount(followedUserIds.length)
         if (followedUserIds.length === 0) return
@@ -92,21 +95,24 @@ export default function CategoryFeed({ category }: { category: string }) {
       let recsRaw: Recommendation[] | null = null
       if (activeTab === 'discovery') {
         const { data: rpcData, error: rpcError } = await supabase
-          .rpc('get_discovery_feed', { p_category: cat, p_user_id: uid ?? null, p_limit: 30, p_offset: 0 })
+          .rpc('get_discovery_feed', { p_category: cat, p_user_id: uid ?? null, p_limit: 30, p_offset: 0 }).abortSignal(signal)
+        if (signal.aborted) return
         if (!rpcError) {
           recsRaw = rpcData
         } else {
           // RPC not yet deployed — fall back to recency order
           const { data } = await supabase
             .from('recommendations').select('*').eq('category', cat)
-            .order('created_at', { ascending: false }).limit(30)
+            .order('created_at', { ascending: false }).limit(30).abortSignal(signal)
+          if (signal.aborted) return
           recsRaw = data
         }
       } else {
         const { data } = await supabase
           .from('recommendations').select('*').eq('category', cat)
           .in('user_id', followedUserIds!)
-          .order('created_at', { ascending: false }).limit(30)
+          .order('created_at', { ascending: false }).limit(30).abortSignal(signal)
+        if (signal.aborted) return
         recsRaw = data
       }
 
@@ -115,7 +121,8 @@ export default function CategoryFeed({ category }: { category: string }) {
       if (baseRecs.length > 0) {
         const userIds = [...new Set(baseRecs.map((r: { user_id: string }) => r.user_id))]
         const { data: profilesData } = await supabase
-          .from('profiles').select('id, name, handle, avatar_url').in('id', userIds)
+          .from('profiles').select('id, name, handle, avatar_url').in('id', userIds).abortSignal(signal)
+        if (signal.aborted) return
         for (const p of profilesData ?? []) {
           profileMap[p.id] = { name: p.name, handle: p.handle, avatar_url: p.avatar_url }
         }
@@ -130,11 +137,12 @@ export default function CategoryFeed({ category }: { category: string }) {
 
       const ids = fetchedRecs.map((r) => r.id)
       const [{ data: allLikes }, { data: allComments }, { data: myLikes }, { data: myBookmarks }] = await Promise.all([
-        supabase.from('likes').select('recommendation_id').in('recommendation_id', ids),
-        supabase.from('comments').select('recommendation_id').in('recommendation_id', ids),
-        uid ? supabase.from('likes').select('recommendation_id').eq('user_id', uid).in('recommendation_id', ids) : Promise.resolve({ data: [] }),
-        uid ? supabase.from('bookmarks').select('recommendation_id').eq('user_id', uid).in('recommendation_id', ids) : Promise.resolve({ data: [] }),
+        supabase.from('likes').select('recommendation_id').in('recommendation_id', ids).abortSignal(signal),
+        supabase.from('comments').select('recommendation_id').in('recommendation_id', ids).abortSignal(signal),
+        uid ? supabase.from('likes').select('recommendation_id').eq('user_id', uid).in('recommendation_id', ids).abortSignal(signal) : Promise.resolve({ data: [] }),
+        uid ? supabase.from('bookmarks').select('recommendation_id').eq('user_id', uid).in('recommendation_id', ids).abortSignal(signal) : Promise.resolve({ data: [] }),
       ])
+      if (signal.aborted) return
 
       const lc: Record<string, number> = {}
       const cc: Record<string, number> = {}
@@ -145,12 +153,19 @@ export default function CategoryFeed({ category }: { category: string }) {
       setCommentCounts(cc)
       setUserLikes(new Set((myLikes ?? []).map((l: { recommendation_id: string }) => l.recommendation_id)))
       setUserBookmarks(new Set((myBookmarks ?? []).map((b: { recommendation_id: string }) => b.recommendation_id)))
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
+      throw err
     } finally {
-      setLoading(false)
+      if (!signal.aborted) setLoading(false)
     }
   }, [cat, supabase, activeTab])
 
-  useEffect(() => { fetchFeed() }, [fetchFeed])
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchFeed(controller.signal)
+    return () => { controller.abort() }
+  }, [fetchFeed])
 
   const loadMore = useCallback(async () => {
     if (!hasMore || loadingMore) return
@@ -334,7 +349,10 @@ export default function CategoryFeed({ category }: { category: string }) {
   useEffect(() => {
     function onNewPost(e: Event) {
       const evt = e as CustomEvent<{ category: string }>
-      if (evt.detail?.category === cat) fetchFeed()
+      if (evt.detail?.category === cat) {
+        const ctrl = new AbortController()
+        fetchFeed(ctrl.signal)
+      }
     }
     window.addEventListener('notable:new-post', onNewPost)
     return () => window.removeEventListener('notable:new-post', onNewPost)
