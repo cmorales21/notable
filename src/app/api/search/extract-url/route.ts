@@ -1,5 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// ── In-memory rate limiter: 20 requests / IP / hour ──────────────────────────
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
+const RATE_LIMIT = 20
+const WINDOW_MS = 60 * 60 * 1000
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now()
+  for (const [key, entry] of rateLimitMap) {
+    if (entry.resetAt < now) rateLimitMap.delete(key)
+  }
+  const entry = rateLimitMap.get(ip)
+  if (!entry || entry.resetAt < now) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + WINDOW_MS })
+    return true
+  }
+  if (entry.count >= RATE_LIMIT) return false
+  entry.count++
+  return true
+}
+
 function isPrivateHost(hostname: string): boolean {
   if (hostname === 'localhost' || hostname.endsWith('.local')) return true
   // Only block raw IP addresses — no DNS resolution
@@ -74,6 +94,18 @@ async function handleImdb(url: string): Promise<NextResponse | null> {
 }
 
 export async function POST(req: NextRequest) {
+  const ip =
+    req.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
+    req.headers.get('x-real-ip') ??
+    'unknown'
+
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429 }
+    )
+  }
+
   let url: string
   try {
     const body = await req.json()
