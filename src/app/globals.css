@@ -226,6 +226,21 @@ body {
   animation-play-state: paused;
 }
 
+/*
+  Each row wrapper needs a stacking context so that :has() can raise the
+  hovered row above rows below it. The animated .strip-row inside creates its
+  own stacking context (animation triggers one), which traps its children's
+  z-index — raising the wrapper itself is the only way to beat sibling rows.
+  z-index: 5 keeps it below the auth card overlay (z-index: 10).
+*/
+.strip-row-wrapper {
+  position: relative;
+  z-index: 0;
+}
+.strip-row-wrapper:has(.strip-box:hover) {
+  z-index: 5;
+}
+
 .strip-box {
   position: relative;
   width: 73px;
@@ -252,35 +267,8 @@ body {
 }
 
 .strip-box:hover .strip-img {
-  transform: scale(1.15);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-}
-
-/* Tooltip that fades in just below the image on hover */
-.strip-tile-label {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(30, 20, 10, 0.8);
-  color: #f0ebe0;
-  font-size: 10px;
-  font-family: var(--font-body, 'DM Sans', sans-serif);
-  line-height: 1.3;
-  padding: 3px 7px;
-  border-radius: 4px;
-  white-space: nowrap;
-  max-width: 130px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  opacity: 0;
-  transition: opacity 180ms 100ms;
-  pointer-events: none;
-  z-index: 20;
-}
-
-.strip-box:hover .strip-tile-label {
-  opacity: 1;
+  transform: scale(1.5);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 
 @media (min-width: 768px) {

@@ -72,9 +72,6 @@ function StripRow({ tiles, offset = '0s' }: { tiles: StripTile[]; offset?: strin
               alt={tile.alt}
               className="strip-img"
             />
-            {tile.label && (
-              <div className="strip-tile-label">{tile.label}</div>
-            )}
           </div>
         ))}
       </div>
@@ -121,7 +118,6 @@ export default async function LandingPage() {
   let mosaicRow1: StripTile[]
   let mosaicRow2: StripTile[]
   let mosaicRow3: StripTile[]
-  let dbCount = 0
 
   try {
     const supabase = await createClient()
@@ -134,25 +130,30 @@ export default async function LandingPage() {
       .limit(75)
 
     if (data && data.length >= 25) {
-      dbCount = data.length
-      // Sort by category so each row gets a balanced mix when dealt round-robin
-      const sorted = [...data].sort((a, b) =>
-        (a.category as string).localeCompare(b.category as string)
-      )
-      const r1: StripTile[] = [], r2: StripTile[] = [], r3: StripTile[] = []
-      sorted.forEach((item, i) => {
-        const tile: StripTile = {
-          src: item.image_url as string,
-          alt: item.title as string,
-          label: item.title as string,
-        }
-        if (i % 3 === 0) r1.push(tile)
-        else if (i % 3 === 1) r2.push(tile)
-        else r3.push(tile)
+      // Seed changes each hour so the mosaic looks different across visits
+      // but stays stable within a short window (avoids per-request churn)
+      let s = (Math.floor(Date.now() / (1000 * 60 * 60)) ^ 0xdeadbeef) >>> 0 || 1
+      const rng = () => {
+        s ^= s << 13; s ^= s >> 17; s ^= s << 5
+        return (s >>> 0) / 0x100000000
+      }
+
+      // Fisher-Yates shuffle
+      const items = [...data]
+      for (let i = items.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [items[i], items[j]] = [items[j], items[i]]
+      }
+
+      const toTile = (item: (typeof items)[0]): StripTile => ({
+        src: item.image_url as string,
+        alt: item.title as string,
+        label: item.title as string,
       })
-      mosaicRow1 = r1
-      mosaicRow2 = r2
-      mosaicRow3 = r3
+
+      mosaicRow1 = items.slice(0, 25).map(toTile)
+      mosaicRow2 = items.slice(25, 50).map(toTile)
+      mosaicRow3 = items.slice(50, 75).map(toTile)
     } else {
       throw new Error('insufficient items')
     }
