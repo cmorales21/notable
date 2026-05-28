@@ -221,16 +221,66 @@ body {
   to   { transform: translateX(0); }
 }
 
-.strip-section:hover .strip-row {
+/* Pause only the specific row being hovered, not all three */
+.strip-row-wrapper:hover .strip-row {
   animation-play-state: paused;
 }
 
 .strip-box {
+  position: relative;
   width: 73px;
   height: 73px;
   flex-shrink: 0;
   border-radius: 8px;
-  overflow: hidden; /* clips img to rounded corners */
+  overflow: visible; /* allow scaled img to rise above neighbours */
+  z-index: 1;
+}
+
+/* Hovered tile floats above its siblings */
+.strip-box:hover {
+  z-index: 10;
+}
+
+/* The image itself — corners clipped here since the box no longer clips */
+.strip-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  transition: transform 300ms ease-out, box-shadow 300ms ease-out;
+}
+
+.strip-box:hover .strip-img {
+  transform: scale(1.15);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Tooltip that fades in just below the image on hover */
+.strip-tile-label {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(30, 20, 10, 0.8);
+  color: #f0ebe0;
+  font-size: 10px;
+  font-family: var(--font-body, 'DM Sans', sans-serif);
+  line-height: 1.3;
+  padding: 3px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  transition: opacity 180ms 100ms;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.strip-box:hover .strip-tile-label {
+  opacity: 1;
 }
 
 @media (min-width: 768px) {

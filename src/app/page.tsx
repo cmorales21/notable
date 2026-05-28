@@ -1,9 +1,11 @@
+/* eslint-disable @next/next/no-img-element */
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
 import Navbar from './components/Navbar'
 import FadeIn from './components/FadeIn'
 import AuthCard from './components/AuthCard'
+import { createClient } from '@/lib/supabase/server'
 
 export const metadata: Metadata = {
   title: 'Notable — Get in, get inspired, go live your life',
@@ -30,50 +32,49 @@ const TILES = [
   { name: 'Podcasts',    href: '/podcasts',    color: '#e5a517', iconSrc: '/icons/podcasts-large.svg',    iconWidth: '44%' },
 ]
 
-/* ─── Mosaic image data — 75 images, all {cat}-{n}.jpg, interleaved 5×5 ─── */
+/* ─── Mosaic tile type ───────────────────────────────────────────────────── */
 
-type StripImage = { src: string; alt: string }
+type StripTile = { src: string; alt: string; label?: string }
 
-const CATS = ['movies', 'music', 'books', 'food', 'podcasts'] as const
+/* Static fallback — used when DB is unreachable or returns < 25 items */
+const STATIC_CATS = ['movies', 'music', 'books', 'food', 'podcasts'] as const
 
-function makeRow(start: number): StripImage[] {
-  const row: StripImage[] = []
+function makeStaticRow(start: number): StripTile[] {
+  const row: StripTile[] = []
   for (let n = start; n < start + 5; n++) {
-    for (const cat of CATS) {
+    for (const cat of STATIC_CATS) {
       row.push({ src: `/mosaic/${cat}-${n}.jpg`, alt: `${cat} ${n}` })
     }
   }
   return row
 }
 
-const ROW1 = makeRow(1)   // images 1–5 from each category
-const ROW2 = makeRow(6)   // images 6–10
-const ROW3 = makeRow(11)  // images 11–15
-
 /* ─── Scrolling strip row (CSS-animated, seamless) ───────────────────────── */
-function StripRow({ images, offset = '0s' }: { images: StripImage[]; offset?: string }) {
+function StripRow({ tiles, offset = '0s' }: { tiles: StripTile[]; offset?: string }) {
   return (
-    <div style={{ overflow: 'hidden' }}>
+    /* overflow-x:clip keeps the wide track from scrolling the page;
+       overflow-y:visible lets scaled tiles grow vertically without clipping */
+    <div className="strip-row-wrapper" style={{ overflowX: 'clip', overflowY: 'visible' }}>
       <div
         className="strip-row"
         style={{
           display: 'flex',
           gap: '2px',
           width: 'max-content',
-          /* scroll-right: translateX(-50%) → translateX(0), images move left-to-right */
           animation: `scroll-right 135s linear ${offset} infinite`,
         }}
       >
         {/* Original set + duplicate — translateX(-50%) loops back to start seamlessly */}
-        {[...images, ...images].map((img, i) => (
-          <div key={i} className="strip-box" style={{ position: 'relative' }}>
-            <Image
-              src={img.src}
-              alt={img.alt}
-              fill
-              sizes="(max-width: 768px) 25vw, 15vw"
-              style={{ objectFit: 'cover' }}
+        {[...tiles, ...tiles].map((tile, i) => (
+          <div key={i} className="strip-box">
+            <img
+              src={tile.src}
+              alt={tile.alt}
+              className="strip-img"
             />
+            {tile.label && (
+              <div className="strip-tile-label">{tile.label}</div>
+            )}
           </div>
         ))}
       </div>
@@ -115,7 +116,52 @@ function TileInner({ name, color, iconSrc, iconWidth }: {
 }
 
 /* ─── Page ───────────────────────────────────────────────────────────────── */
-export default function LandingPage() {
+export default async function LandingPage() {
+  /* ── Fetch mosaic items from DB ───────────────────────────────────── */
+  let mosaicRow1: StripTile[]
+  let mosaicRow2: StripTile[]
+  let mosaicRow3: StripTile[]
+  let dbCount = 0
+
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase
+      .from('items')
+      .select('id, title, image_url, category, author_or_creator')
+      .not('image_url', 'is', null)
+      .neq('image_url', '')
+      .order('created_at', { ascending: false })
+      .limit(75)
+
+    if (data && data.length >= 25) {
+      dbCount = data.length
+      // Sort by category so each row gets a balanced mix when dealt round-robin
+      const sorted = [...data].sort((a, b) =>
+        (a.category as string).localeCompare(b.category as string)
+      )
+      const r1: StripTile[] = [], r2: StripTile[] = [], r3: StripTile[] = []
+      sorted.forEach((item, i) => {
+        const tile: StripTile = {
+          src: item.image_url as string,
+          alt: item.title as string,
+          label: item.title as string,
+        }
+        if (i % 3 === 0) r1.push(tile)
+        else if (i % 3 === 1) r2.push(tile)
+        else r3.push(tile)
+      })
+      mosaicRow1 = r1
+      mosaicRow2 = r2
+      mosaicRow3 = r3
+    } else {
+      throw new Error('insufficient items')
+    }
+  } catch {
+    mosaicRow1 = makeStaticRow(1)
+    mosaicRow2 = makeStaticRow(6)
+    mosaicRow3 = makeStaticRow(11)
+  }
+
   return (
     <>
       <Navbar />
@@ -160,9 +206,9 @@ export default function LandingPage() {
               }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <StripRow images={ROW1} />
-                <StripRow images={ROW2} offset="-6s" />
-                <StripRow images={ROW3} offset="-13s" />
+                <StripRow tiles={mosaicRow1} />
+                <StripRow tiles={mosaicRow2} offset="-6s" />
+                <StripRow tiles={mosaicRow3} offset="-13s" />
               </div>
             </div>
           </div>
