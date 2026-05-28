@@ -2244,7 +2244,7 @@ export default function ProfilePage() {
                     ) : (
                       <EmptyState
                         title={`No ${CATEGORY_LABELS[collectionsFilter as CollectionCategory]} collections`}
-                        description=""
+                        description="Try a different category, or create a new collection."
                       />
                     )
                   ) : (
@@ -2288,31 +2288,31 @@ export default function ProfilePage() {
               activeTab === 'posted' ? (
                 isOwnProfile ? (
                   <EmptyState
-                    title="No recommendations yet"
-                    description="When you recommend something you love, it'll live here. Tap the + to get started."
+                    title="Nothing shared yet"
+                    description="You haven't shared any recommendations yet. What's something you've loved lately?"
                   />
                 ) : (
                   <EmptyState
-                    title="No recommendations yet"
+                    title="Nothing shared yet"
                     description={`${profile?.name ?? 'This person'} hasn't recommended anything yet.`}
                   />
                 )
               ) : activeTab === 'bookmarked' ? (
                 isOwnProfile ? (
                   <EmptyState
-                    title="Nothing bookmarked yet"
-                    description="When you find something worth saving, bookmark it and it'll appear here."
+                    title="Nothing saved yet"
+                    description="When you find something worth remembering, bookmark it and it'll appear here."
                   />
                 ) : (
                   <EmptyState
-                    title="Nothing bookmarked yet"
+                    title="Nothing saved yet"
                     description={`${profile?.name ?? 'This person'} hasn't bookmarked anything yet.`}
                   />
                 )
               ) : isOwnProfile ? (
                 <EmptyState
                   title="No likes yet"
-                  description="Recommendations you ❤️ will collect here."
+                  description="Hearts are private — only you can see them."
                 />
               ) : (
                 <EmptyState

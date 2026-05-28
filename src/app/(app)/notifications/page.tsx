@@ -362,7 +362,7 @@ export default function NotificationsPage() {
             </svg>
           </div>
           <p className="font-body" style={{ color: 'var(--color-muted)', fontSize: '15px' }}>
-            Nothing here yet. When someone follows you, likes, or comments on a post, it will show up here.
+            Nothing new. When someone likes your recommendations or starts following you, it&apos;ll show up here.
           </p>
         </div>
       )}

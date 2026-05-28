@@ -271,3 +271,11 @@ body {
 /* ─── Profile link hover ─────────────────────────────────────────────── */
 .profile-link { transition: opacity 0.15s; }
 .profile-link:hover { opacity: 0.8; }
+
+/* ─── Feed infinite-scroll spinner ──────────────────────────────────── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.feed-spinner {
+  animation: spin 0.75s linear infinite;
+}

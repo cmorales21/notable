@@ -1355,7 +1355,7 @@ export default function CollectionPage() {
             </p>
             <p className="font-body" style={{ color: theme.colors.textMuted, fontSize: '14px', maxWidth: '280px', lineHeight: '1.55' }}>
               {isOwnCollection
-                ? 'Tap "Add Items" above to add your posts or bookmarks to this collection.'
+                ? 'Tap + Add Items above to start adding recommendations.'
                 : `${owner.name ?? 'This person'} hasn't added anything here yet.`}
             </p>
           </div>

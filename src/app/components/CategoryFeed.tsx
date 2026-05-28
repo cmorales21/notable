@@ -249,6 +249,11 @@ export default function CategoryFeed({ category }: { category: string }) {
     }
   }, [recs.length, hasMore, loadingMore, cat, supabase, activeTab, currentUserId])
 
+  // Stable ref so the IntersectionObserver callback always calls the latest loadMore
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const loadMoreRef = useRef(loadMore)
+  useEffect(() => { loadMoreRef.current = loadMore }, [loadMore])
+
   useEffect(() => {
     document.body.style.overflow = selectedGroup ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
@@ -357,6 +362,18 @@ export default function CategoryFeed({ category }: { category: string }) {
     window.addEventListener('notable:new-post', onNewPost)
     return () => window.removeEventListener('notable:new-post', onNewPost)
   }, [cat, fetchFeed])
+
+  // IntersectionObserver — trigger loadMore when sentinel enters viewport
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel || !hasMore || loading) return
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) loadMoreRef.current() },
+      { rootMargin: '500px' }
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, loading])
 
   // Auto-open modal when ?rec=<id> is present in the URL
   useEffect(() => {
@@ -492,22 +509,21 @@ export default function CategoryFeed({ category }: { category: string }) {
           </div>
         )}
 
-        {hasMore && !loading && (
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
-            <button
-              onClick={loadMore}
-              disabled={loadingMore}
-              className="font-body"
+        {/* Sentinel: IntersectionObserver fires loadMore when this enters viewport */}
+        {!loading && <div ref={sentinelRef} style={{ height: 1 }} />}
+
+        {/* Per-page spinner — only shown during subsequent fetches, not initial load */}
+        {loadingMore && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0' }}>
+            <div
+              className="feed-spinner"
               style={{
-                padding: '12px 28px', background: theme.colors.surface, border: '1px solid rgba(0,0,0,0.12)',
-                borderRadius: '999px', fontSize: '14px', fontWeight: 500, color: theme.colors.textPrimary,
-                cursor: loadingMore ? 'default' : 'pointer',
-                fontFamily: 'var(--font-body, "DM Sans", sans-serif)',
-                transition: 'background 0.15s, border-color 0.15s', opacity: loadingMore ? 0.7 : 1,
+                width: 20, height: 20,
+                border: `2px solid ${theme.colors.input}`,
+                borderTopColor: accentColor,
+                borderRadius: '50%',
               }}
-            >
-              {loadingMore ? 'Loading…' : 'Load more recommendations'}
-            </button>
+            />
           </div>
         )}
       </div>
