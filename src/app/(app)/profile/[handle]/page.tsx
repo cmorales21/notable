@@ -997,10 +997,11 @@ function EditProfileModal({
     }
     setUploading(true)
     try {
-      const ext = file.name.split('.').pop() ?? 'jpg'
-      const path = `${profile.id}/avatar.${ext}`
+      const mimeToExt: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }
+      const ext = mimeToExt[file.type] ?? 'jpg'
+      const path = `${currentUserId}/avatar.${ext}`
       const { error: upErr } = await supabase.current.storage
-        .from('avatars').upload(path, file, { upsert: true })
+        .from('avatars').upload(path, file, { upsert: true, contentType: file.type })
       if (upErr) throw upErr
       const { data: { publicUrl } } = supabase.current.storage.from('avatars').getPublicUrl(path)
       setAvatarUrl(publicUrl)
@@ -1574,9 +1575,10 @@ export default function ProfilePage() {
     if (file.size > 5 * 1024 * 1024) return
     setAvatarUploading(true)
     try {
-      const ext = file.name.split('.').pop() ?? 'jpg'
+      const mimeToExt: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }
+      const ext = mimeToExt[file.type] ?? 'jpg'
       const path = `${currentUserId}/avatar.${ext}`
-      const { error: upErr } = await supabase.current.storage.from('avatars').upload(path, file, { upsert: true })
+      const { error: upErr } = await supabase.current.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type })
       if (upErr) throw upErr
       const { data: { publicUrl } } = supabase.current.storage.from('avatars').getPublicUrl(path)
       await supabase.current.from('profiles').update({ avatar_url: publicUrl }).eq('id', currentUserId)

@@ -10,16 +10,30 @@ type AsyncPlatform = 'apple-music' | 'soundcloud' | 'bandcamp'
 
 // ── Platform detection ─────────────────────────────────────────────────────
 
+// Parse hostname once; reject anything that isn't a valid http/https URL.
+function parseHostname(url: string): string | null {
+  try {
+    const { protocol, hostname } = new URL(url)
+    return protocol === 'http:' || protocol === 'https:' ? hostname : null
+  } catch {
+    return null
+  }
+}
+
 function detectPlatform(url: string, category: string): Platform | null {
-  if (url.includes('open.spotify.com') && category === 'music') return 'spotify'
-  if ((url.includes('youtube.com/watch') || url.includes('youtu.be/')) &&
+  const host = parseHostname(url)
+  if (!host) return null
+  if (host === 'open.spotify.com' && category === 'music') return 'spotify'
+  if ((host === 'www.youtube.com' || host === 'youtube.com' || host === 'youtu.be') &&
     (category === 'movies' || category === 'music')) return 'youtube'
-  if (url.includes('music.apple.com') && category === 'music') return 'apple-music'
-  if ((url.includes('google.com/maps') || url.includes('maps.google.com') ||
-    url.includes('maps.app.goo.gl')) && category === 'restaurants') return 'maps'
-  if (url.includes('vimeo.com') && (category === 'movies' || category === 'music')) return 'vimeo'
-  if (url.includes('soundcloud.com') && category === 'music') return 'soundcloud'
-  if (url.includes('bandcamp.com') && category === 'music') return 'bandcamp'
+  if (host === 'music.apple.com' && category === 'music') return 'apple-music'
+  if ((host === 'www.google.com' || host === 'maps.google.com' ||
+    host === 'maps.app.goo.gl') && category === 'restaurants') return 'maps'
+  if ((host === 'vimeo.com' || host === 'www.vimeo.com') &&
+    (category === 'movies' || category === 'music')) return 'vimeo'
+  if ((host === 'soundcloud.com' || host === 'www.soundcloud.com' ||
+    host === 'w.soundcloud.com') && category === 'music') return 'soundcloud'
+  if (host.endsWith('.bandcamp.com') && category === 'music') return 'bandcamp'
   return null
 }
 
@@ -218,7 +232,7 @@ export function RichMediaEmbed({
   }
 
   // w.soundcloud.com player URLs can be rendered directly — no oEmbed call needed
-  if (platform === 'soundcloud' && external_url.includes('w.soundcloud.com')) {
+  if (platform === 'soundcloud' && parseHostname(external_url) === 'w.soundcloud.com') {
     const scHeight = external_url.includes('playlists') ? 350 : 166
     return (
       <iframe
