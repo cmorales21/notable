@@ -38,6 +38,7 @@ export default function CategoryFeed({ category }: { category: string }) {
   const [currentUserProfile, setCurrentUserProfile] = useState<Profile | null>(null)
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({})
   const [commentCounts, setCommentCounts] = useState<Record<string, number>>({})
+  const [bookmarkCounts, setBookmarkCounts] = useState<Record<string, number>>({})
   const [userLikes, setUserLikes] = useState<Set<string>>(new Set())
   const [userBookmarks, setUserBookmarks] = useState<Set<string>>(new Set())
   const [activeTab, setActiveTab] = useState<'discovery' | 'following'>('discovery')
@@ -136,9 +137,10 @@ export default function CategoryFeed({ category }: { category: string }) {
       if (fetchedRecs.length === 0) return
 
       const ids = fetchedRecs.map((r) => r.id)
-      const [{ data: allLikes }, { data: allComments }, { data: myLikes }, { data: myBookmarks }] = await Promise.all([
+      const [{ data: allLikes }, { data: allComments }, { data: allBookmarks }, { data: myLikes }, { data: myBookmarks }] = await Promise.all([
         supabase.from('likes').select('recommendation_id').in('recommendation_id', ids).abortSignal(signal),
         supabase.from('comments').select('recommendation_id').in('recommendation_id', ids).abortSignal(signal),
+        supabase.from('bookmarks').select('recommendation_id').in('recommendation_id', ids).abortSignal(signal),
         uid ? supabase.from('likes').select('recommendation_id').eq('user_id', uid).in('recommendation_id', ids).abortSignal(signal) : Promise.resolve({ data: [] }),
         uid ? supabase.from('bookmarks').select('recommendation_id').eq('user_id', uid).in('recommendation_id', ids).abortSignal(signal) : Promise.resolve({ data: [] }),
       ])
@@ -146,11 +148,14 @@ export default function CategoryFeed({ category }: { category: string }) {
 
       const lc: Record<string, number> = {}
       const cc: Record<string, number> = {}
-      for (const id of ids) { lc[id] = 0; cc[id] = 0 }
+      const bc: Record<string, number> = {}
+      for (const id of ids) { lc[id] = 0; cc[id] = 0; bc[id] = 0 }
       for (const l of allLikes ?? []) lc[l.recommendation_id] = (lc[l.recommendation_id] ?? 0) + 1
       for (const c of allComments ?? []) cc[c.recommendation_id] = (cc[c.recommendation_id] ?? 0) + 1
+      for (const b of allBookmarks ?? []) bc[b.recommendation_id] = (bc[b.recommendation_id] ?? 0) + 1
       setLikeCounts(lc)
       setCommentCounts(cc)
+      setBookmarkCounts(bc)
       setUserLikes(new Set((myLikes ?? []).map((l: { recommendation_id: string }) => l.recommendation_id)))
       setUserBookmarks(new Set((myBookmarks ?? []).map((b: { recommendation_id: string }) => b.recommendation_id)))
     } catch (err) {
@@ -218,22 +223,26 @@ export default function CategoryFeed({ category }: { category: string }) {
         ...r, profiles: profileMap[r.user_id] ?? null,
       }))
       const ids = newRecs.map((r) => r.id)
-      const [{ data: allLikes }, { data: allComments }, { data: myLikes }, { data: myBookmarks }] = await Promise.all([
+      const [{ data: allLikes }, { data: allComments }, { data: allBookmarks }, { data: myLikes }, { data: myBookmarks }] = await Promise.all([
         supabase.from('likes').select('recommendation_id').in('recommendation_id', ids),
         supabase.from('comments').select('recommendation_id').in('recommendation_id', ids),
+        supabase.from('bookmarks').select('recommendation_id').in('recommendation_id', ids),
         uid ? supabase.from('likes').select('recommendation_id').eq('user_id', uid).in('recommendation_id', ids) : Promise.resolve({ data: [] }),
         uid ? supabase.from('bookmarks').select('recommendation_id').eq('user_id', uid).in('recommendation_id', ids) : Promise.resolve({ data: [] }),
       ])
 
       const lc: Record<string, number> = {}
       const cc: Record<string, number> = {}
-      for (const id of ids) { lc[id] = 0; cc[id] = 0 }
+      const bc: Record<string, number> = {}
+      for (const id of ids) { lc[id] = 0; cc[id] = 0; bc[id] = 0 }
       for (const l of allLikes ?? []) lc[l.recommendation_id] = (lc[l.recommendation_id] ?? 0) + 1
       for (const c of allComments ?? []) cc[c.recommendation_id] = (cc[c.recommendation_id] ?? 0) + 1
+      for (const b of allBookmarks ?? []) bc[b.recommendation_id] = (bc[b.recommendation_id] ?? 0) + 1
 
       setRecs(prev => [...prev, ...newRecs])
       setLikeCounts(prev => ({ ...prev, ...lc }))
       setCommentCounts(prev => ({ ...prev, ...cc }))
+      setBookmarkCounts(prev => ({ ...prev, ...bc }))
       setUserLikes(prev => {
         const next = new Set(prev)
         for (const l of (myLikes ?? []) as { recommendation_id: string }[]) next.add(l.recommendation_id)
@@ -311,15 +320,21 @@ export default function CategoryFeed({ category }: { category: string }) {
     if (activeTab === 'discovery') {
       const msPerDay = 86_400_000
       groups.sort((a, b) => {
-        const score = (g: typeof a) =>
-          g.total_likes * 3 +
-          g.total_comments * 2 +
-          10 / (1 + (Date.now() - new Date(g.most_recent_date).getTime()) / msPerDay)
+        const score = (g: typeof a) => {
+          const groupBookmarks = g.recommenders.reduce(
+            (sum, r) => sum + (bookmarkCounts[r.recommendation_id] ?? 0), 0)
+          return (
+            g.total_likes * 2 +
+            g.total_comments * 3 +
+            groupBookmarks * 3 +
+            10 / (1 + (Date.now() - new Date(g.most_recent_date).getTime()) / msPerDay)
+          )
+        }
         return score(b) - score(a)
       })
     }
     return groups
-  }, [recs, likeCounts, commentCounts, userLikes, userBookmarks, activeTab])
+  }, [recs, likeCounts, commentCounts, userLikes, userBookmarks, activeTab, bookmarkCounts])
 
   const visibleGroups = useMemo(() => {
     if (ignoredUserIds.size === 0) return groupedRecs
