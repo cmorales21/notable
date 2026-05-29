@@ -25,7 +25,7 @@ export default function Whisper({ id, message }: WhisperProps) {
 
   useEffect(() => {
     if (!show || loading) return
-    timerRef.current = setTimeout(() => handleDismiss(), 6000)
+    timerRef.current = setTimeout(() => handleDismiss(), 5000)
     return () => { if (timerRef.current) clearTimeout(timerRef.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [show, loading])
@@ -41,11 +41,9 @@ export default function Whisper({ id, message }: WhisperProps) {
 
   return (
     <div
-      onClick={handleDismiss}
       style={{
         opacity,
         transition: 'opacity 0.3s ease',
-        cursor: 'pointer',
         display: 'block',
         width: 'fit-content',
         maxWidth: '320px',

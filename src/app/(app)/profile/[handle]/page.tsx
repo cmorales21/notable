@@ -1583,6 +1583,7 @@ export default function ProfilePage() {
       const { data: { publicUrl } } = supabase.current.storage.from('avatars').getPublicUrl(path)
       await supabase.current.from('profiles').update({ avatar_url: publicUrl }).eq('id', currentUserId)
       setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : prev)
+      window.dispatchEvent(new CustomEvent('notable:avatar-updated', { detail: { url: publicUrl } }))
       toast('Photo updated')
     } catch (err) {
       if (process.env.NODE_ENV !== 'production') console.error('Avatar upload failed:', err)
@@ -2235,7 +2236,7 @@ export default function ProfilePage() {
                       isOwnProfile ? (
                         <EmptyState
                           title="No collections yet"
-                          description="Group your recommendations into collections. Tap + New Collection to get started."
+                          description="Group your recommendations and bookmarks into collections. Tap + New Collection to get started."
                         />
                       ) : (
                         <EmptyState
@@ -2302,8 +2303,8 @@ export default function ProfilePage() {
               ) : activeTab === 'bookmarked' ? (
                 isOwnProfile ? (
                   <EmptyState
-                    title="Nothing saved yet"
-                    description="When you find something worth remembering, bookmark it and it'll appear here."
+                    title="No bookmarks yet"
+                    description="Save recommendations you want to revisit. You can make bookmarks private in Settings."
                   />
                 ) : (
                   <EmptyState
@@ -2314,7 +2315,7 @@ export default function ProfilePage() {
               ) : isOwnProfile ? (
                 <EmptyState
                   title="No likes yet"
-                  description="Hearts are private — only you can see them."
+                  description="When you ❤️ a recommendation, it'll show up here."
                 />
               ) : (
                 <EmptyState
@@ -2365,6 +2366,7 @@ export default function ProfilePage() {
           onClose={() => setEditOpen(false)}
           onSave={({ name, bio, avatar_url }) => {
             setProfile(prev => prev ? { ...prev, name, bio, avatar_url } : prev)
+            window.dispatchEvent(new CustomEvent('notable:avatar-updated', { detail: { url: avatar_url } }))
             setEditOpen(false)
           }}
         />

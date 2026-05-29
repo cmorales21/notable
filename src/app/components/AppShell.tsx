@@ -155,6 +155,10 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
     ? profile.name.charAt(0).toUpperCase()
     : '?'
 
+  // Seeded from the server-rendered prop; updated client-side via custom event
+  // so avatar changes in Settings/profile reflect immediately without a reload.
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url ?? null)
+
   // ── Initial unread check + realtime subscription ────────────────────────────
   useEffect(() => {
     const supabase = supabaseRef.current
@@ -245,6 +249,16 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
     window.addEventListener('follow-request-updated', handler)
     return () => window.removeEventListener('follow-request-updated', handler)
   }, [dropdownOpen, fetchDropdownNotifs])
+
+  // ── Sync nav avatar when the user uploads a new photo ──────────────────────
+  useEffect(() => {
+    function onAvatarUpdated(e: Event) {
+      const { url } = (e as CustomEvent<{ url: string | null }>).detail
+      setAvatarUrl(url)
+    }
+    window.addEventListener('notable:avatar-updated', onAvatarUpdated)
+    return () => window.removeEventListener('notable:avatar-updated', onAvatarUpdated)
+  }, [])
 
   // ── Close notification dropdown on outside click ────────────────────────────
   useEffect(() => {
@@ -563,10 +577,10 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
           </button>
 
           <Link href={profile?.handle ? `/profile/${profile.handle}` : '/profile'} style={{ display: 'block', lineHeight: 0 }}>
-            {profile?.avatar_url ? (
+            {avatarUrl ? (
               <Image
-                src={profile.avatar_url}
-                alt={profile.name ?? 'Profile'}
+                src={avatarUrl}
+                alt={profile?.name ?? 'Profile'}
                 width={36}
                 height={36}
                 style={{
