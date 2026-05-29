@@ -60,6 +60,49 @@ function getMeta(html: string, property: string): string | null {
   return null
 }
 
+// ── YouTube oEmbed handler ────────────────────────────────────────────────────
+// YouTube blocks server-side HTML scraping, so OG tags are unreliable.
+// oEmbed is public, unauthenticated, and always returns the correct title +
+// thumbnail for any public video.
+
+const YOUTUBE_RE = /^https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/watch[?&]v=|youtu\.be\/)/i
+
+async function handleYoutube(url: string): Promise<NextResponse | null> {
+  if (!YOUTUBE_RE.test(url)) return null
+
+  try {
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), 5000)
+    const res = await fetch(
+      `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`,
+      { signal: ctrl.signal, cache: 'no-store' }
+    )
+    clearTimeout(t)
+    if (!res.ok) return null
+
+    type OEmbed = { title?: string; thumbnail_url?: string; author_name?: string }
+    const data = await res.json() as OEmbed
+    if (!data.title) return null
+
+    // Prefer maxresdefault over hqdefault — verify it exists first
+    let image_url: string | null = data.thumbnail_url ?? null
+    if (image_url?.includes('hqdefault')) {
+      const maxRes = image_url.replace('hqdefault', 'maxresdefault')
+      try {
+        const headCtrl = new AbortController()
+        const ht = setTimeout(() => headCtrl.abort(), 3000)
+        const head = await fetch(maxRes, { method: 'HEAD', signal: headCtrl.signal, cache: 'no-store' })
+        clearTimeout(ht)
+        if (head.ok) image_url = maxRes
+      } catch { /* keep hqdefault */ }
+    }
+
+    return NextResponse.json({ title: data.title, description: data.author_name ?? '', image_url, url })
+  } catch {
+    return null
+  }
+}
+
 const IMDB_RE = /imdb\.com\/title\/(tt\d{7,8})/i
 
 async function handleImdb(url: string): Promise<NextResponse | null> {
@@ -118,6 +161,9 @@ export async function POST(req: NextRequest) {
   if (!validateUrl(url)) {
     return NextResponse.json({ error: 'Invalid or blocked URL' }, { status: 400 })
   }
+
+  const youtubeResult = await handleYoutube(url)
+  if (youtubeResult) return youtubeResult
 
   const imdbResult = await handleImdb(url)
   if (imdbResult) return imdbResult
