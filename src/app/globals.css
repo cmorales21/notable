@@ -263,10 +263,17 @@ body {
   height: 100%;
   object-fit: cover;
   border-radius: 8px;
-  transition: transform 300ms ease-out, box-shadow 300ms ease-out;
+  transition: transform 300ms ease-out, box-shadow 300ms ease-out, background-color 300ms ease-out;
 }
 
+/*
+  object-fit cannot be animated, so the switch from cover → contain is instant.
+  background-color fills letterbox areas and fades in over 300ms alongside the
+  scale, smoothing over the abrupt object-fit change.
+*/
 .strip-box:hover .strip-img {
+  object-fit: contain;
+  background-color: var(--color-background);
   transform: scale(1.5);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
