@@ -374,7 +374,7 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
           </Link>
         )}
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 sm:gap-6">
           <button
             ref={searchBtnRef}
             onClick={() => { setSearchOpen(o => !o); setDropdownOpen(false) }}
@@ -576,7 +576,7 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
             </svg>
           </button>
 
-          <Link href={profile?.handle ? `/profile/${profile.handle}` : '/profile'} style={{ display: 'block', lineHeight: 0 }}>
+          <Link href={profile?.handle ? `/profile/${profile.handle}` : '/profile'} style={{ display: 'block', lineHeight: 0, flexShrink: 0 }}>
             {avatarUrl ? (
               <Image
                 src={avatarUrl}
@@ -584,6 +584,8 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
                 width={36}
                 height={36}
                 style={{
+                  width: '36px',
+                  height: '36px',
                   borderRadius: '50%',
                   objectFit: 'cover',
                   border: isLobby ? '1px solid rgba(26,24,20,0.18)' : '1px solid rgba(0,0,0,0.12)',
@@ -595,6 +597,7 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
                 style={{
                   width: '36px',
                   height: '36px',
+                  flexShrink: 0,
                   borderRadius: '50%',
                   background: isLobby ? '#e0d8cc' : '#e8e0d4',
                   border: isLobby ? '1px solid rgba(26,24,20,0.18)' : '1px solid rgba(0,0,0,0.12)',
