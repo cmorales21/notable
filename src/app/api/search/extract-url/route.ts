@@ -22,16 +22,15 @@ function checkRateLimit(ip: string): boolean {
 
 function isPrivateHost(hostname: string): boolean {
   if (hostname === 'localhost' || hostname.endsWith('.local')) return true
-  // Only block raw IP addresses — no DNS resolution
   const ipv4 = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
   if (ipv4) {
     const [, a, b] = ipv4.map(Number)
-    if (a === 127) return true                            // 127.0.0.0/8
-    if (a === 10) return true                             // 10.0.0.0/8
-    if (a === 172 && b >= 16 && b <= 31) return true     // 172.16.0.0/12
-    if (a === 192 && b === 168) return true               // 192.168.0.0/16
-    if (a === 169 && b === 254) return true               // 169.254.0.0/16 (link-local)
-    if (a === 0) return true                              // 0.0.0.0/8
+    if (a === 127) return true
+    if (a === 10) return true
+    if (a === 172 && b >= 16 && b <= 31) return true
+    if (a === 192 && b === 168) return true
+    if (a === 169 && b === 254) return true
+    if (a === 0) return true
   }
   return false
 }
@@ -48,6 +47,12 @@ function validateUrl(raw: string): string | null {
   return raw
 }
 
+const BROWSER_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml',
+  'Accept-Language': 'en-US,en;q=0.9',
+}
+
 function getMeta(html: string, property: string): string | null {
   const patterns = [
     new RegExp(`<meta[^>]+(?:property|name)=["']${property}["'][^>]+content=["']([^"']*?)["']`, 'i'),
@@ -60,11 +65,13 @@ function getMeta(html: string, property: string): string | null {
   return null
 }
 
-// ── YouTube oEmbed handler ────────────────────────────────────────────────────
-// YouTube blocks server-side HTML scraping, so OG tags are unreliable.
-// oEmbed is public, unauthenticated, and always returns the correct title +
-// thumbnail for any public video.
+function normalizeImageUrl(url: string | null): string | null {
+  if (!url) return null
+  if (url.startsWith('//')) return `https:${url}`
+  return url
+}
 
+// ── YouTube oEmbed handler ────────────────────────────────────────────────────
 const YOUTUBE_RE = /^https?:\/\/(?:www\.|m\.)?(?:youtube\.com\/watch[?&]v=|youtu\.be\/)/i
 
 async function handleYoutube(url: string): Promise<NextResponse | null> {
@@ -84,7 +91,6 @@ async function handleYoutube(url: string): Promise<NextResponse | null> {
     const data = await res.json() as OEmbed
     if (!data.title) return null
 
-    // Prefer maxresdefault over hqdefault — verify it exists first
     let image_url: string | null = data.thumbnail_url ?? null
     if (image_url?.includes('hqdefault')) {
       const maxRes = image_url.replace('hqdefault', 'maxresdefault')
@@ -136,6 +142,23 @@ async function handleImdb(url: string): Promise<NextResponse | null> {
   }
 }
 
+// ── Site-specific fallback extractors ─────────────────────────────────────────
+
+function extractAmazon(html: string): { title: string; image_url: string | null } | null {
+  const rawTitle = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ?? ''
+  if (!rawTitle) return null
+  const title = rawTitle.replace(/\s*[-–|]?\s*Amazon(\.[a-z.]+)?.*$/i, '').trim()
+  const imageMatch = html.match(/https:\/\/m\.media-amazon\.com\/images\/[^\s"']+/)
+  return { title, image_url: imageMatch?.[0] ?? null }
+}
+
+function extractImdbFallback(html: string): { title: string } | null {
+  const rawTitle = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ?? ''
+  if (!rawTitle) return null
+  const title = rawTitle.replace(/\s*[-–|]?\s*IMDb\s*$/i, '').trim()
+  return { title }
+}
+
 export async function POST(req: NextRequest) {
   const ip =
     req.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
@@ -168,26 +191,58 @@ export async function POST(req: NextRequest) {
   const imdbResult = await handleImdb(url)
   if (imdbResult) return imdbResult
 
+  const hostname = new URL(url).hostname
+
   try {
     const ctrl = new AbortController()
     const timeout = setTimeout(() => ctrl.abort(), 5000)
 
     const res = await fetch(url, {
       signal: ctrl.signal,
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NotableBot/1.0)' },
+      headers: BROWSER_HEADERS,
     })
     clearTimeout(timeout)
 
     const html = await res.text()
 
+    const ogTitle = getMeta(html, 'og:title')
+    const ogDescription = getMeta(html, 'og:description')
+    const ogImage = normalizeImageUrl(getMeta(html, 'og:image'))
+
+    // Site-specific fallbacks — only applied when OG tags are missing
+    const isAmazon = /\bamazon\.[a-z.]{2,6}$/.test(hostname)
+    const isImdb = hostname.includes('imdb.com')
+
+    if (isAmazon && !ogTitle) {
+      const extracted = extractAmazon(html)
+      if (extracted) {
+        return NextResponse.json({
+          title: extracted.title,
+          description: ogDescription ?? '',
+          image_url: extracted.image_url,
+          url,
+        })
+      }
+    }
+
+    if (isImdb && !ogTitle) {
+      const extracted = extractImdbFallback(html)
+      if (extracted) {
+        return NextResponse.json({
+          title: extracted.title,
+          description: ogDescription ?? '',
+          image_url: ogImage,
+          url,
+        })
+      }
+    }
+
     const title =
-      getMeta(html, 'og:title') ??
+      ogTitle ??
       html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ??
       ''
-    const description = getMeta(html, 'og:description') ?? ''
-    const image_url = getMeta(html, 'og:image') ?? null
 
-    return NextResponse.json({ title, description, image_url, url })
+    return NextResponse.json({ title, description: ogDescription ?? '', image_url: ogImage, url })
   } catch {
     return NextResponse.json({ title: '', description: '', image_url: null, url })
   }
