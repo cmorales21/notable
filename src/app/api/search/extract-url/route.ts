@@ -189,6 +189,14 @@ function extractImdbFallback(html: string): { title: string } | null {
   return { title }
 }
 
+// Strip a known site suffix from the <title> tag when og:title is absent.
+function stripTitleSuffix(html: string, suffix: RegExp): string | null {
+  const rawTitle = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ?? ''
+  if (!rawTitle) return null
+  const title = rawTitle.replace(suffix, '').trim()
+  return title || null
+}
+
 export async function POST(req: NextRequest) {
   const ip =
     req.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
@@ -242,6 +250,9 @@ export async function POST(req: NextRequest) {
     // Site-specific fallbacks — only applied when OG tags are missing
     const isAmazon = /\bamazon\.[a-z.]{2,6}$/.test(hostname)
     const isImdb = hostname.includes('imdb.com')
+    const isGoodreads = hostname.includes('goodreads.com')
+    const isYelp = hostname.includes('yelp.com')
+    const isTripAdvisor = hostname.includes('tripadvisor.')
 
     if (isAmazon && !ogTitle) {
       const extracted = extractAmazon(html, url)
@@ -264,6 +275,27 @@ export async function POST(req: NextRequest) {
           image_url: ogImage,
           url,
         })
+      }
+    }
+
+    if (isGoodreads && !ogTitle) {
+      const title = stripTitleSuffix(html, /\s*[|]\s*Goodreads\s*$/i)
+      if (title) {
+        return NextResponse.json({ title, description: ogDescription ?? '', image_url: ogImage, url })
+      }
+    }
+
+    if (isYelp && !ogTitle) {
+      const title = stripTitleSuffix(html, /\s*[-–]\s*Yelp\s*$/i)
+      if (title) {
+        return NextResponse.json({ title, description: ogDescription ?? '', image_url: ogImage, url })
+      }
+    }
+
+    if (isTripAdvisor && !ogTitle) {
+      const title = stripTitleSuffix(html, /\s*[-–]\s*Tripadvisor\s*$/i)
+      if (title) {
+        return NextResponse.json({ title, description: ogDescription ?? '', image_url: ogImage, url })
       }
     }
 
