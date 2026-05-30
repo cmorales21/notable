@@ -49,8 +49,11 @@ function validateUrl(raw: string): string | null {
 
 const BROWSER_HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-  'Accept': 'text/html,application/xhtml+xml',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
   'Accept-Language': 'en-US,en;q=0.9',
+  'Accept-Encoding': 'gzip, deflate, br',
+  'Cache-Control': 'max-age=0',
+  'Connection': 'keep-alive',
 }
 
 function getMeta(html: string, property: string): string | null {
@@ -144,12 +147,39 @@ async function handleImdb(url: string): Promise<NextResponse | null> {
 
 // ── Site-specific fallback extractors ─────────────────────────────────────────
 
-function extractAmazon(html: string): { title: string; image_url: string | null } | null {
-  const rawTitle = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ?? ''
+function extractAmazon(html: string, url: string): { title: string; image_url: string | null } | null {
+  // Amazon has <meta name="title"> even when og:title is absent
+  const rawTitle =
+    getMeta(html, 'title') ??
+    html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ??
+    ''
   if (!rawTitle) return null
-  const title = rawTitle.replace(/\s*[-–|]?\s*Amazon(\.[a-z.]+)?.*$/i, '').trim()
-  const imageMatch = html.match(/https:\/\/m\.media-amazon\.com\/images\/[^\s"']+/)
-  return { title, image_url: imageMatch?.[0] ?? null }
+
+  // Strip "… : Amazon.com: Books" / "… - Amazon" suffix then clean trailing punctuation
+  const title = rawTitle
+    .replace(/\s*[:\-–|]\s*Amazon(\.[a-z.]+)?.*$/i, '')
+    .replace(/[:\s]+$/, '')
+    .trim()
+  if (!title) return null
+
+  // Prefer ASIN-based cover image (reliable, no HTML scraping needed).
+  // Amazon product URLs always contain a 10-char alphanumeric ASIN in the path.
+  let image_url: string | null = null
+  const asinMatch = url.match(/\/(?:dp|gp\/product|product|ASIN|a)\/([A-Z0-9]{10})/i)
+  if (asinMatch?.[1]) {
+    image_url = `https://images-na.ssl-images-amazon.com/images/P/${asinMatch[1]}.jpg`
+  }
+
+  // Fall back to extracting a product image from the HTML.
+  // Amazon product images in /images/I/ end with a size code like "L.jpg".
+  if (!image_url) {
+    const imgMatch = html.match(
+      /https:\/\/m\.media-amazon\.com\/images\/I\/[A-Za-z0-9%+\-]+L\.(jpg|jpeg|png)/i
+    )
+    image_url = imgMatch?.[0] ?? null
+  }
+
+  return { title, image_url }
 }
 
 function extractImdbFallback(html: string): { title: string } | null {
@@ -214,7 +244,7 @@ export async function POST(req: NextRequest) {
     const isImdb = hostname.includes('imdb.com')
 
     if (isAmazon && !ogTitle) {
-      const extracted = extractAmazon(html)
+      const extracted = extractAmazon(html, url)
       if (extracted) {
         return NextResponse.json({
           title: extracted.title,
