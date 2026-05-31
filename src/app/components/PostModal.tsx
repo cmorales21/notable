@@ -301,19 +301,22 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
 
   // ── Search ────────────────────────────────────────────────────────────────
 
-  const searchCategory = useCallback(async (query: string, cat: Category) => {
+  const searchCategory = useCallback(async (query: string, cat: Category | null) => {
     if (cat === 'restaurants') return
     const id = ++searchIdRef.current
     setSearching(true)
     setNotableItems([])
     try {
-      let externalUrl = `/api/search/${cat}?q=${encodeURIComponent(query)}`
-      if (cat === 'podcasts') externalUrl += `&type=${podcastTypeRef.current}`
-      const notableUrl = `/api/search/items?q=${encodeURIComponent(query)}&category=${cat}&limit=4`
+      const notableUrl = cat
+        ? `/api/search/items?q=${encodeURIComponent(query)}&category=${cat}&limit=4`
+        : `/api/search/items?q=${encodeURIComponent(query)}&limit=8`
+      const externalFetch = cat
+        ? (() => { let u = `/api/search/${cat}?q=${encodeURIComponent(query)}`; if (cat === 'podcasts') u += `&type=${podcastTypeRef.current}`; return fetch(u).then(r => r.json()) })()
+        : Promise.reject('no-category')
 
       const [notableResult, externalResult] = await Promise.allSettled([
         fetch(notableUrl).then(r => r.json()),
-        fetch(externalUrl).then(r => r.json()),
+        externalFetch,
       ])
 
       if (id !== searchIdRef.current) return
@@ -519,24 +522,30 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
     }
 
     const cat = categoryRef.current
-    if (cat && cat !== 'restaurants') {
+    if (cat !== 'restaurants') {
       pauseTimerRef.current = setTimeout(async () => {
         const trimmed = val.trim()
         if (trimmed.length < 3) return
-        const query = await extractTitle(trimmed)
-        if (query) {
-          searchCategory(query, cat)
+
+        const wordCount = trimmed.split(/\s+/).length
+        const hasTriggerVerb = TRIGGER_VERBS.test(trimmed)
+        const query = (wordCount < 6 && !hasTriggerVerb)
+          ? trimmed
+          : await extractTitle(trimmed)
+
+        if (!query) {
+          if (emptyTimerRef.current) clearTimeout(emptyTimerRef.current)
+          setSearching(true)
+          noSignalTimerRef.current = setTimeout(() => {
+            noSignalTimerRef.current = null
+            setSearching(false)
+            setSearchEmpty(true)
+            emptyTimerRef.current = setTimeout(() => setSearchEmpty(false), 400)
+          }, 400)
           return
         }
-        // No extractable title — show feedback without an API call
-        if (emptyTimerRef.current) clearTimeout(emptyTimerRef.current)
-        setSearching(true)
-        noSignalTimerRef.current = setTimeout(() => {
-          noSignalTimerRef.current = null
-          setSearching(false)
-          setSearchEmpty(true)
-          emptyTimerRef.current = setTimeout(() => setSearchEmpty(false), 400)
-        }, 400)
+
+        searchCategory(query, cat)
       }, 600)
     }
   }
@@ -552,7 +561,11 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
       const trimmed = text.replace(URL_RE, '').trim()
       if (trimmed) {
         if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current)
-        const query = (await extractTitle(trimmed)) ?? trimmed
+        const wordCount = trimmed.split(/\s+/).length
+        const hasTriggerVerb = TRIGGER_VERBS.test(trimmed)
+        const query = (wordCount < 6 && !hasTriggerVerb)
+          ? trimmed
+          : ((await extractTitle(trimmed)) ?? trimmed)
         searchCategory(query, next)
       }
     }

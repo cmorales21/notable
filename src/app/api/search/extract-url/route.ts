@@ -147,6 +147,48 @@ async function handleImdb(url: string): Promise<NextResponse | null> {
 
 // ── Site-specific fallback extractors ─────────────────────────────────────────
 
+const AMAZON_JUNK_CATEGORIES = new Set([
+  'books', 'kindle store', 'kindle edition', 'audible audiobook', 'music',
+  'movies & tv', 'electronics', 'home & kitchen', 'clothing', 'toys & games',
+  'sports & outdoors', 'tools & home improvement', 'health & personal care',
+  'grocery & gourmet food', 'beauty', 'automotive', 'office products',
+  'garden & outdoor', 'pet supplies', 'baby', 'video games', 'software',
+  'cds & vinyl', 'movies', 'tv', 'dvd', 'blu-ray',
+])
+
+function isJunkSegment(seg: string): boolean {
+  const s = seg.trim()
+  // ISBN: 10 or 13 digits (with or without hyphens)
+  if (/^\d{10}(\d{3})?$/.test(s.replace(/-/g, ''))) return true
+  // Known Amazon category
+  if (AMAZON_JUNK_CATEGORIES.has(s.toLowerCase())) return true
+  // Author "Lastname, Firstname" or "Lastname, F. Middlename"
+  if (/^[A-ZÀ-ÖØ-öø-ÿ][^,]+,\s+[A-ZÀ-ÖØ-öø-ÿ]/.test(s)) return true
+  // Author "Firstname Lastname" — 2–3 capitalized words, letters only (e.g. "Ray Bradbury")
+  if (/^[A-ZÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ.]+(?:\s+[A-ZÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ.]+){1,2}$/.test(s) && !/\d/.test(s)) return true
+  // Edition segment: "Spanish Edition", "2nd Edition", "Kindle Edition" (short, no colon)
+  if (/\bEdition\b/i.test(s) && s.split(/\s+/).length <= 4) return true
+  return false
+}
+
+function cleanAmazonTitle(raw: string): string | null {
+  // Strip leading "Amazon.com: " or "Amazon.co.uk: " etc.
+  const withoutPrefix = raw.replace(/^Amazon(?:\.[a-z]{2,6})+:\s*/i, '')
+
+  // Split on ": " and walk from the end removing junk segments
+  const segments = withoutPrefix.split(': ')
+  while (segments.length > 1 && isJunkSegment(segments[segments.length - 1])) {
+    segments.pop()
+  }
+
+  // Strip edition parentheticals embedded inside the title: "(Spanish Edition)", "(Revised Edition)"
+  const title = segments.join(': ')
+    .replace(/\s*\([^)]*\bEdition\b[^)]*\)/gi, '')
+    .trim()
+    .replace(/[:\s]+$/, '')
+  return title || null
+}
+
 function extractAmazon(html: string, url: string): { title: string; image_url: string | null } | null {
   // Amazon has <meta name="title"> even when og:title is absent
   const rawTitle =
@@ -155,11 +197,7 @@ function extractAmazon(html: string, url: string): { title: string; image_url: s
     ''
   if (!rawTitle) return null
 
-  // Strip "… : Amazon.com: Books" / "… - Amazon" suffix then clean trailing punctuation
-  const title = rawTitle
-    .replace(/\s*[:\-–|]\s*Amazon(\.[a-z.]+)?.*$/i, '')
-    .replace(/[:\s]+$/, '')
-    .trim()
+  const title = cleanAmazonTitle(rawTitle)
   if (!title) return null
 
   // Prefer ASIN-based cover image (reliable, no HTML scraping needed).
