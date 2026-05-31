@@ -46,8 +46,7 @@ function externalLinkLabel(url: string): string {
 // ─── Data helpers ─────────────────────────────────────────────────────────────
 
 const fetchRec = cache(async (id: string) => {
-  const db = createAdminClient()
-  if (!db) return null
+  const db = createAdminClient() ?? await createClient()
   const { data: rec } = await db
     .from('recommendations')
     .select('id, user_id, category, title, description, image_url, external_url, created_at')
@@ -100,8 +99,7 @@ export default async function RecPage(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const db = createAdminClient()
-  if (!db) return null
+  const db = createAdminClient() ?? await createClient()
 
   const recData = await fetchRec(id)
 

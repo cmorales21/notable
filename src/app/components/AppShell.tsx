@@ -7,6 +7,15 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/app/components/Toast'
+import {
+  type NotifType,
+  type RawNotif,
+  type GroupedNotif,
+  groupNotifications,
+  getRelTimeCompact,
+  getNotifText,
+  getNotifHref,
+} from '@/lib/notifications'
 
 const PostModal = dynamic(() => import('./PostModal'), { ssr: false })
 const SearchDropdown = dynamic(() => import('./SearchDropdown'), { ssr: false })
@@ -22,97 +31,6 @@ interface AppShellProps {
   profile: Profile | null
   userId: string
   children: React.ReactNode
-}
-
-// ─── Notification types ───────────────────────────────────────────────────────
-
-type NotifType = 'follow' | 'follow_request' | 'follow_request_accepted' | 'like' | 'bookmark' | 'comment' | 'mention' | 'collection_like' | 'collection_bookmark'
-
-type RawNotif = {
-  id: string
-  type: NotifType
-  rec_id: string | null
-  collection_id: string | null
-  read: boolean
-  updated_at: string
-  actor_id: string | null
-  actor: { name: string | null; handle: string | null; avatar_url: string | null } | null
-  rec: { title: string; category: string } | null
-}
-
-type DropdownNotif = {
-  key: string
-  type: NotifType
-  count: number
-  ids: string[]
-  rec_id: string | null
-  collection_id: string | null
-  read: boolean
-  updated_at: string
-  actor_id: string | null
-  actor: { name: string | null; handle: string | null; avatar_url: string | null } | null
-  rec: { title: string; category: string } | null
-}
-
-function groupNotifs(rows: RawNotif[]): DropdownNotif[] {
-  const map = new Map<string, DropdownNotif>()
-  for (const row of rows) {
-    let key: string
-    if ((row.type === 'like' || row.type === 'bookmark') && row.rec_id) {
-      key = `${row.type}:${row.rec_id}`
-    } else if ((row.type === 'collection_like' || row.type === 'collection_bookmark') && row.collection_id) {
-      key = `${row.type}:${row.collection_id}`
-    } else {
-      key = row.id
-    }
-    if (!map.has(key)) {
-      map.set(key, { key, type: row.type, count: 1, ids: [row.id], rec_id: row.rec_id, collection_id: row.collection_id, read: row.read, updated_at: row.updated_at, actor_id: row.actor_id, actor: row.actor, rec: row.rec })
-    } else {
-      const g = map.get(key)!
-      g.count++
-      g.ids.push(row.id)
-      if (!row.read) g.read = false
-    }
-  }
-  return Array.from(map.values())
-}
-
-function notifText(n: DropdownNotif): string {
-  const name = n.actor?.name ?? n.actor?.handle ?? 'Someone'
-  const others = n.count - 1
-  const suffix = others > 0 ? ` and ${others} other${others > 1 ? 's' : ''}` : ''
-  switch (n.type) {
-    case 'follow':                   return `${name} started following you`
-    case 'follow_request':           return `${name} wants to follow you`
-    case 'follow_request_accepted':  return `${name} accepted your follow request`
-    case 'like':                     return `${name}${suffix} liked your recommendation`
-    case 'bookmark':                 return `${name}${suffix} bookmarked your recommendation`
-    case 'comment':                  return `${name} commented on your recommendation`
-    case 'mention':                  return `${name} mentioned you in a recommendation`
-    case 'collection_like':          return `${name}${suffix} liked your collection`
-    case 'collection_bookmark':      return `${name}${suffix} bookmarked your collection`
-  }
-}
-
-function relTime(dateStr: string): string {
-  const diffMs = Date.now() - new Date(dateStr).getTime()
-  const minutes = Math.floor(diffMs / 60000)
-  const hours = Math.floor(minutes / 60)
-  const days = Math.floor(hours / 24)
-  if (days > 0) return `${days}d`
-  if (hours > 0) return `${hours}h`
-  if (minutes > 0) return `${minutes}m`
-  return 'now'
-}
-
-function notifHref(n: DropdownNotif): string | null {
-  if (n.type === 'follow') return n.actor?.handle ? `/profile/${n.actor.handle}` : null
-  if (n.type === 'follow_request') return null
-  if (n.type === 'follow_request_accepted') return n.actor?.handle ? `/profile/${n.actor.handle}` : null
-  if (n.type === 'collection_like' || n.type === 'collection_bookmark') return n.collection_id ? `/collections/${n.collection_id}` : null
-  if (n.rec?.category && n.rec_id) return `/${n.rec.category}?rec=${n.rec_id}`
-  if (n.rec?.category) return `/${n.rec.category}`
-  return null
 }
 
 // ─── Category config ──────────────────────────────────────────────────────────
@@ -138,7 +56,7 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
   // Notification state
   const [hasUnread, setHasUnread] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [previewNotifs, setPreviewNotifs] = useState<DropdownNotif[]>([])
+  const [previewNotifs, setPreviewNotifs] = useState<GroupedNotif[]>([])
   const [previewLoading, setPreviewLoading] = useState(false)
 
   const toast = useToast()
@@ -204,7 +122,7 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
   }, [pathname])
 
   // ── Fetch preview notifications ─────────────────────────────────────────────
-  const fetchDropdownNotifs = useCallback(async () => {
+  const fetchGroupedNotifs = useCallback(async () => {
     setPreviewLoading(true)
     const supabase = supabaseRef.current
     const [{ data, error }, { data: blockData }] = await Promise.all([
@@ -231,7 +149,7 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
         blockedIds.add(r.blocker_id === userId ? r.blocked_id : r.blocker_id)
       }
       const filtered = ((data ?? []) as unknown as RawNotif[]).filter(n => !n.actor_id || !blockedIds.has(n.actor_id))
-      const grouped = groupNotifs(filtered)
+      const grouped = groupNotifications(filtered)
       setPreviewNotifs(grouped.slice(0, 5))
     }
     setPreviewLoading(false)
@@ -239,16 +157,16 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
 
   useEffect(() => {
     if (!dropdownOpen) return
-    fetchDropdownNotifs()
-  }, [dropdownOpen, fetchDropdownNotifs])
+    fetchGroupedNotifs()
+  }, [dropdownOpen, fetchGroupedNotifs])
 
   // Refetch the dropdown if it's open when a follow request is accepted/declined
   // on the notifications page (keeps both in sync without a shared context).
   useEffect(() => {
-    const handler = () => { if (dropdownOpen) fetchDropdownNotifs() }
+    const handler = () => { if (dropdownOpen) fetchGroupedNotifs() }
     window.addEventListener('follow-request-updated', handler)
     return () => window.removeEventListener('follow-request-updated', handler)
-  }, [dropdownOpen, fetchDropdownNotifs])
+  }, [dropdownOpen, fetchGroupedNotifs])
 
   // ── Sync nav avatar when the user uploads a new photo ──────────────────────
   useEffect(() => {
@@ -302,7 +220,7 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
   // Accepting triggers the Postgres fn_notify_follow (UPDATE branch), which
   // creates a follow_request_accepted notification for the requester.
   // No manual notification insert needed here.
-  async function acceptFollowRequest(notif: DropdownNotif) {
+  async function acceptFollowRequest(notif: GroupedNotif) {
     if (!notif.actor_id) return
     const supabase = supabaseRef.current
     await supabase.from('follows').update({ status: 'accepted' })
@@ -315,7 +233,7 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
     toast('Follow request accepted')
   }
 
-  async function declineFollowRequest(notif: DropdownNotif) {
+  async function declineFollowRequest(notif: GroupedNotif) {
     if (!notif.actor_id) return
     const supabase = supabaseRef.current
     await supabase.from('follows').delete()
@@ -479,9 +397,9 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
                             {avatar}
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <p className="font-body" style={{ fontSize: '13px', lineHeight: '1.45', color: n.read ? '#b0a290' : '#33261a', marginBottom: '2px', whiteSpace: 'normal' }}>
-                                {notifText(n)}
+                                {getNotifText(n)}
                               </p>
-                              <span className="font-body" style={{ fontSize: '11px', color: '#6b5d4f' }}>{relTime(n.updated_at)}</span>
+                              <span className="font-body" style={{ fontSize: '11px', color: '#6b5d4f' }}>{getRelTimeCompact(n.updated_at)}</span>
                             </div>
                           </div>
                           <div style={{ display: 'flex', gap: '6px', paddingLeft: '38px' }}>
@@ -510,7 +428,7 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
                         onClick={() => {
                           markRead(n.ids)
                           setDropdownOpen(false)
-                          const href = notifHref(n)
+                          const href = getNotifHref(n)
                           if (href) router.push(href)
                         }}
                         style={{
@@ -524,9 +442,9 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
                         {avatar}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <p className="font-body" style={{ fontSize: '13px', lineHeight: '1.45', color: n.read ? '#b0a290' : '#33261a', marginBottom: '2px', whiteSpace: 'normal' }}>
-                            {notifText(n)}
+                            {getNotifText(n)}
                           </p>
-                          <span className="font-body" style={{ fontSize: '11px', color: '#6b5d4f' }}>{relTime(n.updated_at)}</span>
+                          <span className="font-body" style={{ fontSize: '11px', color: '#6b5d4f' }}>{getRelTimeCompact(n.updated_at)}</span>
                         </div>
                         {!n.read && (
                           <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e05555', flexShrink: 0, marginTop: '7px' }} />

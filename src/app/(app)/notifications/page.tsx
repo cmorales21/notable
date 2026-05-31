@@ -4,38 +4,16 @@ import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type NotifType = 'follow' | 'follow_request' | 'follow_request_accepted' | 'like' | 'bookmark' | 'comment' | 'mention' | 'collection_like' | 'collection_bookmark'
-
-type RawNotif = {
-  id: string
-  type: NotifType
-  rec_id: string | null
-  collection_id: string | null
-  read: boolean
-  updated_at: string
-  actor_id: string | null
-  actor: { name: string | null; handle: string | null; avatar_url: string | null } | { name: string | null; handle: string | null; avatar_url: string | null }[] | null
-  rec: { title: string; category: string } | null
-  collection: { name: string; category: string } | null
-}
-
-type GroupedNotif = {
-  key: string
-  type: NotifType
-  count: number
-  ids: string[]
-  rec_id: string | null
-  collection_id: string | null
-  read: boolean
-  updated_at: string
-  actor_id: string | null
-  actor: { name: string | null; handle: string | null; avatar_url: string | null } | null
-  rec: { title: string; category: string } | null
-  collection: { name: string; category: string } | null
-}
+import {
+  type NotifType,
+  type RawNotif,
+  type GroupedNotif,
+  resolveActor,
+  groupNotifications,
+  getRelTimeFull,
+  getNotifText,
+  getNotifHref,
+} from '@/lib/notifications'
 
 interface FollowRequest {
   actor_id: string
@@ -46,61 +24,6 @@ interface FollowRequest {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function resolveActor(raw: RawNotif['actor']): { name: string | null; handle: string | null; avatar_url: string | null } | null {
-  if (!raw) return null
-  if (Array.isArray(raw)) return raw[0] ?? null
-  return raw
-}
-
-function groupNotifications(rows: RawNotif[]): GroupedNotif[] {
-  const map = new Map<string, GroupedNotif>()
-  for (const row of rows) {
-    const key = (row.type === 'like' || row.type === 'bookmark') && row.rec_id
-      ? `${row.type}:${row.rec_id}`
-      : (row.type === 'collection_like' || row.type === 'collection_bookmark') && row.collection_id
-        ? `${row.type}:${row.collection_id}`
-        : row.id
-    const actor = resolveActor(row.actor)
-    if (!map.has(key)) {
-      map.set(key, { key, type: row.type, count: 1, ids: [row.id], rec_id: row.rec_id, collection_id: row.collection_id ?? null, read: row.read, updated_at: row.updated_at, actor_id: row.actor_id, actor, rec: row.rec, collection: row.collection ?? null })
-    } else {
-      const g = map.get(key)!
-      g.count++
-      g.ids.push(row.id)
-      if (!row.read) g.read = false
-    }
-  }
-  return Array.from(map.values())
-}
-
-function formatRelativeTime(dateStr: string): string {
-  const diffMs = Date.now() - new Date(dateStr).getTime()
-  const minutes = Math.floor(diffMs / 60000)
-  const hours = Math.floor(minutes / 60)
-  const days = Math.floor(hours / 24)
-  if (days > 0) return `${days}d ago`
-  if (hours > 0) return `${hours}h ago`
-  if (minutes > 0) return `${minutes}m ago`
-  return 'just now'
-}
-
-function notificationText(n: GroupedNotif): string {
-  const name = n.actor?.name ?? n.actor?.handle ?? 'Someone'
-  const others = n.count - 1
-  const suffix = others > 0 ? ` and ${others} other${others > 1 ? 's' : ''}` : ''
-  switch (n.type) {
-    case 'follow':                   return `${name} started following you`
-    case 'follow_request':           return `${name} wants to follow you`
-    case 'follow_request_accepted':  return `${name} accepted your follow request`
-    case 'like':                     return `${name}${suffix} liked your recommendation`
-    case 'bookmark':                 return `${name}${suffix} bookmarked your recommendation`
-    case 'comment':                  return `${name} commented on your recommendation`
-    case 'mention':                  return `${name} mentioned you in a recommendation`
-    case 'collection_like':          return n.collection ? `${name}${suffix} liked "${n.collection.name}"` : `${name}${suffix} liked your collection`
-    case 'collection_bookmark':      return n.collection ? `${name}${suffix} saved "${n.collection.name}"` : `${name}${suffix} saved your collection`
-  }
-}
-
 function TypeIcon({ type }: { type: NotifType }) {
   const size = 14
   const stroke = '#6b5d4f'
@@ -110,16 +33,6 @@ function TypeIcon({ type }: { type: NotifType }) {
   if (type === 'bookmark' || type === 'collection_bookmark') return <svg viewBox="0 0 24 24" {...w}><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
   if (type === 'comment') return <svg viewBox="0 0 24 24" {...w}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
   return <svg viewBox="0 0 24 24" {...w}><circle cx="12" cy="12" r="10"/><path d="M12 8h.01M12 12v4"/></svg>
-}
-
-function notifHref(n: GroupedNotif): string | null {
-  if (n.type === 'follow') return n.actor?.handle ? `/profile/${n.actor.handle}` : null
-  if (n.type === 'follow_request') return null
-  if (n.type === 'follow_request_accepted') return n.actor?.handle ? `/profile/${n.actor.handle}` : null
-  if (n.type === 'collection_like' || n.type === 'collection_bookmark') return n.collection_id ? `/collections/${n.collection_id}` : null
-  if (n.rec?.category && n.rec_id) return `/${n.rec.category}?rec=${n.rec_id}`
-  if (n.rec?.category) return `/${n.rec.category}`
-  return null
 }
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
@@ -431,7 +344,7 @@ export default function NotificationsPage() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
         {notifications.map(n => {
           const isComment = n.type === 'comment' || n.type === 'mention'
-          const href = notifHref(n)
+          const href = getNotifHref(n)
           const rowStyle = {
             display: 'flex',
             alignItems: 'center',
@@ -465,13 +378,13 @@ export default function NotificationsPage() {
                     marginBottom: '2px',
                   }}
                 >
-                  {notificationText(n)}
+                  {getNotifText(n)}
                 </p>
                 <span
                   className="font-body"
                   style={{ fontSize: '12px', color: '#6b5d4f' }}
                 >
-                  {formatRelativeTime(n.updated_at)}
+                  {getRelTimeFull(n.updated_at)}
                 </span>
               </div>
 
