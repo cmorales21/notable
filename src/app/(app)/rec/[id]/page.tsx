@@ -81,14 +81,12 @@ export async function generateMetadata(
     description,
     openGraph: {
       title, description,
-      ...(rec.image_url ? { images: [rec.image_url] } : {}),
       type: 'article',
       siteName: 'Notable',
     },
     twitter: {
       card: 'summary_large_image',
       title, description,
-      ...(rec.image_url ? { images: [rec.image_url] } : {}),
     },
   }
 }
