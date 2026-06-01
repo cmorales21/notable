@@ -115,7 +115,6 @@ export default async function Image({ params }: { params: { id: string } }) {
           }}
         >
           {rec.image_url ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
             <img
               src={rec.image_url}
               width={500}
@@ -219,7 +218,7 @@ export default async function Image({ params }: { params: { id: string } }) {
                 display: 'flex',
               }}
             >
-              "{description}"
+              &quot;{description}&quot;
             </div>
           )}
 

@@ -8,7 +8,6 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/app/components/Toast'
 import {
-  type NotifType,
   type RawNotif,
   type GroupedNotif,
   groupNotifications,
