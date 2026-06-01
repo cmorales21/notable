@@ -15,6 +15,7 @@
     "seed:all": "npx tsx scripts/seed/run-all.ts"
   },
   "dependencies": {
+    "@sentry/nextjs": "^10.55.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.3",
     "@vercel/analytics": "^2.0.1",
