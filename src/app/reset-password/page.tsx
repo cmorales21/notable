@@ -114,7 +114,7 @@ export default function ResetPasswordPage() {
           <Link
             href="/"
             className="text-text inline-block"
-            style={{ fontSize: '1.6rem', letterSpacing: '-0.02em', fontFamily: 'var(--font-climate-crisis)' }}
+            style={{ fontSize: '1.6rem', letterSpacing: '-0.02em', fontFamily: 'var(--font-climate-crisis)', textTransform: 'uppercase' }}
           >
             Notable
           </Link>
