@@ -143,14 +143,6 @@ export default async function Image({ params }: { params: { id: string } }) {
             </div>
           )}
 
-          {/* Gradient fade into the right panel */}
-          <div
-            style={{
-              position: 'absolute', top: 0, right: 0, bottom: 0, width: 80,
-              background: `linear-gradient(to right, transparent, ${PANEL})`,
-              display: 'flex',
-            }}
-          />
         </div>
 
         {/* ── Right: content panel ── */}
@@ -261,14 +253,6 @@ export default async function Image({ params }: { params: { id: string } }) {
               }}
             >
               Notable
-            </div>
-            <div
-              style={{
-                fontSize: 15, fontFamily: 'sans-serif', color: MUTED,
-                opacity: 0.7, display: 'flex',
-              }}
-            >
-              notable.app
             </div>
           </div>
         </div>
