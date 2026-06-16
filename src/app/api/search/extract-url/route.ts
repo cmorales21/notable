@@ -20,18 +20,92 @@ function checkRateLimit(ip: string): boolean {
   return true
 }
 
-function isPrivateHost(hostname: string): boolean {
-  if (hostname === 'localhost' || hostname.endsWith('.local')) return true
-  const ipv4 = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
-  if (ipv4) {
-    const [, a, b] = ipv4.map(Number)
-    if (a === 127) return true
-    if (a === 10) return true
-    if (a === 172 && b >= 16 && b <= 31) return true
-    if (a === 192 && b === 168) return true
-    if (a === 169 && b === 254) return true
-    if (a === 0) return true
+function isPrivateIPv4Octets(octets: [number, number, number, number]): boolean {
+  const [a, b] = octets
+  if (a === 127) return true
+  if (a === 10) return true
+  if (a === 172 && b >= 16 && b <= 31) return true
+  if (a === 192 && b === 168) return true
+  if (a === 169 && b === 254) return true
+  if (a === 0) return true
+  return false
+}
+
+// Parse a hostname that may encode an IPv4 address in decimal (2130706433),
+// hex (0x7f000001), octal (0177.0.0.1), or mixed dotted notation. Returns the
+// four octets if the hostname is recognizable as a numeric IPv4, else null.
+function parseNumericIPv4(hostname: string): [number, number, number, number] | null {
+  if (/^\d+$/.test(hostname)) {
+    const n = Number(hostname)
+    if (!Number.isFinite(n) || n < 0 || n > 0xffffffff) return null
+    return [(n >>> 24) & 0xff, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff]
   }
+  if (/^0[xX][0-9a-fA-F]+$/.test(hostname)) {
+    const n = parseInt(hostname, 16)
+    if (!Number.isFinite(n) || n < 0 || n > 0xffffffff) return null
+    return [(n >>> 24) & 0xff, (n >>> 16) & 0xff, (n >>> 8) & 0xff, n & 0xff]
+  }
+  const parts = hostname.split('.')
+  if (parts.length === 4) {
+    const octets: number[] = []
+    for (const p of parts) {
+      let n: number
+      if (/^0[xX][0-9a-fA-F]+$/.test(p)) n = parseInt(p, 16)
+      else if (/^0[0-7]+$/.test(p)) n = parseInt(p, 8)
+      else if (/^\d+$/.test(p)) n = parseInt(p, 10)
+      else return null
+      if (!Number.isFinite(n) || n < 0 || n > 255) return null
+      octets.push(n)
+    }
+    return octets as [number, number, number, number]
+  }
+  return null
+}
+
+function isPrivateHost(hostname: string): boolean {
+  // URL.hostname returns IPv6 literals wrapped in brackets ("[::1]") — strip them.
+  let h = hostname
+  if (h.startsWith('[') && h.endsWith(']')) h = h.slice(1, -1)
+  const lower = h.toLowerCase()
+
+  if (lower === 'localhost' || lower.endsWith('.local')) return true
+  // Cloud metadata hostnames — block by name regardless of how the IP is encoded.
+  if (lower === 'metadata.google.internal' || lower === 'metadata' || lower === 'metadata.goog') return true
+
+  if (lower.includes(':')) {
+    if (lower === '::' || lower === '::1') return true
+    // IPv4-mapped IPv6: ::ffff:127.0.0.1
+    const mappedDotted = lower.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/)
+    if (mappedDotted) {
+      const octets = parseNumericIPv4(mappedDotted[1])
+      if (octets && (isPrivateIPv4Octets(octets) || (octets[0] === 169 && octets[1] === 254))) return true
+    }
+    // IPv4-mapped IPv6 in hex form: ::ffff:7f00:0001
+    const mappedHex = lower.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/)
+    if (mappedHex) {
+      const hi = parseInt(mappedHex[1], 16)
+      const lo = parseInt(mappedHex[2], 16)
+      const octets: [number, number, number, number] = [
+        (hi >> 8) & 0xff, hi & 0xff, (lo >> 8) & 0xff, lo & 0xff,
+      ]
+      if (isPrivateIPv4Octets(octets) || (octets[0] === 169 && octets[1] === 254)) return true
+    }
+    // Unique-local fc00::/7 — first byte fc or fd (canonical 4-hex-digit first group).
+    if (/^f[cd][0-9a-f]{2}:/.test(lower)) return true
+    // Link-local fe80::/10 — first 10 bits 1111111010 → first group fe80–febf.
+    if (/^fe[89ab][0-9a-f]:/.test(lower)) return true
+    return false
+  }
+
+  const octets = parseNumericIPv4(h)
+  if (octets) {
+    if (isPrivateIPv4Octets(octets)) return true
+    // Entire 169.254.0.0/16 link-local range covers 169.254.169.254 metadata IP
+    // in every encoding once normalized to octets.
+    if (octets[0] === 169 && octets[1] === 254) return true
+    return false
+  }
+
   return false
 }
 
@@ -276,8 +350,15 @@ export async function POST(req: NextRequest) {
     const res = await fetch(url, {
       signal: ctrl.signal,
       headers: BROWSER_HEADERS,
+      // Don't follow redirects — validation only ran on the original URL, so a
+      // 302 to an internal address (e.g. 169.254.169.254) would bypass it.
+      redirect: 'manual',
     })
     clearTimeout(timeout)
+
+    if ((res.status >= 300 && res.status < 400) || res.type === 'opaqueredirect') {
+      return NextResponse.json({ title: '', description: '', image_url: null, url })
+    }
 
     const html = await res.text()
 

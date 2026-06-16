@@ -7,6 +7,7 @@ import type { Recommendation } from '@/app/lib/types'
 import { Avatar, ActionButton, TeaserText } from './helpers'
 import { LikeIcon, BookmarkIcon, CommentIcon } from './icons'
 import { trackImpression, trackExpand } from '@/lib/items'
+import { safeExternalHref } from '@/lib/url'
 
 const loggedImpressions = new Set<string>()
 const loggedExpands = new Set<string>()
@@ -109,33 +110,36 @@ export function RecommendationCard({
 
       {!!rec.image_url && !imgError && (
         <div style={{ height: '280px', overflow: 'hidden', position: 'relative', background: '#faf8f4' }}>
-          {rec.external_url ? (
-            <a
-              href={rec.external_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={e => e.stopPropagation()}
-              onMouseEnter={() => setImageHovered(true)}
-              onMouseLeave={() => setImageHovered(false)}
-              style={{ display: 'block', height: '100%', position: 'relative' }}
-            >
+          {(() => {
+            const safeHref = safeExternalHref(rec.external_url)
+            return safeHref ? (
+              <a
+                href={safeHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={e => e.stopPropagation()}
+                onMouseEnter={() => setImageHovered(true)}
+                onMouseLeave={() => setImageHovered(false)}
+                style={{ display: 'block', height: '100%', position: 'relative' }}
+              >
+                <RecommendationImage fill src={rec.image_url} category={rec.category} alt={rec.title} sizes="(max-width: 768px) 100vw, 50vw" onFallback={() => setImgError(true)} style={{ objectFit: 'contain', background: '#faf8f4' }} />
+                <div style={{
+                  position: 'absolute', top: '8px', right: '8px',
+                  background: 'rgba(0,0,0,0.55)', borderRadius: '7px',
+                  width: '28px', height: '28px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  opacity: imageHovered ? 1 : 0, transition: 'opacity 0.15s',
+                  backdropFilter: 'blur(4px)', pointerEvents: 'none',
+                }}>
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M7 17L17 7M17 7H7M17 7v10" />
+                  </svg>
+                </div>
+              </a>
+            ) : (
               <RecommendationImage fill src={rec.image_url} category={rec.category} alt={rec.title} sizes="(max-width: 768px) 100vw, 50vw" onFallback={() => setImgError(true)} style={{ objectFit: 'contain', background: '#faf8f4' }} />
-              <div style={{
-                position: 'absolute', top: '8px', right: '8px',
-                background: 'rgba(0,0,0,0.55)', borderRadius: '7px',
-                width: '28px', height: '28px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                opacity: imageHovered ? 1 : 0, transition: 'opacity 0.15s',
-                backdropFilter: 'blur(4px)', pointerEvents: 'none',
-              }}>
-                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M7 17L17 7M17 7H7M17 7v10" />
-                </svg>
-              </div>
-            </a>
-          ) : (
-            <RecommendationImage fill src={rec.image_url} category={rec.category} alt={rec.title} sizes="(max-width: 768px) 100vw, 50vw" onFallback={() => setImgError(true)} style={{ objectFit: 'contain', background: '#faf8f4' }} />
-          )}
+            )
+          })()}
         </div>
       )}
 

@@ -361,6 +361,11 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       })
+      if (id !== searchIdRef.current) return
+      if (!res.ok) {
+        toast(`Couldn't load a preview for that link`)
+        return
+      }
       const data = await res.json() as { title: string; image_url: string | null }
       if (id !== searchIdRef.current) return
       if (data.title) {
@@ -377,7 +382,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
       }
     } catch { /* silent */ }
     finally { if (id === searchIdRef.current) setSearching(false) }
-  }, [])
+  }, [toast])
 
   // ── @ mention search ─────────────────────────────────────────────────────
 
@@ -652,6 +657,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
         .replace(/https?:\/\/[^\s]+/gi, '')
         .replace(/\s{2,}/g, ' ')
         .trim()
+        .slice(0, 1000)
 
       const title = confirmedItem?.title
         ?? (cleanedText.split('\n')[0].trim().slice(0, 100) || 'Untitled')
@@ -744,7 +750,8 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
         router.push(`/${postedCategory}`)
       }, 1000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.')
+      console.error('[Notable] post failed:', err)
+      setError('Something went wrong posting your recommendation — please try again.')
       setPosting(false)
     }
   }

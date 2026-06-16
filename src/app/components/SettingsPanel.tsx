@@ -749,7 +749,7 @@ function AboutSection() {
 
 // ── Delete confirmation modal ─────────────────────────────────────────────────
 
-function DeleteModal({ onCancel, onConfirm, deleting }: { onCancel: () => void; onConfirm: () => void; deleting: boolean }) {
+function DeleteModal({ onCancel, onConfirm, deleting, error }: { onCancel: () => void; onConfirm: () => void; deleting: boolean; error: string | null }) {
   return (
     <div
       style={{
@@ -769,9 +769,18 @@ function DeleteModal({ onCancel, onConfirm, deleting }: { onCancel: () => void; 
         <h3 className="font-display font-bold" style={{ fontSize: '1.05rem', color: '#33261a', marginBottom: '12px' }}>
           Delete your account?
         </h3>
-        <p className="font-body" style={{ fontSize: '14px', color: '#6b5d4f', lineHeight: '1.55', marginBottom: '24px' }}>
+        <p className="font-body" style={{ fontSize: '14px', color: '#6b5d4f', lineHeight: '1.55', marginBottom: error ? '14px' : '24px' }}>
           This is permanent. Your account, all your recommendations, bookmarks and data will be deleted immediately. This cannot be undone.
         </p>
+        {error && (
+          <p className="font-body" style={{
+            fontSize: '13px', color: '#e05555', lineHeight: '1.5',
+            background: 'rgba(224,85,85,0.08)', border: '1px solid rgba(224,85,85,0.22)',
+            borderRadius: '8px', padding: '10px 12px', marginBottom: '18px',
+          }}>
+            {error}
+          </p>
+        )}
         <div style={{ display: 'flex', gap: '10px' }}>
           <button
             onClick={onCancel}
@@ -830,6 +839,7 @@ function PanelContent({
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const handleSignOut = async () => {
     const supabase = createClient()
@@ -840,10 +850,24 @@ function PanelContent({
 
   const handleDelete = async () => {
     setDeleting(true)
+    setDeleteError(null)
+    let res: Response
     try {
-      await fetch('/api/account/delete', { method: 'DELETE' })
+      res = await fetch('/api/account/delete', { method: 'DELETE' })
     } catch {
-      // best effort
+      setDeleteError('Could not reach the server. Check your connection and try again.')
+      setDeleting(false)
+      return
+    }
+    if (!res.ok) {
+      let msg = 'Could not delete your account. Please try again.'
+      try {
+        const body = await res.json() as { error?: string }
+        if (body.error) msg = body.error
+      } catch { /* keep default */ }
+      setDeleteError(msg)
+      setDeleting(false)
+      return
     }
     const supabase = createClient()
     await supabase.auth.signOut()
@@ -1014,9 +1038,10 @@ function PanelContent({
       {/* Delete confirmation — overlaid on the panel */}
       {showDeleteModal && (
         <DeleteModal
-          onCancel={() => setShowDeleteModal(false)}
+          onCancel={() => { setShowDeleteModal(false); setDeleteError(null) }}
           onConfirm={handleDelete}
           deleting={deleting}
+          error={deleteError}
         />
       )}
     </>

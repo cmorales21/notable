@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { cache } from 'react'
+import { cache, type CSSProperties } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { RecommendationImage } from '@/app/components/RecommendationImage'
@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { theme } from '@/app/lib/theme'
 import { ShareButton } from './ShareButton'
+import { safeExternalHref } from '@/lib/url'
 
 // ─── Category config ──────────────────────────────────────────────────────────
 
@@ -147,7 +148,7 @@ export default async function RecPage(
               This recommendation is from a private profile. Sign in and follow this person to view it.
             </p>
             <Link
-              href="/auth/login"
+              href="/login"
               className="font-body"
               style={{
                 display: 'inline-block', padding: '10px 24px',
@@ -354,31 +355,38 @@ export default async function RecPage(
             )}
 
             {/* ── External link ───────────────────────────────────────── */}
-            {rec.external_url && (
-              <div style={{ marginBottom: '20px' }}>
-                <a
-                  href={rec.external_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-body"
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: '6px',
-                    color: cat.color, fontSize: '13px', fontWeight: 500,
-                    textDecoration: 'none', padding: '7px 14px',
-                    background: `${cat.color}14`, borderRadius: theme.radii.pill,
-                    border: `1px solid ${cat.color}28`,
-                  }}
-                >
+            {rec.external_url && (() => {
+              const safeHref = safeExternalHref(rec.external_url)
+              const pillStyle: CSSProperties = {
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                color: cat.color, fontSize: '13px', fontWeight: 500,
+                textDecoration: 'none', padding: '7px 14px',
+                background: `${cat.color}14`, borderRadius: theme.radii.pill,
+                border: `1px solid ${cat.color}28`,
+              }
+              const pillBody = (
+                <>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
                     strokeLinecap="round" strokeLinejoin="round" width="13" height="13">
                     <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
                     <polyline points="15 3 21 3 21 9" />
                     <line x1="10" y1="14" x2="21" y2="3" />
                   </svg>
-                  {externalLinkLabel(rec.external_url)}
-                </a>
-              </div>
-            )}
+                  {externalLinkLabel(rec.external_url!)}
+                </>
+              )
+              return (
+                <div style={{ marginBottom: '20px' }}>
+                  {safeHref ? (
+                    <a href={safeHref} target="_blank" rel="noopener noreferrer" className="font-body" style={pillStyle}>
+                      {pillBody}
+                    </a>
+                  ) : (
+                    <span className="font-body" style={pillStyle}>{pillBody}</span>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* ── Action/stats row ────────────────────────────────────── */}
             <div style={{ display: 'flex', gap: '6px', marginBottom: commentCount > 0 ? '28px' : '0' }}>

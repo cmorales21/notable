@@ -241,6 +241,10 @@ export default function PostPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       })
+      if (!res.ok) {
+        toast(`Couldn't load a preview for that link`)
+        return
+      }
       const data = await res.json() as { title: string; description: string; image_url: string | null; url: string }
       const detectedCat = detectCategoryFromUrl(url)
       const currentCat = selectedCategoryRef.current
@@ -361,7 +365,7 @@ export default function PostPage() {
         external_url: selectedItem?.external_url ?? null,
         external_id: selectedItem?.fromExternalApi ? selectedItem.id : null,
         year: selectedItem?.year ?? null,
-        description: description.trim() || null,
+        description: description.trim().slice(0, 1000) || null,
       })
 
       if (insertError) throw insertError
@@ -371,7 +375,8 @@ export default function PostPage() {
       toast('Recommendation posted!')
       setTimeout(() => router.push(`/${selectedCategory}`), 1500)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.')
+      console.error('[Notable] post failed:', err)
+      setError('Something went wrong posting your recommendation — please try again.')
       setPosting(false)
     }
   }
@@ -627,7 +632,7 @@ export default function PostPage() {
                 onChange={handleTextareaChange}
                 placeholder="What made it special?"
                 rows={6}
-                maxLength={2000}
+                maxLength={1000}
                 disabled={postSuccess}
                 className="font-body"
                 style={{
@@ -668,9 +673,9 @@ export default function PostPage() {
             {description.length > 0 && (
               <p className="font-body" style={{
                 textAlign: 'right', fontSize: '11px', marginTop: '5px',
-                color: description.length >= 1800 ? '#e05555' : '#6b5d4f',
+                color: description.length >= 900 ? '#e05555' : '#6b5d4f',
               }}>
-                {description.length} / 2000
+                {description.length} / 1000
               </p>
             )}
 

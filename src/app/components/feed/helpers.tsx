@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import type { RecComment } from '@/app/lib/types'
 import { theme } from '@/app/lib/theme'
+import { safeExternalHref } from '@/lib/url'
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
@@ -190,9 +191,17 @@ export function TeaserText({
 
 export function ExternalLink({ href, label, color, onTrackClick }: { href: string; label: string; color: string; onTrackClick?: () => void }) {
   const [hovered, setHovered] = useState(false)
+  const safeHref = safeExternalHref(href)
+  if (!safeHref) {
+    return (
+      <span className="font-body" style={{ color, fontSize: '13px' }}>
+        {label}
+      </span>
+    )
+  }
   return (
     <a
-      href={href}
+      href={safeHref}
       target="_blank"
       rel="noopener noreferrer"
       onClick={e => { e.stopPropagation(); onTrackClick?.() }}

@@ -18,6 +18,13 @@ export default function SignupPage() {
   const supabase = supabaseRef.current
   const router = useRouter()
 
+  // If signup step 1 (auth.signUp) succeeds but step 2 (profile insert) fails
+  // recoverably — handle collision — we retain the created auth user here so
+  // a retry on the same page resumes from step 2 rather than calling signUp
+  // again (which would fail with "User already registered").
+  // Cleared on success and when the component unmounts.
+  const createdAuthUserRef = useRef<{ id: string; email: string } | null>(null)
+
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
@@ -25,72 +32,116 @@ export default function SignupPage() {
 
     const cleanHandle = handle.replace(/^@/, '')
 
-    // 1. Create the auth user.
+    // ── 1. Create the auth user (or skip if a prior attempt already did) ───
     //    Store name + handle in user_metadata so onboarding can recover
     //    the profile server-side if the client-side insert below ever races.
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: name,
-          handle: cleanHandle || undefined,
+    let authUser: { id: string; email: string }
+    if (createdAuthUserRef.current) {
+      // Resume: a prior submit in this session already created the auth user;
+      // skip signUp and go straight to the profile insert with the new handle.
+      authUser = createdAuthUserRef.current
+    } else {
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: name,
+            handle: cleanHandle || undefined,
+          },
         },
-      },
-    })
-
-    if (authError) {
-      setError(authError.message)
-      setLoading(false)
-      return
-    }
-
-    if (!authData.user) {
-      setError('Something went wrong. Please try again.')
-      setLoading(false)
-      return
-    }
-
-    // 2. With email confirmation disabled, signUp returns a live session.
-    //    Explicitly set it before any DB call — this guarantees the auth
-    //    token is active and the next insert passes the RLS check.
-    if (authData.session) {
-      await supabase.auth.setSession({
-        access_token: authData.session.access_token,
-        refresh_token: authData.session.refresh_token,
       })
+
+      if (authError) {
+        setError(authError.message)
+        setLoading(false)
+        return
+      }
+
+      if (!authData.user) {
+        setError('Something went wrong. Please try again.')
+        setLoading(false)
+        return
+      }
+
+      // 2. With email confirmation disabled, signUp returns a live session.
+      //    Explicitly set it before any DB call — this guarantees the auth
+      //    token is active and the next insert passes the RLS check.
+      if (authData.session) {
+        await supabase.auth.setSession({
+          access_token: authData.session.access_token,
+          refresh_token: authData.session.refresh_token,
+        })
+      }
+
+      authUser = { id: authData.user.id, email: authData.user.email ?? email }
+      createdAuthUserRef.current = authUser
     }
 
-    // 3. Insert the profile. Only attempted when we have a non-empty handle
-    //    so we never write handle:'' to the database.
+    // ── 3. Insert the profile. Only attempted when we have a non-empty handle
+    //    so we never write handle:'' to the database. Uses the auth user's
+    //    email so profile and auth.users stay consistent even if the user
+    //    edits the email field between attempts.
     if (cleanHandle) {
       const { error: insertError } = await supabase.from('profiles').insert({
-        id: authData.user.id,
+        id: authUser.id,
         name,
         handle: cleanHandle,
-        email,
+        email: authUser.email,
       })
 
       if (insertError) {
+        console.error('[Notable] signup profile insert failed:', insertError)
+
+        // 23505 (unique_violation) can mean either:
+        //   (a) the chosen handle is already taken by another user, OR
+        //   (b) a Supabase trigger already created our profile row (PK conflict on id),
+        //       in which case we patch by id.
+        // Distinguish by looking at which constraint the error is about.
+        const details = (insertError.details ?? '').toString()
+        const messageLower = (insertError.message ?? '').toLowerCase()
+        const isHandleCollision =
+          insertError.code === '23505' &&
+          (details.includes('(handle)') || messageLower.includes('handle'))
+
+        if (isHandleCollision) {
+          setError('That handle is already taken — please choose another.')
+          setLoading(false)
+          return
+        }
+
         if (insertError.code === '23505') {
-          // A Supabase trigger already created the profile row — patch it.
+          // Trigger-race case: profile row already exists for this user; patch it.
           const { error: updateError } = await supabase
             .from('profiles')
             .update({ name, handle: cleanHandle })
-            .eq('id', authData.user.id)
+            .eq('id', authUser.id)
           if (updateError) {
-            setError(updateError.message)
+            console.error('[Notable] signup profile patch failed:', updateError)
+            const upDetails = (updateError.details ?? '').toString()
+            const upMessageLower = (updateError.message ?? '').toLowerCase()
+            if (
+              updateError.code === '23505' &&
+              (upDetails.includes('(handle)') || upMessageLower.includes('handle'))
+            ) {
+              setError('That handle is already taken — please choose another.')
+            } else {
+              setError('Something went wrong creating your profile. Please try again.')
+            }
             setLoading(false)
             return
           }
         } else {
-          setError(insertError.message)
+          setError('Something went wrong creating your profile. Please try again.')
           setLoading(false)
           return
         }
       }
     }
 
+    // Success — clear the resume ref so a (hypothetical) fresh attempt
+    // after this in the same component lifetime would start over.
+    createdAuthUserRef.current = null
     router.push('/lobby')
   }
 
