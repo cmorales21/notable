@@ -61,7 +61,7 @@ function StripRow({ tiles, offset = '0s' }: { tiles: StripTile[]; offset?: strin
           display: 'flex',
           gap: '2px',
           width: 'max-content',
-          animation: `scroll-right 135s linear ${offset} infinite`,
+          animation: `scroll-right 240s linear ${offset} infinite`,
         }}
       >
         {/* Original set + duplicate — translateX(-50%) loops back to start seamlessly */}
@@ -302,7 +302,7 @@ export default async function LandingPage() {
                 lineHeight: 1.75,
               }}
             >
-              No algorithms. No endless scrolling. No AI. Just people sharing what they love.
+              No AI. No deep algorithms. No endless scrolling. Just people sharing what they love.
             </p>
           </section>
         </FadeIn>
