@@ -534,16 +534,15 @@ export function GroupedModal({
 
             {group.external_url && (
               <div style={{ padding: '0 20px 12px' }}>
-                {willEmbed(group.external_url, group.category, 'feed') && !embedFailed ? (
+                {willEmbed(group.external_url, group.category, 'feed') && !embedFailed && (
                   <RichMediaEmbed external_url={group.external_url} category={group.category} context="feed" title={group.title} onEmbedFail={() => setEmbedFailed(true)} />
-                ) : (
-                  <ExternalLink
-                    href={group.external_url}
-                    label={getExternalLinkLabel(group.category, group.external_url)}
-                    color={accentColor}
-                    onTrackClick={leadRec.item_id && currentUserId ? () => trackClick({ itemId: leadRec.item_id!, userId: currentUserId!, category: group.category, source: 'modal' }) : undefined}
-                  />
                 )}
+                <ExternalLink
+                  href={group.external_url}
+                  label={getExternalLinkLabel(group.category, group.external_url)}
+                  color={accentColor}
+                  onTrackClick={leadRec.item_id && currentUserId ? () => trackClick({ itemId: leadRec.item_id!, userId: currentUserId!, category: group.category, source: 'modal' }) : undefined}
+                />
               </div>
             )}
 

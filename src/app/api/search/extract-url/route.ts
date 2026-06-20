@@ -186,6 +186,41 @@ async function handleYoutube(url: string): Promise<NextResponse | null> {
   }
 }
 
+// ── Spotify oEmbed handler ───────────────────────────────────────────────────
+// Spotify serves a JS-rendered shell with no OG tags to server-side fetches,
+// so the generic scraper can only recover "<title>Spotify – Web Player</title>".
+// Their public oEmbed endpoint returns the real title + cover art for tracks,
+// albums, playlists, artists, episodes, and shows — no auth required.
+const SPOTIFY_RE = /^https?:\/\/open\.spotify\.com\/(?:track|album|playlist|artist|episode|show)\/[A-Za-z0-9]+/i
+
+async function handleSpotify(url: string): Promise<NextResponse | null> {
+  if (!SPOTIFY_RE.test(url)) return null
+
+  try {
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), 5000)
+    const res = await fetch(
+      `https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`,
+      { signal: ctrl.signal, cache: 'no-store' }
+    )
+    clearTimeout(t)
+    if (!res.ok) return null
+
+    type OEmbed = { title?: string; thumbnail_url?: string }
+    const data = await res.json() as OEmbed
+    if (!data.title) return null
+
+    return NextResponse.json({
+      title: data.title,
+      description: '',
+      image_url: data.thumbnail_url ?? null,
+      url,
+    })
+  } catch {
+    return null
+  }
+}
+
 const IMDB_RE = /imdb\.com\/title\/(tt\d{7,8})/i
 
 async function handleImdb(url: string): Promise<NextResponse | null> {
@@ -337,6 +372,9 @@ export async function POST(req: NextRequest) {
 
   const youtubeResult = await handleYoutube(url)
   if (youtubeResult) return youtubeResult
+
+  const spotifyResult = await handleSpotify(url)
+  if (spotifyResult) return spotifyResult
 
   const imdbResult = await handleImdb(url)
   if (imdbResult) return imdbResult

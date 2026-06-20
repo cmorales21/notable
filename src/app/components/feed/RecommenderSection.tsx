@@ -341,16 +341,15 @@ export function RecommenderSection({
 
       {recommender.external_url && (
         <div style={{ marginBottom: '10px' }}>
-          {willEmbed(recommender.external_url, category, 'feed') && !embedFailed ? (
+          {willEmbed(recommender.external_url, category, 'feed') && !embedFailed && (
             <RichMediaEmbed external_url={recommender.external_url} category={category} context="feed" title={title} onEmbedFail={() => setEmbedFailed(true)} />
-          ) : (
-            <ExternalLink
-              href={recommender.external_url}
-              label={getExternalLinkLabel(category, recommender.external_url)}
-              color={accentColor}
-              onTrackClick={recommender.item_id && currentUserId ? () => trackClick({ itemId: recommender.item_id!, userId: currentUserId!, category, source: 'section' }) : undefined}
-            />
           )}
+          <ExternalLink
+            href={recommender.external_url}
+            label={getExternalLinkLabel(category, recommender.external_url)}
+            color={accentColor}
+            onTrackClick={recommender.item_id && currentUserId ? () => trackClick({ itemId: recommender.item_id!, userId: currentUserId!, category, source: 'section' }) : undefined}
+          />
         </div>
       )}
 

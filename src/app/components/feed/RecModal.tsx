@@ -429,16 +429,15 @@ export function RecModal({
 
           {rec.external_url && (
             <div style={{ padding: '0 20px 14px' }}>
-              {willEmbed(rec.external_url, rec.category, context ?? 'feed') && !embedFailed ? (
+              {willEmbed(rec.external_url, rec.category, context ?? 'feed') && !embedFailed && (
                 <RichMediaEmbed external_url={rec.external_url} category={rec.category} context={context ?? 'feed'} title={rec.title} onEmbedFail={() => setEmbedFailed(true)} />
-              ) : (
-                <ExternalLink
-                  href={rec.external_url}
-                  label={getExternalLinkLabel(rec.category, rec.external_url)}
-                  color={accentColor}
-                  onTrackClick={rec.item_id && currentUserId ? () => trackClick({ itemId: rec.item_id!, userId: currentUserId!, category: rec.category, source: 'modal' }) : undefined}
-                />
               )}
+              <ExternalLink
+                href={rec.external_url}
+                label={getExternalLinkLabel(rec.category, rec.external_url)}
+                color={accentColor}
+                onTrackClick={rec.item_id && currentUserId ? () => trackClick({ itemId: rec.item_id!, userId: currentUserId!, category: rec.category, source: 'modal' }) : undefined}
+              />
             </div>
           )}
 

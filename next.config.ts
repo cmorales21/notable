@@ -28,6 +28,7 @@ const nextConfig: NextConfig = {
 
       // ── Music ───────────────────────────────────────────────────────────────
       { protocol: 'https', hostname: '**.scdn.co' },                // Spotify (i.scdn.co etc.)
+      { protocol: 'https', hostname: '**.spotifycdn.com' },         // Spotify oEmbed thumbnails (image-cdn-*.spotifycdn.com)
       { protocol: 'https', hostname: 'i.ytimg.com' },              // YouTube
       { protocol: 'https', hostname: '**.mzstatic.com' },          // Apple Music / TV / Podcasts
       { protocol: 'https', hostname: 'f4.bcbits.com' },            // Bandcamp

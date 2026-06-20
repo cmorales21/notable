@@ -54,7 +54,7 @@ export function willEmbed(
 
 function buildSpotifyEmbedUrl(url: string): string | null {
   const withoutQuery = url.split('?')[0]
-  const match = withoutQuery.match(/open\.spotify\.com\/(playlist|album|track|artist)\/([^/?]+)/)
+  const match = withoutQuery.match(/open\.spotify\.com\/(playlist|album|track|artist|episode|show)\/([^/?]+)/)
   if (!match) return null
   return `https://open.spotify.com/embed/${match[1]}/${match[2]}?utm_source=generator`
 }
@@ -164,32 +164,47 @@ export function RichMediaEmbed({
   title?: string
   onEmbedFail?: () => void
 }) {
-  if (context === 'profile') return null
+  const platform = context === 'profile' ? null : detectPlatform(external_url, category)
 
-  const platform = detectPlatform(external_url, category)
-  if (!platform) return null
+  // Build sync embed URLs up front so we can signal failure to the parent if
+  // the URL doesn't match the expected pattern (e.g. a Spotify path verb we
+  // don't recognize). Without this, the iframe silently renders nothing and
+  // the parent's image_url fallback stays suppressed.
+  const spotifyUrl = platform === 'spotify' ? buildSpotifyEmbedUrl(external_url) : null
+  const youtubeUrl = platform === 'youtube' ? buildYouTubeEmbedUrl(external_url) : null
+  const vimeoUrl = platform === 'vimeo' ? buildVimeoEmbedUrl(external_url) : null
+
+  const syncBuildFailed =
+    (platform === 'spotify' && !spotifyUrl) ||
+    (platform === 'youtube' && !youtubeUrl) ||
+    (platform === 'vimeo' && !vimeoUrl)
+
+  const onFailRef = useRef(onEmbedFail)
+  onFailRef.current = onEmbedFail
+  useEffect(() => {
+    if (syncBuildFailed) onFailRef.current?.()
+  }, [syncBuildFailed])
+
+  if (context === 'profile' || !platform) return null
 
   if (platform === 'spotify') {
-    const embedUrl = buildSpotifyEmbedUrl(external_url)
-    if (!embedUrl) return null
+    if (!spotifyUrl) return null
     const height = external_url.includes('/track/') ? 152 : 352
     return (
       <iframe
-        src={embedUrl}
+        src={spotifyUrl}
         style={{ ...BASE, height }}
         allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-        sandbox="allow-scripts allow-same-origin allow-popups"
         loading="lazy"
       />
     )
   }
 
   if (platform === 'youtube') {
-    const embedUrl = buildYouTubeEmbedUrl(external_url)
-    if (!embedUrl) return null
+    if (!youtubeUrl) return null
     return (
       <iframe
-        src={embedUrl}
+        src={youtubeUrl}
         style={{ ...BASE, height: 280 }}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         sandbox="allow-scripts allow-same-origin allow-popups"
@@ -200,11 +215,10 @@ export function RichMediaEmbed({
   }
 
   if (platform === 'vimeo') {
-    const embedUrl = buildVimeoEmbedUrl(external_url)
-    if (!embedUrl) return null
+    if (!vimeoUrl) return null
     return (
       <iframe
-        src={embedUrl}
+        src={vimeoUrl}
         style={{ ...BASE, height: 280 }}
         allow="autoplay; fullscreen; picture-in-picture"
         sandbox="allow-scripts allow-same-origin allow-popups"
