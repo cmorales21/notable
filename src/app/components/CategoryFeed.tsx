@@ -8,6 +8,7 @@ import { EmptyStateIcon } from './feed/helpers'
 import EmptyState from '@/app/components/EmptyState'
 import { FeedSkeleton } from '@/app/components/skeletons'
 import { GroupedCard } from './feed/GroupedCard'
+import CardErrorBoundary from './CardErrorBoundary'
 import { GroupedModal } from './feed/GroupedModal'
 import { theme } from '@/app/lib/theme'
 import { useToast } from '@/app/components/Toast'
@@ -507,19 +508,20 @@ export default function CategoryFeed({ category }: { category: string }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {visibleGroups.map((group) => (
-              <GroupedCard
-                key={group.groupKey}
-                group={group}
-                accentColor={accentColor}
-                tab={activeTab}
-                currentUserId={currentUserId}
-                onLike={(e) => toggleLike(e, group.lead_rec_id)}
-                onBookmark={(e) => toggleBookmark(e, group.lead_rec_id)}
-                onClick={() => { setFocusOnOpen(false); setSelectedGroup(group) }}
-                onCommentClick={(e) => { e.stopPropagation(); setFocusOnOpen(true); setSelectedGroup(group) }}
-                onIgnore={handleIgnoreUser}
-                onDelete={(recId) => setRecs(prev => prev.filter(r => r.id !== recId))}
-              />
+              <CardErrorBoundary key={group.groupKey}>
+                <GroupedCard
+                  group={group}
+                  accentColor={accentColor}
+                  tab={activeTab}
+                  currentUserId={currentUserId}
+                  onLike={(e) => toggleLike(e, group.lead_rec_id)}
+                  onBookmark={(e) => toggleBookmark(e, group.lead_rec_id)}
+                  onClick={() => { setFocusOnOpen(false); setSelectedGroup(group) }}
+                  onCommentClick={(e) => { e.stopPropagation(); setFocusOnOpen(true); setSelectedGroup(group) }}
+                  onIgnore={handleIgnoreUser}
+                  onDelete={(recId) => setRecs(prev => prev.filter(r => r.id !== recId))}
+                />
+              </CardErrorBoundary>
             ))}
           </div>
         )}
