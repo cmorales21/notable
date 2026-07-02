@@ -125,17 +125,20 @@ export function RecModal({
     toast('Comment removed')
   }
 
-  async function reportComment(commentId: string, reason: string, details: string) {
-    if (!currentUserId) return
+  async function reportComment(commentId: string, reason: string, details: string): Promise<boolean> {
+    if (!currentUserId) return false
     const fullReason = details ? `${reason} — ${details}` : reason
-    await supabaseRef.current.from('comment_reports').insert({ comment_id: commentId, reporter_id: currentUserId, reason: fullReason })
+    const { error } = await supabaseRef.current.from('comment_reports').insert({ comment_id: commentId, reporter_id: currentUserId, reason: fullReason })
+    return !error
   }
 
-  async function reportRec(reason: string, details: string) {
-    if (!currentUserId) return
+  async function reportRec(reason: string, details: string): Promise<boolean> {
+    if (!currentUserId) return false
     const fullReason = details ? `${reason} — ${details}` : reason
-    await supabaseRef.current.from('recommendation_reports').insert({ recommendation_id: rec.id, reporter_id: currentUserId, reason: fullReason })
+    const { error } = await supabaseRef.current.from('recommendation_reports').insert({ recommendation_id: rec.id, reporter_id: currentUserId, reason: fullReason })
+    if (error) return false
     toast('Report submitted')
+    return true
   }
 
   async function saveDescEdit() {

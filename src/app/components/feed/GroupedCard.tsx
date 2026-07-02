@@ -162,15 +162,17 @@ export function GroupedCard({
     return () => observer.disconnect()
   }, [leadRec.item_id, currentUserId, group.category])
 
-  async function reportRec(reason: string, details: string) {
-    if (!currentUserId) return
+  async function reportRec(reason: string, details: string): Promise<boolean> {
+    if (!currentUserId) return false
     const fullReason = details ? `${reason} — ${details}` : reason
-    await supabaseRef.current.from('recommendation_reports').insert({
+    const { error } = await supabaseRef.current.from('recommendation_reports').insert({
       recommendation_id: leadRec.recommendation_id,
       reporter_id: currentUserId,
       reason: fullReason,
     })
+    if (error) return false
     toast('Report submitted')
+    return true
   }
 
   return (

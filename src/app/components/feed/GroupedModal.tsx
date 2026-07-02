@@ -241,13 +241,15 @@ export function GroupedModal({
     toast('Link copied')
   }
 
-  async function reportRec(reason: string, details: string) {
-    if (!currentUserId) return
+  async function reportRec(reason: string, details: string): Promise<boolean> {
+    if (!currentUserId) return false
     const primaryId = group.recommenders[0]?.recommendation_id
-    if (!primaryId) return
+    if (!primaryId) return false
     const fullReason = details ? `${reason} — ${details}` : reason
-    await supabaseRef.current.from('recommendation_reports').insert({ recommendation_id: primaryId, reporter_id: currentUserId, reason: fullReason })
+    const { error } = await supabaseRef.current.from('recommendation_reports').insert({ recommendation_id: primaryId, reporter_id: currentUserId, reason: fullReason })
+    if (error) return false
     toast('Report submitted')
+    return true
   }
 
   async function handleLike(e: React.MouseEvent) {

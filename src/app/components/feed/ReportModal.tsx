@@ -17,7 +17,7 @@ export function ReportModal({
   zIndex = 400,
 }: {
   title: string
-  onSubmit: (reason: string, details: string) => Promise<void>
+  onSubmit: (reason: string, details: string) => Promise<boolean>
   onClose: () => void
   zIndex?: number
 }) {
@@ -25,12 +25,18 @@ export function ReportModal({
   const [details, setDetails] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [done, setDone] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   async function handleSubmit() {
     if (!selected || submitting) return
     setSubmitting(true)
-    await onSubmit(selected, details.trim())
-    setDone(true)
+    setSubmitError(null)
+    const ok = await onSubmit(selected, details.trim())
+    if (ok) {
+      setDone(true)
+    } else {
+      setSubmitError('Couldn’t send your report. Please try again.')
+    }
     setSubmitting(false)
   }
 
@@ -120,6 +126,11 @@ export function ReportModal({
                 display: 'block',
               }}
             />
+            {submitError && (
+              <p className="font-body" style={{ color: '#e05555', fontSize: '13px', marginTop: '-6px', marginBottom: '14px' }}>
+                {submitError}
+              </p>
+            )}
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
               <button
                 onClick={onClose}

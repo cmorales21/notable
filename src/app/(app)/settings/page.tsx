@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useToast } from '@/app/components/Toast'
 
 // ─── Toggle row ───────────────────────────────────────────────────────────────
 
@@ -96,6 +97,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 export default function SettingsPage() {
   const router = useRouter()
+  const toast = useToast()
   const [notifyBookmarks, setNotifyBookmarks] = useState(true)
   const [emailOptedIn, setEmailOptedIn] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
@@ -121,20 +123,24 @@ export default function SettingsPage() {
     })
   }, [])
 
-  const saveField = async (patch: Record<string, boolean>) => {
+  const saveField = async (patch: Record<string, boolean>, revert: () => void) => {
     if (!userId) return
     const supabase = createClient()
-    await supabase.from('profiles').update(patch).eq('id', userId)
+    const { error } = await supabase.from('profiles').update(patch).eq('id', userId)
+    if (error) {
+      revert()
+      toast('Couldn’t save that setting. Please try again.')
+    }
   }
 
   const handleNotifyBookmarks = (val: boolean) => {
     setNotifyBookmarks(val)
-    saveField({ notify_bookmarks: val })
+    saveField({ notify_bookmarks: val }, () => setNotifyBookmarks(!val))
   }
 
   const handleEmailOptedIn = (val: boolean) => {
     setEmailOptedIn(val)
-    saveField({ email_opted_in: val })
+    saveField({ email_opted_in: val }, () => setEmailOptedIn(!val))
   }
 
   const handleSignOut = async () => {

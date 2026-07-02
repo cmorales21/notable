@@ -423,7 +423,13 @@ export default function ProfilePage() {
   async function handleBlock() {
     if (!currentUserId || !profile || blockLoading) return
     setBlockLoading(true)
-    await supabase.current.from('user_blocks').insert({ blocker_id: currentUserId, blocked_id: profile.id })
+    const name = profile.name ?? `@${profile.handle}`
+    const { error } = await supabase.current.from('user_blocks').insert({ blocker_id: currentUserId, blocked_id: profile.id })
+    if (error) {
+      toast(`Couldn’t block ${name}. Please try again.`)
+      setBlockLoading(false)
+      return
+    }
     await Promise.all([
       supabase.current.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', profile.id),
       supabase.current.from('follows').delete().eq('follower_id', profile.id).eq('following_id', currentUserId),
@@ -435,18 +441,21 @@ export default function ProfilePage() {
     setIBlockedThem(true)
     setBlockConfirm(false)
     setBlockMenuOpen(false)
-    const name = profile.name ?? `@${profile.handle}`
     toast(`${name} blocked`)
     setBlockLoading(false)
   }
 
   async function handleUnblock() {
     if (!currentUserId || !profile) return
-    await supabase.current.from('user_blocks').delete()
+    const name = profile.name ?? `@${profile.handle}`
+    const { error } = await supabase.current.from('user_blocks').delete()
       .eq('blocker_id', currentUserId).eq('blocked_id', profile.id)
+    if (error) {
+      toast(`Couldn’t unblock ${name}. Please try again.`)
+      return
+    }
     setIBlockedThem(false)
     setBlockMenuOpen(false)
-    const name = profile.name ?? `@${profile.handle}`
     toast(`${name} unblocked`)
   }
 
@@ -1379,11 +1388,12 @@ export default function ProfilePage() {
           title={`Report ${profile.name ?? `@${profile.handle}`}`}
           onSubmit={async (reason, details) => {
             const fullReason = details ? `${reason} — ${details}` : reason
-            await supabase.current.from('user_reports').insert({
+            const { error } = await supabase.current.from('user_reports').insert({
               reporter_id: currentUserId,
               reported_user_id: profile.id,
               reason: fullReason,
             })
+            return !error
           }}
           onClose={() => setReportOpen(false)}
           zIndex={450}

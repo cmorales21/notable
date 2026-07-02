@@ -167,7 +167,8 @@ export function RecommenderSection({
   async function reportComment(commentId: string) {
     if (!currentUserId) return
     setOpenMenuCommentId(null)
-    await supabaseRef.current.from('comment_reports').insert({ comment_id: commentId, reporter_id: currentUserId })
+    const { error } = await supabaseRef.current.from('comment_reports').insert({ comment_id: commentId, reporter_id: currentUserId })
+    if (error) toast('Couldn’t send your report. Please try again.')
   }
 
   async function submitComment(e: React.FormEvent) {
