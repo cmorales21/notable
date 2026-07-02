@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import type { RecComment } from '@/app/lib/types'
-import { theme } from '@/app/lib/theme'
+import { theme, CATEGORY_COLORS } from '@/app/lib/theme'
 import { safeExternalHref } from '@/lib/url'
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
@@ -241,11 +241,11 @@ export function SkeletonCard() {
 }
 
 const EMPTY_STATE_ICONS: Record<string, { src: string; color: string; padding: string }> = {
-  books:       { src: '/icons/books-small.svg',       color: '#5271FF', padding: '12px' },
-  movies:      { src: '/icons/movies-small.svg',      color: '#dc4f5c', padding: '16px' },
-  music:       { src: '/icons/music-small.svg',       color: '#4aad4e', padding: '14px' },
-  restaurants: { src: '/icons/restaurants-small.svg', color: '#9055d0', padding: '12px' },
-  podcasts:    { src: '/icons/podcasts-small.svg',    color: '#e5a517', padding: '12px' },
+  books:       { src: '/icons/books-small.svg',       color: CATEGORY_COLORS.books,       padding: '12px' },
+  movies:      { src: '/icons/movies-small.svg',      color: CATEGORY_COLORS.movies,      padding: '16px' },
+  music:       { src: '/icons/music-small.svg',       color: CATEGORY_COLORS.music,       padding: '14px' },
+  restaurants: { src: '/icons/restaurants-small.svg', color: CATEGORY_COLORS.restaurants, padding: '12px' },
+  podcasts:    { src: '/icons/podcasts-small.svg',    color: CATEGORY_COLORS.podcasts,    padding: '12px' },
 }
 
 export function EmptyStateIcon({ category }: { category: string }) {

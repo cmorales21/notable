@@ -1,5 +1,7 @@
 // ─── Shared types ─────────────────────────────────────────────────────────────
 
+import { CATEGORY_ORDER, type Category } from '@/app/lib/theme'
+
 export interface FullProfile {
   id: string
   name: string | null
@@ -11,7 +13,7 @@ export interface FullProfile {
   collections_private?: boolean | null
 }
 
-export type CollectionCategory = 'books' | 'movies' | 'music' | 'restaurants' | 'podcasts'
+export type CollectionCategory = Category
 
 export interface Collection {
   id: string
@@ -29,20 +31,6 @@ export interface Collection {
 
 // ─── Shared constants ──────────────────────────────────────────────────────────
 
-export const CATEGORY_COLORS: Record<string, string> = {
-  books: '#5271FF',
-  movies: '#dc4f5c',
-  music: '#4aad4e',
-  restaurants: '#9055d0',
-  podcasts: '#e5a517',
-}
+export { CATEGORY_COLORS, CATEGORY_LABELS } from '@/app/lib/theme'
 
-export const CATEGORY_LABELS: Record<string, string> = {
-  books: 'Books',
-  movies: 'Movies & TV',
-  music: 'Music',
-  restaurants: 'Restaurants',
-  podcasts: 'Podcasts',
-}
-
-export const COLLECTION_CATEGORIES: CollectionCategory[] = ['books', 'movies', 'music', 'restaurants', 'podcasts']
+export const COLLECTION_CATEGORIES: CollectionCategory[] = [...CATEGORY_ORDER]

@@ -14,6 +14,7 @@ import {
   type FullProfile, type Collection, type CollectionCategory,
   CATEGORY_COLORS, CATEGORY_LABELS, COLLECTION_CATEGORIES,
 } from '@/app/components/profile/types'
+import { CATEGORY_ORDER, type Category } from '@/app/lib/theme'
 import { InitialsAvatar } from '@/app/components/profile/InitialsAvatar'
 import { GridTile } from '@/app/components/profile/GridTile'
 import { AddToCollectionMenu } from '@/app/components/profile/AddToCollectionMenu'
@@ -34,9 +35,9 @@ interface SavedCollection {
 }
 
 type TabId = 'posted' | 'liked' | 'bookmarked' | 'collections'
-type CategoryFilter = 'all' | 'books' | 'movies' | 'music' | 'restaurants' | 'podcasts'
+type CategoryFilter = 'all' | Category
 
-const CATEGORIES: CategoryFilter[] = ['all', 'books', 'movies', 'music', 'restaurants', 'podcasts']
+const CATEGORIES: CategoryFilter[] = ['all', ...CATEGORY_ORDER]
 
 const TAB_LABELS: Record<TabId, string> = {
   posted: 'Posted',

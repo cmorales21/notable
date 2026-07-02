@@ -2,14 +2,7 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
-
-const COLORS: Record<string, string> = {
-  books: '#5271FF',
-  movies: '#dc4f5c',
-  music: '#4aad4e',
-  restaurants: '#9055d0',
-  podcasts: '#e5a517',
-}
+import { CATEGORY_COLORS } from '@/app/lib/theme'
 
 const INITIALS: Record<string, string> = {
   books: 'B',
@@ -97,7 +90,7 @@ export function RecommendationImage({
   onFallback,
 }: RecommendationImageProps) {
   const [error, setError] = useState(false)
-  const color = COLORS[category] ?? '#6b5d4f'
+  const color = CATEGORY_COLORS[category] ?? '#6b5d4f'
   const showImage = !!src && !error
 
   const handleError = () => {

@@ -4,15 +4,16 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import WelcomeOverlay from './WelcomeOverlay'
 import Whisper from '@/app/components/Whisper'
+import { CATEGORY_COLORS, CATEGORY_LABELS } from '@/app/lib/theme'
 
 // ─── Tile config ──────────────────────────────────────────────────────────────
 
 const TILES = [
-  { name: 'Books',       href: '/books',       color: '#5271FF', iconSrc: '/icons/books-large.svg',       iconWidth: '80%' },
-  { name: 'Movies & TV', href: '/movies',      color: '#dc4f5c', iconSrc: '/icons/movies-large.svg',      iconWidth: '44%' },
-  { name: 'Music',       href: '/music',       color: '#4aad4e', iconSrc: '/icons/music-large.svg',       iconWidth: '44%' },
-  { name: 'Restaurants', href: '/restaurants', color: '#9055d0', iconSrc: '/icons/restaurants-ramen.svg',  iconWidth: '52%' },
-  { name: 'Podcasts',    href: '/podcasts',    color: '#e5a517', iconSrc: '/icons/podcasts-large.svg',    iconWidth: '44%' },
+  { name: CATEGORY_LABELS.books,       href: '/books',       color: CATEGORY_COLORS.books,       iconSrc: '/icons/books-large.svg',       iconWidth: '80%' },
+  { name: CATEGORY_LABELS.movies,      href: '/movies',      color: CATEGORY_COLORS.movies,      iconSrc: '/icons/movies-large.svg',      iconWidth: '44%' },
+  { name: CATEGORY_LABELS.music,       href: '/music',       color: CATEGORY_COLORS.music,       iconSrc: '/icons/music-large.svg',       iconWidth: '44%' },
+  { name: CATEGORY_LABELS.restaurants, href: '/restaurants', color: CATEGORY_COLORS.restaurants, iconSrc: '/icons/restaurants-ramen.svg', iconWidth: '52%' },
+  { name: CATEGORY_LABELS.podcasts,    href: '/podcasts',    color: CATEGORY_COLORS.podcasts,    iconSrc: '/icons/podcasts-large.svg',    iconWidth: '44%' },
 ]
 
 // ─── Shared tile inner layout ─────────────────────────────────────────────────

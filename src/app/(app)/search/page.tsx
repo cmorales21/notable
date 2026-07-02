@@ -10,35 +10,16 @@ import { Avatar } from '@/app/components/CategoryFeed'
 import { SearchSkeleton } from '@/app/components/skeletons'
 import type { SearchPerson } from '@/app/hooks/useSearch'
 import type { SearchGroupedRec } from '@/lib/groupRecommendations'
+import { CATEGORY_COLORS, CATEGORY_LABELS, CATEGORY_ORDER, type Category } from '@/app/lib/theme'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CATEGORY_COLORS: Record<string, string> = {
-  books: '#5271FF',
-  movies: '#dc4f5c',
-  music: '#4aad4e',
-  restaurants: '#9055d0',
-  podcasts: '#e5a517',
-}
-
-const CATEGORY_LABELS: Record<string, string> = {
-  books: 'Books',
-  movies: 'Movies & TV',
-  music: 'Music',
-  restaurants: 'Restaurants',
-  podcasts: 'Podcasts',
-}
-
-type FilterId = 'all' | 'books' | 'movies' | 'music' | 'restaurants' | 'podcasts' | 'people'
+type FilterId = 'all' | Category | 'people'
 
 const FILTERS: { id: FilterId; label: string }[] = [
-  { id: 'all',         label: 'All' },
-  { id: 'books',       label: 'Books' },
-  { id: 'movies',      label: 'Movies & TV' },
-  { id: 'music',       label: 'Music' },
-  { id: 'restaurants', label: 'Restaurants' },
-  { id: 'podcasts',    label: 'Podcasts' },
-  { id: 'people',      label: 'People' },
+  { id: 'all', label: 'All' },
+  ...CATEGORY_ORDER.map((id) => ({ id, label: CATEGORY_LABELS[id] })),
+  { id: 'people', label: 'People' },
 ]
 
 // ─── Image with fallback ──────────────────────────────────────────────────────

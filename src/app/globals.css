@@ -9,7 +9,9 @@
   --color-muted:        #6b5d4f;
   --color-border:       rgba(0, 0, 0, 0.08);
 
-  /* Category accent colors */
+  /* Category accent colors — canonical values live in src/app/lib/theme.ts
+     (theme.categoryColors). CSS cannot import TypeScript, so these are a
+     mirror: any change here must also be made in theme.ts and vice versa. */
   --color-books:        #5271FF;
   --color-movies:       #dc4f5c;
   --color-music:        #4aad4e;

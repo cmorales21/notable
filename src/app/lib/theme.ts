@@ -4,6 +4,13 @@
 // so #ffffff is the correct choice in those contexts. This is an intentional
 // exception to the "no pure white" rule.
 
+// Single source of truth for the category system (colors, labels, order,
+// type union). The CSS variables in globals.css mirror these values because
+// CSS cannot import TypeScript — keep them in sync.
+
+export const CATEGORY_ORDER = ['books', 'movies', 'music', 'restaurants', 'podcasts'] as const
+export type Category = (typeof CATEGORY_ORDER)[number]
+
 export const theme = {
   colors: {
     bg: '#f5f0e8',
@@ -40,8 +47,18 @@ export const theme = {
   },
 } as const
 
-export type CategoryId = keyof typeof theme.categoryColors
+// Record<string, string> (not Record<Category, string>) so call sites can
+// index with loosely-typed category strings coming from the database.
+export const CATEGORY_COLORS: Record<string, string> = theme.categoryColors
+
+export const CATEGORY_LABELS: Record<string, string> = {
+  books: 'Books',
+  movies: 'Movies & TV',
+  music: 'Music',
+  restaurants: 'Restaurants',
+  podcasts: 'Podcasts',
+}
 
 export function getCategoryColor(category: string): string {
-  return theme.categoryColors[category as CategoryId] ?? theme.colors.textMuted
+  return theme.categoryColors[category as Category] ?? theme.colors.textMuted
 }

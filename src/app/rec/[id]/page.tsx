@@ -5,18 +5,18 @@ import Image from 'next/image'
 import { RecommendationImage } from '@/app/components/RecommendationImage'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-import { theme } from '@/app/lib/theme'
+import { theme, CATEGORY_COLORS, CATEGORY_LABELS } from '@/app/lib/theme'
 import { ShareButton } from './ShareButton'
 import { safeExternalHref } from '@/lib/url'
 
 // ─── Category config ──────────────────────────────────────────────────────────
 
 const CAT: Record<string, { label: string; color: string; href: string }> = {
-  books:       { label: 'Books',       color: '#5271FF', href: '/books'       },
-  movies:      { label: 'Movies & TV', color: '#dc4f5c', href: '/movies'      },
-  music:       { label: 'Music',       color: '#4aad4e', href: '/music'       },
-  restaurants: { label: 'Restaurants', color: '#9055d0', href: '/restaurants' },
-  podcasts:    { label: 'Podcasts',    color: '#e5a517', href: '/podcasts'    },
+  books:       { label: CATEGORY_LABELS.books,       color: CATEGORY_COLORS.books,       href: '/books'       },
+  movies:      { label: CATEGORY_LABELS.movies,      color: CATEGORY_COLORS.movies,      href: '/movies'      },
+  music:       { label: CATEGORY_LABELS.music,       color: CATEGORY_COLORS.music,       href: '/music'       },
+  restaurants: { label: CATEGORY_LABELS.restaurants, color: CATEGORY_COLORS.restaurants, href: '/restaurants' },
+  podcasts:    { label: CATEGORY_LABELS.podcasts,    color: CATEGORY_COLORS.podcasts,    href: '/podcasts'    },
 }
 
 function relativeTime(dateStr: string): string {

@@ -9,10 +9,9 @@ import Whisper from '@/app/components/Whisper'
 import { useWhispers } from '@/app/hooks/useWhispers'
 import { useToast } from '@/app/components/Toast'
 import { createOrMatchItem } from '@/lib/items'
+import { CATEGORY_CONFIG, CATEGORY_ORDER, type Category } from '@/app/components/feed/categoryConfig'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-type Category = 'books' | 'movies' | 'music' | 'restaurants' | 'podcasts'
 
 interface SearchResult {
   id: string
@@ -55,17 +54,6 @@ interface MentionResult {
   handle: string | null
   avatar_url: string | null
 }
-
-// ─── Config ───────────────────────────────────────────────────────────────────
-
-const CAT_CONFIG: Record<Category, { label: string; color: string }> = {
-  books:       { label: 'Books',       color: '#5271FF' },
-  movies:      { label: 'Movies & TV', color: '#dc4f5c' },
-  music:       { label: 'Music',       color: '#4aad4e' },
-  restaurants: { label: 'Restaurants', color: '#9055d0' },
-  podcasts:    { label: 'Podcasts',    color: '#e5a517' },
-}
-const CAT_ORDER: Category[] = ['books', 'movies', 'music', 'restaurants', 'podcasts']
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -253,7 +241,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
   const { dismiss: dismissWhisper } = useWhispers()
   const toast = useToast()
 
-  const accentColor = category ? CAT_CONFIG[category].color : '#6b9fd4'
+  const accentColor = category ? CATEGORY_CONFIG[category].color : '#6b9fd4'
   const canPost = !!category && (!!confirmedItem || !!uploadedImage || text.replace(URL_RE, '').trim().length > 5)
   const mentionActive = mentionQuery !== null && mentionQuery.length >= 1 && mentionResults.length > 0
 
@@ -415,7 +403,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
     replaceRange.deleteContents()
 
     const span = document.createElement('span')
-    const color = categoryRef.current ? CAT_CONFIG[categoryRef.current].color : '#6b9fd4'
+    const color = categoryRef.current ? CATEGORY_CONFIG[categoryRef.current].color : '#6b9fd4'
     span.style.color = color
     span.style.fontWeight = '500'
     span.dataset.mention = ''
@@ -982,8 +970,8 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
               margin: '0 -16px 18px',
               padding: '0 16px',
             }}>
-              {CAT_ORDER.map(id => {
-                const { label, color } = CAT_CONFIG[id]
+              {CATEGORY_ORDER.map(id => {
+                const { label, color } = CATEGORY_CONFIG[id]
                 const sel = category === id
                 return (
                   <button
@@ -1342,7 +1330,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
                     autoFocus
                     value={manualQuery}
                     onChange={handleManualQueryChange}
-                    placeholder={category ? `Search ${CAT_CONFIG[category].label.toLowerCase()}…` : 'Search…'}
+                    placeholder={category ? `Search ${CATEGORY_CONFIG[category].label.toLowerCase()}…` : 'Search…'}
                     className="font-body"
                     style={{
                       flex: 1, background: 'transparent', border: 'none', outline: 'none',

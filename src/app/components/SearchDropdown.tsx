@@ -9,21 +9,7 @@ import { Avatar } from '@/app/components/CategoryFeed'
 import { SkeletonPulse } from '@/app/components/skeletons'
 import type { SearchGroupedRec } from '@/lib/groupRecommendations'
 
-const CATEGORY_COLORS: Record<string, string> = {
-  books: '#5271FF',
-  movies: '#dc4f5c',
-  music: '#4aad4e',
-  restaurants: '#9055d0',
-  podcasts: '#e5a517',
-}
-
-const CATEGORY_LABELS: Record<string, string> = {
-  books: 'Books',
-  movies: 'Movies & TV',
-  music: 'Music',
-  restaurants: 'Restaurants',
-  podcasts: 'Podcasts',
-}
+import { CATEGORY_COLORS, CATEGORY_LABELS } from '@/app/lib/theme'
 
 // ─── Rec thumbnail (48×48) ────────────────────────────────────────────────────
 

@@ -20,10 +20,4 @@ export interface CollectionItemRow {
   rec: Recommendation
 }
 
-export const CATEGORY_LABELS: Record<string, string> = {
-  books: 'Books',
-  movies: 'Movies & TV',
-  music: 'Music',
-  restaurants: 'Restaurants',
-  podcasts: 'Podcasts',
-}
+export { CATEGORY_LABELS } from '@/app/lib/theme'

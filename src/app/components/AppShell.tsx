@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/app/components/Toast'
+import { CATEGORY_COLORS, CATEGORY_LABELS } from '@/app/lib/theme'
 import {
   type RawNotif,
   type GroupedNotif,
@@ -35,11 +36,11 @@ interface AppShellProps {
 // ─── Category config ──────────────────────────────────────────────────────────
 
 const CATEGORIES = [
-  { name: 'Books',       href: '/books',       color: '#5271FF', iconSrc: '/icons/books-small.svg',       sidebarPadding: '6px'  },
-  { name: 'Movies & TV', href: '/movies',      color: '#dc4f5c', iconSrc: '/icons/movies-small.svg',      sidebarPadding: '10px' },
-  { name: 'Music',       href: '/music',       color: '#4aad4e', iconSrc: '/icons/music-small.svg',       sidebarPadding: '8px'  },
-  { name: 'Restaurants', href: '/restaurants', color: '#9055d0', iconSrc: '/icons/restaurants-small.svg', sidebarPadding: '6px'  },
-  { name: 'Podcasts',    href: '/podcasts',    color: '#e5a517', iconSrc: '/icons/podcasts-small.svg',    sidebarPadding: '6px'  },
+  { name: CATEGORY_LABELS.books,       href: '/books',       color: CATEGORY_COLORS.books,       iconSrc: '/icons/books-small.svg',       sidebarPadding: '6px'  },
+  { name: CATEGORY_LABELS.movies,      href: '/movies',      color: CATEGORY_COLORS.movies,      iconSrc: '/icons/movies-small.svg',      sidebarPadding: '10px' },
+  { name: CATEGORY_LABELS.music,       href: '/music',       color: CATEGORY_COLORS.music,       iconSrc: '/icons/music-small.svg',       sidebarPadding: '8px'  },
+  { name: CATEGORY_LABELS.restaurants, href: '/restaurants', color: CATEGORY_COLORS.restaurants, iconSrc: '/icons/restaurants-small.svg', sidebarPadding: '6px'  },
+  { name: CATEGORY_LABELS.podcasts,    href: '/podcasts',    color: CATEGORY_COLORS.podcasts,    iconSrc: '/icons/podcasts-small.svg',    sidebarPadding: '6px'  },
 ]
 
 // ─── Component ────────────────────────────────────────────────────────────────

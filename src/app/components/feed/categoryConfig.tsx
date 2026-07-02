@@ -1,11 +1,14 @@
 'use client'
 
-export type Category = 'books' | 'movies' | 'music' | 'restaurants' | 'podcasts'
+import { theme, CATEGORY_LABELS, type Category } from '@/app/lib/theme'
+
+export { CATEGORY_ORDER } from '@/app/lib/theme'
+export type { Category }
 
 export const CATEGORY_CONFIG: Record<Category, { label: string; color: string; Icon: () => React.ReactElement }> = {
   books: {
-    label: 'Books',
-    color: '#5271FF',
+    label: CATEGORY_LABELS.books,
+    color: theme.categoryColors.books,
     Icon: () => (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
         <path d="M12 20V5" />
@@ -15,8 +18,8 @@ export const CATEGORY_CONFIG: Record<Category, { label: string; color: string; I
     ),
   },
   movies: {
-    label: 'Movies & TV',
-    color: '#dc4f5c',
+    label: CATEGORY_LABELS.movies,
+    color: theme.categoryColors.movies,
     Icon: () => (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
         <rect x="2" y="8" width="14" height="10" rx="2" />
@@ -25,8 +28,8 @@ export const CATEGORY_CONFIG: Record<Category, { label: string; color: string; I
     ),
   },
   music: {
-    label: 'Music',
-    color: '#4aad4e',
+    label: CATEGORY_LABELS.music,
+    color: theme.categoryColors.music,
     Icon: () => (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
         <path d="M3 18v-6a9 9 0 0118 0v6" />
@@ -36,8 +39,8 @@ export const CATEGORY_CONFIG: Record<Category, { label: string; color: string; I
     ),
   },
   restaurants: {
-    label: 'Restaurants',
-    color: '#9055d0',
+    label: CATEGORY_LABELS.restaurants,
+    color: theme.categoryColors.restaurants,
     Icon: () => (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
         <path d="M8 3v5a3 3 0 006 0V3" />
@@ -47,8 +50,8 @@ export const CATEGORY_CONFIG: Record<Category, { label: string; color: string; I
     ),
   },
   podcasts: {
-    label: 'Podcasts',
-    color: '#e5a517',
+    label: CATEGORY_LABELS.podcasts,
+    color: theme.categoryColors.podcasts,
     Icon: () => (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
         <rect x="9" y="2" width="6" height="12" rx="3" />

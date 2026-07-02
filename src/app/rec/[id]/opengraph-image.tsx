@@ -1,17 +1,14 @@
 import { ImageResponse } from 'next/og'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient as createAnonClient } from '@supabase/supabase-js'
+import { CATEGORY_COLORS, CATEGORY_LABELS, CATEGORY_ORDER } from '@/app/lib/theme'
 
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
-const CATEGORY: Record<string, { label: string; color: string }> = {
-  books:       { label: 'Books',       color: '#5271FF' },
-  movies:      { label: 'Movies & TV', color: '#dc4f5c' },
-  music:       { label: 'Music',       color: '#4aad4e' },
-  restaurants: { label: 'Restaurants', color: '#9055d0' },
-  podcasts:    { label: 'Podcasts',    color: '#e5a517' },
-}
+const CATEGORY: Record<string, { label: string; color: string }> = Object.fromEntries(
+  CATEGORY_ORDER.map((c) => [c, { label: CATEGORY_LABELS[c], color: CATEGORY_COLORS[c] }])
+)
 
 const LINEN   = '#f5f0e8'
 const PANEL   = '#fffcf8'
