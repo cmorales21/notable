@@ -560,29 +560,6 @@ export default function ProfilePage() {
       const newComment: RecComment = { ...inserted, profiles: currentUserProfile, comment_likes: [] }
       setModalComments(prev => sortComments([...prev, newComment]))
       setModalCommentCount(c => c + 1)
-      if (selectedRec.user_id !== currentUserId) {
-        const { data: recipientProfile } = await supabase.current
-          .from('profiles').select('notify_comments').eq('id', selectedRec.user_id).single()
-        if (recipientProfile?.notify_comments !== false) {
-          supabase.current.from('notifications').insert({ user_id: selectedRec.user_id, actor_id: currentUserId, type: 'comment', rec_id: selectedRec.id, read: false })
-        }
-      }
-      // Parse @mentions and notify mentioned users
-      const handles = [...new Set([...text.matchAll(/@([a-zA-Z0-9_]+)/g)].map(m => m[1]))]
-      if (handles.length > 0) {
-        supabase.current.from('profiles').select('id, handle').in('handle', handles)
-          .then(({ data: mentioned }) => {
-            const rows = (mentioned ?? [])
-              .filter((p: { id: string }) => p.id !== currentUserId)
-              .map((p: { id: string }) => ({
-                user_id: p.id, actor_id: currentUserId, type: 'mention',
-                rec_id: selectedRec.id, read: false,
-              }))
-            if (rows.length > 0) {
-              supabase.current.from('notifications').insert(rows)
-            }
-          })
-      }
     }
     setModalSubmittingComment(false)
   }

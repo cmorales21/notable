@@ -186,9 +186,6 @@ export function RecommenderSection({
       setComments(prev => sortComments([...prev, newComment]))
       setCommentCount(c => c + 1)
       setCommentLikesMap(prev => ({ ...prev, [inserted.id]: { count: 0, likedByMe: false } }))
-      if (recommender.user_id !== currentUserId) {
-        void supabaseRef.current.from('notifications').insert({ user_id: recommender.user_id, actor_id: currentUserId, type: 'comment', rec_id: recommender.recommendation_id, read: false })
-      }
     }
     setSubmittingComment(false)
   }

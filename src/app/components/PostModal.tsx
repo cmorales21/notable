@@ -686,7 +686,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
         } catch { /* non-fatal */ }
       }
 
-      const { data: newRec, error: insertError } = await supabase.current
+      const { error: insertError } = await supabase.current
         .from('recommendations')
         .insert({
           user_id: user.id,
@@ -701,32 +701,6 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
         .single()
 
       if (insertError) throw insertError
-
-      // Fire mention notifications (non-blocking)
-      if (cleanedText && newRec?.id) {
-        const handles = [...new Set([...cleanedText.matchAll(/@([a-zA-Z0-9_]+)/g)].map(m => m[1]))]
-        if (handles.length > 0) {
-          supabase.current
-            .from('profiles')
-            .select('id, handle')
-            .in('handle', handles)
-            .then(({ data: mentioned }) => {
-              const rows = (mentioned ?? [])
-                .filter((p: { id: string }) => p.id !== user.id)
-                .map((p: { id: string }) => ({
-                  user_id: p.id,
-                  actor_id: user.id,
-                  actor_ids: [user.id],
-                  type: 'mention',
-                  rec_id: newRec.id,
-                  read: false,
-                }))
-              if (rows.length > 0) {
-                supabase.current.from('notifications').insert(rows)
-              }
-            })
-        }
-      }
 
       setPostSuccess(true)
       toast('Recommendation posted!')

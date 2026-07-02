@@ -108,29 +108,6 @@ function SingleRecDetailModal({
       const newComment: Comment = { ...inserted, profiles: currentUserProfile, comment_likes: [] }
       setComments(prev => sortComments([...prev, newComment]))
       setCommentCount(c => c + 1)
-      if (recommender.user_id !== currentUserId) {
-        const { data: recipientProfile } = await supabaseRef.current
-          .from('profiles').select('notify_comments').eq('id', recommender.user_id).single()
-        if (recipientProfile?.notify_comments !== false) {
-          void supabaseRef.current.from('notifications').insert({ user_id: recommender.user_id, actor_id: currentUserId, type: 'comment', rec_id: recommender.recommendation_id, read: false })
-        }
-      }
-      // Parse @mentions and notify mentioned users
-      const handles = [...new Set([...text.matchAll(/@([a-zA-Z0-9_]+)/g)].map(m => m[1]))]
-      if (handles.length > 0) {
-        supabaseRef.current.from('profiles').select('id, handle').in('handle', handles)
-          .then(({ data: mentioned }) => {
-            const rows = (mentioned ?? [])
-              .filter((p: { id: string }) => p.id !== currentUserId)
-              .map((p: { id: string }) => ({
-                user_id: p.id, actor_id: currentUserId, type: 'mention',
-                rec_id: recommender.recommendation_id, read: false,
-              }))
-            if (rows.length > 0) {
-              supabaseRef.current.from('notifications').insert(rows)
-            }
-          })
-      }
     }
     setSubmittingComment(false)
   }
@@ -325,29 +302,6 @@ export function GroupedModal({
       setCommentCount(c => c + 1)
       onCommentCountChange?.(leadRec.recommendation_id, 1)
       toast('Comment posted')
-      if (leadRec.user_id !== currentUserId) {
-        const { data: recipientProfile } = await supabaseRef.current
-          .from('profiles').select('notify_comments').eq('id', leadRec.user_id).single()
-        if (recipientProfile?.notify_comments !== false) {
-          void supabaseRef.current.from('notifications').insert({ user_id: leadRec.user_id, actor_id: currentUserId, type: 'comment', rec_id: leadRec.recommendation_id, read: false })
-        }
-      }
-      // Parse @mentions and notify mentioned users
-      const handles = [...new Set([...text.matchAll(/@([a-zA-Z0-9_]+)/g)].map(m => m[1]))]
-      if (handles.length > 0) {
-        supabaseRef.current.from('profiles').select('id, handle').in('handle', handles)
-          .then(({ data: mentioned }) => {
-            const rows = (mentioned ?? [])
-              .filter((p: { id: string }) => p.id !== currentUserId)
-              .map((p: { id: string }) => ({
-                user_id: p.id, actor_id: currentUserId, type: 'mention',
-                rec_id: leadRec.recommendation_id, read: false,
-              }))
-            if (rows.length > 0) {
-              supabaseRef.current.from('notifications').insert(rows)
-            }
-          })
-      }
     }
     setSubmittingComment(false)
   }
