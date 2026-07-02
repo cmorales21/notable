@@ -1,19 +1,19 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { Avatar } from '@/app/components/Avatar'
 import {
   type NotifType,
   type RawNotif,
   type GroupedNotif,
   resolveActor,
   groupNotifications,
-  getRelTimeFull,
   getNotifText,
   getNotifHref,
 } from '@/lib/notifications'
+import { formatRelativeTime } from '@/lib/relativeTime'
 
 interface FollowRequest {
   actor_id: string
@@ -33,34 +33,6 @@ function TypeIcon({ type }: { type: NotifType }) {
   if (type === 'bookmark' || type === 'collection_bookmark') return <svg viewBox="0 0 24 24" {...w}><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
   if (type === 'comment') return <svg viewBox="0 0 24 24" {...w}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
   return <svg viewBox="0 0 24 24" {...w}><circle cx="12" cy="12" r="10"/><path d="M12 8h.01M12 12v4"/></svg>
-}
-
-// ─── Avatar ───────────────────────────────────────────────────────────────────
-
-function Avatar({ src, name }: { src: string | null | undefined; name: string | null | undefined }) {
-  const initial = name?.charAt(0).toUpperCase() ?? '?'
-  if (src) {
-    return (
-      <Image
-        src={src}
-        alt={name ?? ''}
-        width={36}
-        height={36}
-        style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
-      />
-    )
-  }
-  return (
-    <div style={{
-      width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-      background: 'var(--color-surface)',
-      border: '1px solid rgba(0,0,0,0.1)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: '14px', color: 'var(--color-text)',
-    }}>
-      {initial}
-    </div>
-  )
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -298,7 +270,7 @@ export default function NotificationsPage() {
                   background: 'rgba(0,0,0,0.02)',
                 }}
               >
-                <Avatar src={req.avatar_url} name={req.name} />
+                <Avatar url={req.avatar_url} name={req.name} size={36} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p className="font-body" style={{ fontSize: '14px', color: '#33261a', fontWeight: 500, margin: 0 }}>
                     {req.name ?? req.handle}
@@ -364,7 +336,7 @@ export default function NotificationsPage() {
           const inner = (
             <>
               <div style={{ flexShrink: 0 }}>
-                <Avatar src={n.actor?.avatar_url} name={n.actor?.name} />
+                <Avatar url={n.actor?.avatar_url} name={n.actor?.name} size={36} />
               </div>
 
               {/* Text + timestamp */}
@@ -384,7 +356,7 @@ export default function NotificationsPage() {
                   className="font-body"
                   style={{ fontSize: '12px', color: '#6b5d4f' }}
                 >
-                  {getRelTimeFull(n.updated_at)}
+                  {formatRelativeTime(n.updated_at)}
                 </span>
               </div>
 

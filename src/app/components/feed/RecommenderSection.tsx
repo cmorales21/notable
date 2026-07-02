@@ -4,10 +4,13 @@ import { useRef, useState, useCallback } from 'react'
 import { useToast } from '@/app/components/Toast'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { toggleEngagement } from '@/lib/engagement'
 import { RichMediaEmbed, willEmbed } from '@/app/components/RichMediaEmbed'
 import type { RecComment, RecProfile } from '@/app/lib/types'
 import type { GroupedRecommender } from '@/lib/groupRecommendations'
-import { Avatar, ActionButton, ExternalLink, getExternalLinkLabel, formatRelativeTime, sortComments, fetchComments } from './helpers'
+import { Avatar } from '@/app/components/Avatar'
+import { ActionButton, ExternalLink, getExternalLinkLabel, sortComments, fetchComments } from './helpers'
+import { formatRelativeTime } from '@/lib/relativeTime'
 import { trackClick } from '@/lib/items'
 import { LikeIcon, BookmarkIcon, CommentIcon } from './icons'
 import { theme } from '@/app/lib/theme'
@@ -95,36 +98,35 @@ export function RecommenderSection({
     if (!currentUserId) return
     setLikeAnim(liked ? 'shrink' : 'pop')
     setTimeout(() => setLikeAnim(null), liked ? 150 : 350)
-    onLikeToggle(recId, liked)
-    if (liked) {
-      setLiked(false); setLikeCount(c => c - 1)
-      await supabaseRef.current.from('likes').delete()
-        .eq('user_id', currentUserId).eq('recommendation_id', recId)
-    } else {
-      setLiked(true); setLikeCount(c => c + 1)
-      await supabaseRef.current.from('likes').insert({ user_id: currentUserId, recommendation_id: recId })
-      if (recommender.user_id !== currentUserId) {
-        void supabaseRef.current.from('notifications').insert({ user_id: recommender.user_id, actor_id: currentUserId, type: 'like', rec_id: recId, read: false })
-      }
-    }
+    await toggleEngagement(supabaseRef.current, {
+      kind: 'like',
+      scope: 'rec',
+      targetId: recId,
+      userId: currentUserId,
+      isActive: liked,
+      apply: (active) => {
+        onLikeToggle(recId, !active)
+        setLiked(active)
+        setLikeCount(c => c + (active ? 1 : -1))
+      },
+    })
   }
 
   async function toggleBookmark(e: React.MouseEvent) {
     e.stopPropagation()
     if (!currentUserId) return
     if (!bookmarked) { setBookmarkAnim(true); setTimeout(() => setBookmarkAnim(false), 250) }
-    onBookmarkToggle(recId, bookmarked)
-    if (bookmarked) {
-      setBookmarked(false)
-      await supabaseRef.current.from('bookmarks').delete()
-        .eq('user_id', currentUserId).eq('recommendation_id', recId)
-    } else {
-      setBookmarked(true)
-      await supabaseRef.current.from('bookmarks').insert({ user_id: currentUserId, recommendation_id: recId })
-      if (recommender.user_id !== currentUserId) {
-        void supabaseRef.current.from('notifications').insert({ user_id: recommender.user_id, actor_id: currentUserId, type: 'bookmark', rec_id: recId, read: false })
-      }
-    }
+    await toggleEngagement(supabaseRef.current, {
+      kind: 'bookmark',
+      scope: 'rec',
+      targetId: recId,
+      userId: currentUserId,
+      isActive: bookmarked,
+      apply: (active) => {
+        onBookmarkToggle(recId, !active)
+        setBookmarked(active)
+      },
+    })
   }
 
   async function handleExpandComments(e: React.MouseEvent) {

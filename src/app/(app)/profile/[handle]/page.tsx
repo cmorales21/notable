@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { toggleEngagement } from '@/lib/engagement'
 import { RecModal, Recommendation, RecComment, RecProfile, sortComments } from '@/app/components/CategoryFeed'
 import EmptyState from '@/app/components/EmptyState'
 import { ReportModal } from '@/app/components/feed/ReportModal'
@@ -15,7 +16,7 @@ import {
   CATEGORY_COLORS, CATEGORY_LABELS, COLLECTION_CATEGORIES,
 } from '@/app/components/profile/types'
 import { CATEGORY_ORDER, type Category } from '@/app/lib/theme'
-import { InitialsAvatar } from '@/app/components/profile/InitialsAvatar'
+import { Avatar } from '@/app/components/Avatar'
 import { GridTile } from '@/app/components/profile/GridTile'
 import { AddToCollectionMenu } from '@/app/components/profile/AddToCollectionMenu'
 import { FollowListModal } from '@/app/components/profile/FollowListModal'
@@ -515,41 +516,32 @@ export default function ProfilePage() {
   async function handleModalLike(e: React.MouseEvent) {
     e.stopPropagation()
     if (!currentUserId || !selectedRec) return
-    if (modalLiked) {
-      await supabase.current.from('likes').delete().eq('user_id', currentUserId).eq('recommendation_id', selectedRec.id)
-      setModalLiked(false)
-      setModalLikeCount(c => c - 1)
-    } else {
-      await supabase.current.from('likes').insert({ user_id: currentUserId, recommendation_id: selectedRec.id })
-      setModalLiked(true)
-      setModalLikeCount(c => c + 1)
-      if (selectedRec.user_id !== currentUserId) {
-        const { data: recipientProfile } = await supabase.current
-          .from('profiles').select('notify_likes').eq('id', selectedRec.user_id).single()
-        if (recipientProfile?.notify_likes !== false) {
-          supabase.current.from('notifications').insert({ user_id: selectedRec.user_id, actor_id: currentUserId, type: 'like', rec_id: selectedRec.id, read: false })
-        }
-      }
-    }
+    await toggleEngagement(supabase.current, {
+      kind: 'like',
+      scope: 'rec',
+      targetId: selectedRec.id,
+      userId: currentUserId,
+      isActive: modalLiked,
+      apply: (active) => {
+        setModalLiked(active)
+        setModalLikeCount(c => c + (active ? 1 : -1))
+      },
+    })
   }
 
   async function handleModalBookmark(e: React.MouseEvent) {
     e.stopPropagation()
     if (!currentUserId || !selectedRec) return
-    if (modalBookmarked) {
-      await supabase.current.from('bookmarks').delete().eq('user_id', currentUserId).eq('recommendation_id', selectedRec.id)
-      setModalBookmarked(false)
-    } else {
-      await supabase.current.from('bookmarks').insert({ user_id: currentUserId, recommendation_id: selectedRec.id })
-      setModalBookmarked(true)
-      if (selectedRec.user_id !== currentUserId) {
-        const { data: recipientProfile } = await supabase.current
-          .from('profiles').select('notify_bookmarks').eq('id', selectedRec.user_id).single()
-        if (recipientProfile?.notify_bookmarks !== false) {
-          supabase.current.from('notifications').insert({ user_id: selectedRec.user_id, actor_id: currentUserId, type: 'bookmark', rec_id: selectedRec.id, read: false })
-        }
-      }
-    }
+    await toggleEngagement(supabase.current, {
+      kind: 'bookmark',
+      scope: 'rec',
+      targetId: selectedRec.id,
+      userId: currentUserId,
+      isActive: modalBookmarked,
+      apply: (active) => {
+        setModalBookmarked(active)
+      },
+    })
   }
 
   async function handleModalComment(e: React.FormEvent) {
@@ -677,7 +669,7 @@ export default function ProfilePage() {
                   />
                 ) : (
                   <div style={{ filter: avatarHovered ? 'brightness(0.78)' : 'none', transition: 'filter 0.15s' }}>
-                    <InitialsAvatar name={profile.name} size={72} />
+                    <Avatar variant="gradient" name={profile.name} size={72} />
                   </div>
                 )}
 
@@ -715,7 +707,7 @@ export default function ProfilePage() {
               profile.avatar_url ? (
                 <Image src={profile.avatar_url} alt={profile.name ?? ''} width={72} height={72} style={{ borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(0,0,0,0.1)', display: 'block' }} />
               ) : (
-                <InitialsAvatar name={profile.name} size={72} />
+                <Avatar variant="gradient" name={profile.name} size={72} />
               )
             )}
             <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/webp"

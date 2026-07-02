@@ -36,7 +36,7 @@ export function SkeletonPulse({
 // Mirrors the exact structure of RecommendationCard / GroupedCard:
 //   recommender row → teaser text → image → title → action buttons
 
-export function FeedCardSkeleton() {
+function FeedCardSkeleton() {
   return (
     <div
       style={{
@@ -92,7 +92,7 @@ export function FeedCardSkeleton() {
 // ── ProfileHeaderSkeleton ─────────────────────────────────────────────────────
 // Mirrors the profile header: large avatar + name / handle / bio / follow counts
 
-export function ProfileHeaderSkeleton() {
+function ProfileHeaderSkeleton() {
   return (
     <div
       style={{
@@ -160,7 +160,7 @@ export function ProfileGridSkeleton() {
 // type="rec"    — 80px square image + two text lines (title + attribution)
 // type="person" — 56px circle avatar + two text lines (name + handle)
 
-export function SearchResultSkeleton({
+function SearchResultSkeleton({
   type = 'rec',
 }: {
   type?: 'rec' | 'person'

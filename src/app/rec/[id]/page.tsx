@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/server'
 import { theme, CATEGORY_COLORS, CATEGORY_LABELS } from '@/app/lib/theme'
 import { ShareButton } from './ShareButton'
 import { safeExternalHref } from '@/lib/url'
+import { formatRelativeTime } from '@/lib/relativeTime'
 
 // ─── Category config ──────────────────────────────────────────────────────────
 
@@ -17,17 +18,6 @@ const CAT: Record<string, { label: string; color: string; href: string }> = {
   music:       { label: CATEGORY_LABELS.music,       color: CATEGORY_COLORS.music,       href: '/music'       },
   restaurants: { label: CATEGORY_LABELS.restaurants, color: CATEGORY_COLORS.restaurants, href: '/restaurants' },
   podcasts:    { label: CATEGORY_LABELS.podcasts,    color: CATEGORY_COLORS.podcasts,    href: '/podcasts'    },
-}
-
-function relativeTime(dateStr: string): string {
-  const diffMs = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diffMs / 60000)
-  const hrs  = Math.floor(mins / 60)
-  const days = Math.floor(hrs  / 24)
-  if (days > 0) return `${days}d ago`
-  if (hrs  > 0) return `${hrs}h ago`
-  if (mins > 0) return `${mins}m ago`
-  return 'just now'
 }
 
 function externalLinkLabel(url: string): string {
@@ -333,7 +323,7 @@ export default async function RecPage(
                   </span>
                 )}
                 <span className="font-body" style={{ color: theme.colors.textMuted, fontSize: '13px' }}>
-                  {profile?.handle ? `@${profile.handle} · ` : ''}{relativeTime(rec.created_at)}
+                  {profile?.handle ? `@${profile.handle} · ` : ''}{formatRelativeTime(rec.created_at)}
                 </span>
               </div>
 
@@ -510,7 +500,7 @@ export default async function RecPage(
                                 </span>
                               )}
                               <span className="font-body" style={{ color: theme.colors.textMuted, fontSize: '12px' }}>
-                                {relativeTime(comment.created_at)}
+                                {formatRelativeTime(comment.created_at)}
                               </span>
                             </div>
                           </div>

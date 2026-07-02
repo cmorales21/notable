@@ -3,22 +3,12 @@
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
+import { Avatar } from '@/app/components/Avatar'
 import type { RecComment } from '@/app/lib/types'
 import { theme, CATEGORY_COLORS } from '@/app/lib/theme'
 import { safeExternalHref } from '@/lib/url'
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
-
-export function formatRelativeTime(dateStr: string): string {
-  const diffMs = Date.now() - new Date(dateStr).getTime()
-  const minutes = Math.floor(diffMs / 60000)
-  const hours = Math.floor(minutes / 60)
-  const days = Math.floor(hours / 24)
-  if (days > 0) return `${days}d ago`
-  if (hours > 0) return `${hours}h ago`
-  if (minutes > 0) return `${minutes}m ago`
-  return 'just now'
-}
 
 export function sortComments(comments: RecComment[]): RecComment[] {
   return [...comments].sort((a, b) => {
@@ -61,43 +51,6 @@ export function getExternalLinkLabel(_category: string, url: string): string {
 }
 
 // ─── UI Components ────────────────────────────────────────────────────────────
-
-export function Avatar({
-  url,
-  name,
-  size,
-}: {
-  url: string | null | undefined
-  name: string | null | undefined
-  size: number
-}) {
-  const [imgErr, setImgErr] = useState(false)
-  const initial = name ? name.charAt(0).toUpperCase() : '?'
-  if (url && !imgErr) {
-    return (
-      <Image
-        src={url}
-        alt={name ?? ''}
-        width={size}
-        height={size}
-        onError={() => setImgErr(true)}
-        style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
-      />
-    )
-  }
-  return (
-    <div
-      style={{
-        width: size, height: size, borderRadius: '50%',
-        background: theme.colors.avatarFallback, border: '1px solid rgba(0,0,0,0.1)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: size * 0.4, color: theme.colors.textPrimary, fontWeight: 500, flexShrink: 0,
-      }}
-    >
-      {initial}
-    </div>
-  )
-}
 
 export function ActionButton({
   onClick,
@@ -212,31 +165,6 @@ export function ExternalLink({ href, label, color, onTrackClick }: { href: strin
     >
       {label}
     </a>
-  )
-}
-
-export function SkeletonCard() {
-  return (
-    <div style={{ background: theme.colors.surface, borderRadius: '16px', border: `1px solid ${theme.colors.border}`, overflow: 'hidden' }}>
-      <div className="skeleton-pulse" style={{ height: '280px', background: theme.colors.input }} />
-      <div style={{ padding: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-          <div className="skeleton-pulse" style={{ width: 32, height: 32, borderRadius: '50%', background: theme.colors.input }} />
-          <div style={{ flex: 1 }}>
-            <div className="skeleton-pulse" style={{ height: 12, width: '40%', borderRadius: 6, background: theme.colors.input, marginBottom: 6 }} />
-            <div className="skeleton-pulse" style={{ height: 10, width: '25%', borderRadius: 6, background: theme.colors.input }} />
-          </div>
-        </div>
-        <div className="skeleton-pulse" style={{ height: 18, width: '80%', borderRadius: 6, background: theme.colors.input, marginBottom: 8 }} />
-        <div className="skeleton-pulse" style={{ height: 13, width: '100%', borderRadius: 6, background: theme.colors.input, marginBottom: 6 }} />
-        <div className="skeleton-pulse" style={{ height: 13, width: '70%', borderRadius: 6, background: theme.colors.input, marginBottom: 16 }} />
-        <div style={{ display: 'flex', gap: '16px' }}>
-          <div className="skeleton-pulse" style={{ height: 12, width: 48, borderRadius: 6, background: theme.colors.input }} />
-          <div className="skeleton-pulse" style={{ height: 12, width: 32, borderRadius: 6, background: theme.colors.input }} />
-          <div className="skeleton-pulse" style={{ height: 12, width: 40, borderRadius: 6, background: theme.colors.input }} />
-        </div>
-      </div>
-    </div>
   )
 }
 

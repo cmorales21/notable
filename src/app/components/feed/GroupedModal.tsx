@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { RecommendationImage } from '@/app/components/RecommendationImage'
 import { createClient } from '@/lib/supabase/client'
+import { toggleEngagement } from '@/lib/engagement'
 import { RichMediaEmbed, willEmbed } from '@/app/components/RichMediaEmbed'
 import type { Recommendation, RecComment, RecProfile } from '@/app/lib/types'
 import type { GroupedRecommendation, GroupedRecommender } from '@/lib/groupRecommendations'
@@ -62,43 +63,34 @@ function SingleRecDetailModal({
   async function handleLike(e: React.MouseEvent) {
     e.stopPropagation()
     if (!currentUserId) return
-    onLikeToggle(recommender.recommendation_id, liked)
-    if (liked) {
-      setLiked(false); setLikeCount(c => c - 1)
-      await supabaseRef.current.from('likes').delete()
-        .eq('user_id', currentUserId).eq('recommendation_id', recommender.recommendation_id)
-    } else {
-      setLiked(true); setLikeCount(c => c + 1)
-      await supabaseRef.current.from('likes').insert({ user_id: currentUserId, recommendation_id: recommender.recommendation_id })
-      if (recommender.user_id !== currentUserId) {
-        const { data: recipientProfile } = await supabaseRef.current
-          .from('profiles').select('notify_likes').eq('id', recommender.user_id).single()
-        if (recipientProfile?.notify_likes !== false) {
-          void supabaseRef.current.from('notifications').insert({ user_id: recommender.user_id, actor_id: currentUserId, type: 'like', rec_id: recommender.recommendation_id, read: false })
-        }
-      }
-    }
+    await toggleEngagement(supabaseRef.current, {
+      kind: 'like',
+      scope: 'rec',
+      targetId: recommender.recommendation_id,
+      userId: currentUserId,
+      isActive: liked,
+      apply: (active) => {
+        onLikeToggle(recommender.recommendation_id, !active)
+        setLiked(active)
+        setLikeCount(c => c + (active ? 1 : -1))
+      },
+    })
   }
 
   async function handleBookmark(e: React.MouseEvent) {
     e.stopPropagation()
     if (!currentUserId) return
-    onBookmarkToggle(recommender.recommendation_id, bookmarked)
-    if (bookmarked) {
-      setBookmarked(false)
-      await supabaseRef.current.from('bookmarks').delete()
-        .eq('user_id', currentUserId).eq('recommendation_id', recommender.recommendation_id)
-    } else {
-      setBookmarked(true)
-      await supabaseRef.current.from('bookmarks').insert({ user_id: currentUserId, recommendation_id: recommender.recommendation_id })
-      if (recommender.user_id !== currentUserId) {
-        const { data: recipientProfile } = await supabaseRef.current
-          .from('profiles').select('notify_bookmarks').eq('id', recommender.user_id).single()
-        if (recipientProfile?.notify_bookmarks !== false) {
-          void supabaseRef.current.from('notifications').insert({ user_id: recommender.user_id, actor_id: currentUserId, type: 'bookmark', rec_id: recommender.recommendation_id, read: false })
-        }
-      }
-    }
+    await toggleEngagement(supabaseRef.current, {
+      kind: 'bookmark',
+      scope: 'rec',
+      targetId: recommender.recommendation_id,
+      userId: currentUserId,
+      isActive: bookmarked,
+      apply: (active) => {
+        onBookmarkToggle(recommender.recommendation_id, !active)
+        setBookmarked(active)
+      },
+    })
   }
 
   async function handleComment(e: React.FormEvent) {
@@ -284,45 +276,36 @@ export function GroupedModal({
   async function handleLike(e: React.MouseEvent) {
     e.stopPropagation()
     if (!currentUserId) return
-    onLikeToggle(leadRec.recommendation_id, liked)
     toast(liked ? 'Unliked' : 'Liked')
-    if (liked) {
-      setLiked(false); setLikeCount(c => c - 1)
-      await supabaseRef.current.from('likes').delete()
-        .eq('user_id', currentUserId).eq('recommendation_id', leadRec.recommendation_id)
-    } else {
-      setLiked(true); setLikeCount(c => c + 1)
-      await supabaseRef.current.from('likes').insert({ user_id: currentUserId, recommendation_id: leadRec.recommendation_id })
-      if (leadRec.user_id !== currentUserId) {
-        const { data: recipientProfile } = await supabaseRef.current
-          .from('profiles').select('notify_likes').eq('id', leadRec.user_id).single()
-        if (recipientProfile?.notify_likes !== false) {
-          void supabaseRef.current.from('notifications').insert({ user_id: leadRec.user_id, actor_id: currentUserId, type: 'like', rec_id: leadRec.recommendation_id, read: false })
-        }
-      }
-    }
+    await toggleEngagement(supabaseRef.current, {
+      kind: 'like',
+      scope: 'rec',
+      targetId: leadRec.recommendation_id,
+      userId: currentUserId,
+      isActive: liked,
+      apply: (active) => {
+        onLikeToggle(leadRec.recommendation_id, !active)
+        setLiked(active)
+        setLikeCount(c => c + (active ? 1 : -1))
+      },
+    })
   }
 
   async function handleBookmark(e: React.MouseEvent) {
     e.stopPropagation()
     if (!currentUserId) return
-    onBookmarkToggle(leadRec.recommendation_id, bookmarked)
     toast(bookmarked ? 'Removed from saved' : 'Saved')
-    if (bookmarked) {
-      setBookmarked(false)
-      await supabaseRef.current.from('bookmarks').delete()
-        .eq('user_id', currentUserId).eq('recommendation_id', leadRec.recommendation_id)
-    } else {
-      setBookmarked(true)
-      await supabaseRef.current.from('bookmarks').insert({ user_id: currentUserId, recommendation_id: leadRec.recommendation_id })
-      if (leadRec.user_id !== currentUserId) {
-        const { data: recipientProfile } = await supabaseRef.current
-          .from('profiles').select('notify_bookmarks').eq('id', leadRec.user_id).single()
-        if (recipientProfile?.notify_bookmarks !== false) {
-          void supabaseRef.current.from('notifications').insert({ user_id: leadRec.user_id, actor_id: currentUserId, type: 'bookmark', rec_id: leadRec.recommendation_id, read: false })
-        }
-      }
-    }
+    await toggleEngagement(supabaseRef.current, {
+      kind: 'bookmark',
+      scope: 'rec',
+      targetId: leadRec.recommendation_id,
+      userId: currentUserId,
+      isActive: bookmarked,
+      apply: (active) => {
+        onBookmarkToggle(leadRec.recommendation_id, !active)
+        setBookmarked(active)
+      },
+    })
   }
 
   async function handleComment(e: React.FormEvent) {

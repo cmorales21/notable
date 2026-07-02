@@ -5,7 +5,7 @@ import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/app/components/Toast'
 import { type FullProfile } from './types'
-import { InitialsAvatar } from './InitialsAvatar'
+import { Avatar } from '@/app/components/Avatar'
 
 export function EditProfileModal({
   profile, currentUserId, onClose, onSave,
@@ -100,7 +100,7 @@ export function EditProfileModal({
             {avatarUrl ? (
               <Image src={avatarUrl} alt="Profile photo" width={56} height={56} style={{ borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(0,0,0,0.1)', display: 'block' }} />
             ) : (
-              <InitialsAvatar name={name} size={56} />
+              <Avatar variant="gradient" name={name} size={56} />
             )}
             <div style={{
               position: 'absolute', inset: 0, borderRadius: '50%',

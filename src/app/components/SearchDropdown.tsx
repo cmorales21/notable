@@ -5,7 +5,7 @@ import { RecommendationImage } from '@/app/components/RecommendationImage'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSearch } from '@/app/hooks/useSearch'
-import { Avatar } from '@/app/components/CategoryFeed'
+import { Avatar } from '@/app/components/Avatar'
 import { SkeletonPulse } from '@/app/components/skeletons'
 import type { SearchGroupedRec } from '@/lib/groupRecommendations'
 

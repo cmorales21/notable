@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
 
-export function normalizeItemTitle(title: string): string {
+function normalizeItemTitle(title: string): string {
   return title
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
@@ -90,7 +90,7 @@ export async function createOrMatchItem({
   return newItem.id as string
 }
 
-export function trackItemEvent({
+function trackItemEvent({
   itemId,
   userId,
   type,

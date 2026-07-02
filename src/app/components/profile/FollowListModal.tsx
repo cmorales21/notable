@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Avatar } from '@/app/components/CategoryFeed'
+import { Avatar } from '@/app/components/Avatar'
 import { FollowRowButton } from './FollowRowButton'
 
 interface FollowUser {

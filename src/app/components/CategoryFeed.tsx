@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { toggleEngagement } from '@/lib/engagement'
 import { groupRecommendations, normalizeTitle, type GroupedRecommendation } from '@/lib/groupRecommendations'
 import { CATEGORY_CONFIG, type Category } from './feed/categoryConfig'
 import { EmptyStateIcon } from './feed/helpers'
@@ -16,7 +17,7 @@ import { useToast } from '@/app/components/Toast'
 // ─── Public re-exports (consumed by profile page, search page, hooks) ─────────
 
 export type { RecProfile, Recommendation, RecComment } from '@/app/lib/types'
-export { Avatar, sortComments, fetchComments } from './feed/helpers'
+export { sortComments, fetchComments } from './feed/helpers'
 export { RecModal } from './feed/RecModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -275,43 +276,35 @@ export default function CategoryFeed({ category }: { category: string }) {
     e.stopPropagation()
     if (!currentUserId) return
     const liked = userLikes.has(recId)
-    setUserLikes((prev) => { const next = new Set(prev); if (liked) next.delete(recId); else next.add(recId); return next })
-    setLikeCounts((prev) => ({ ...prev, [recId]: (prev[recId] ?? 0) + (liked ? -1 : 1) }))
     toast(liked ? 'Unliked' : 'Liked')
-    if (liked) {
-      await supabase.from('likes').delete().eq('user_id', currentUserId).eq('recommendation_id', recId)
-    } else {
-      await supabase.from('likes').insert({ user_id: currentUserId, recommendation_id: recId })
-      const recAuthorId = recs.find(r => r.id === recId)?.user_id ?? null
-      if (recAuthorId && recAuthorId !== currentUserId) {
-        const { data: recipientProfile } = await supabase
-          .from('profiles').select('notify_likes').eq('id', recAuthorId).single()
-        if (recipientProfile?.notify_likes !== false) {
-          void supabase.from('notifications').insert({ user_id: recAuthorId, actor_id: currentUserId, type: 'like', rec_id: recId, read: false })
-        }
-      }
-    }
+    await toggleEngagement(supabase, {
+      kind: 'like',
+      scope: 'rec',
+      targetId: recId,
+      userId: currentUserId,
+      isActive: liked,
+      apply: (active) => {
+        setUserLikes((prev) => { const next = new Set(prev); if (active) next.add(recId); else next.delete(recId); return next })
+        setLikeCounts((prev) => ({ ...prev, [recId]: (prev[recId] ?? 0) + (active ? 1 : -1) }))
+      },
+    })
   }
 
   async function toggleBookmark(e: React.MouseEvent, recId: string) {
     e.stopPropagation()
     if (!currentUserId) return
     const bookmarked = userBookmarks.has(recId)
-    setUserBookmarks((prev) => { const next = new Set(prev); if (bookmarked) next.delete(recId); else next.add(recId); return next })
     toast(bookmarked ? 'Removed from saved' : 'Saved')
-    if (bookmarked) {
-      await supabase.from('bookmarks').delete().eq('user_id', currentUserId).eq('recommendation_id', recId)
-    } else {
-      await supabase.from('bookmarks').insert({ user_id: currentUserId, recommendation_id: recId })
-      const recAuthorId = recs.find(r => r.id === recId)?.user_id ?? null
-      if (recAuthorId && recAuthorId !== currentUserId) {
-        const { data: recipientProfile } = await supabase
-          .from('profiles').select('notify_bookmarks').eq('id', recAuthorId).single()
-        if (recipientProfile?.notify_bookmarks !== false) {
-          void supabase.from('notifications').insert({ user_id: recAuthorId, actor_id: currentUserId, type: 'bookmark', rec_id: recId, read: false })
-        }
-      }
-    }
+    await toggleEngagement(supabase, {
+      kind: 'bookmark',
+      scope: 'rec',
+      targetId: recId,
+      userId: currentUserId,
+      isActive: bookmarked,
+      apply: (active) => {
+        setUserBookmarks((prev) => { const next = new Set(prev); if (active) next.add(recId); else next.delete(recId); return next })
+      },
+    })
   }
 
   // ── Grouped recs + modal handlers ──────────────────────────────────────────

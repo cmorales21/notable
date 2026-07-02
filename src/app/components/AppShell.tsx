@@ -12,10 +12,10 @@ import {
   type RawNotif,
   type GroupedNotif,
   groupNotifications,
-  getRelTimeCompact,
   getNotifText,
   getNotifHref,
 } from '@/lib/notifications'
+import { getRelTimeCompact } from '@/lib/relativeTime'
 
 const PostModal = dynamic(() => import('./PostModal'), { ssr: false })
 const SearchDropdown = dynamic(() => import('./SearchDropdown'), { ssr: false })

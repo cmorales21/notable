@@ -4,7 +4,9 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { Avatar, RecModal, sortComments, fetchComments } from '@/app/components/CategoryFeed'
+import { toggleEngagement } from '@/lib/engagement'
+import { Avatar } from '@/app/components/Avatar'
+import { RecModal, sortComments, fetchComments } from '@/app/components/CategoryFeed'
 import { theme, getCategoryColor } from '@/app/lib/theme'
 import { useToast } from '@/app/components/Toast'
 import type { Recommendation, RecComment, RecProfile } from '@/app/lib/types'
@@ -205,48 +207,31 @@ export default function CollectionPage() {
 
   async function handleCollectionLike() {
     if (!currentUserId || isOwnCollection || !owner) return
-    if (collectionLiked) {
-      await supabase.current.from('collection_likes').delete().eq('collection_id', id).eq('user_id', currentUserId)
-      setCollectionLiked(false)
-      setCollectionLikeCount(c => c - 1)
-    } else {
-      await supabase.current.from('collection_likes').insert({ collection_id: id, user_id: currentUserId })
-      setCollectionLiked(true)
-      setCollectionLikeCount(c => c + 1)
-      const { data: ownerPrefs } = await supabase.current
-        .from('profiles').select('notify_likes').eq('id', owner.id).single()
-      if (ownerPrefs?.notify_likes !== false) {
-        supabase.current.from('notifications').insert({
-          user_id: owner.id,
-          actor_id: currentUserId,
-          type: 'collection_like',
-          collection_id: id,
-          read: false,
-        })
-      }
-    }
+    await toggleEngagement(supabase.current, {
+      kind: 'like',
+      scope: 'collection',
+      targetId: id,
+      userId: currentUserId,
+      isActive: collectionLiked,
+      apply: (active) => {
+        setCollectionLiked(active)
+        setCollectionLikeCount(c => c + (active ? 1 : -1))
+      },
+    })
   }
 
   async function handleCollectionBookmark() {
     if (!currentUserId || isOwnCollection || !owner) return
-    if (collectionBookmarked) {
-      await supabase.current.from('collection_bookmarks').delete().eq('collection_id', id).eq('user_id', currentUserId)
-      setCollectionBookmarked(false)
-    } else {
-      await supabase.current.from('collection_bookmarks').insert({ collection_id: id, user_id: currentUserId })
-      setCollectionBookmarked(true)
-      const { data: ownerPrefs } = await supabase.current
-        .from('profiles').select('notify_bookmarks').eq('id', owner.id).single()
-      if (ownerPrefs?.notify_bookmarks !== false) {
-        supabase.current.from('notifications').insert({
-          user_id: owner.id,
-          actor_id: currentUserId,
-          type: 'collection_bookmark',
-          collection_id: id,
-          read: false,
-        })
-      }
-    }
+    await toggleEngagement(supabase.current, {
+      kind: 'bookmark',
+      scope: 'collection',
+      targetId: id,
+      userId: currentUserId,
+      isActive: collectionBookmarked,
+      apply: (active) => {
+        setCollectionBookmarked(active)
+      },
+    })
   }
 
   // ── Remove item with undo ────────────────────────────────────────────────────
@@ -333,27 +318,32 @@ export default function CollectionPage() {
   async function handleModalLike(e: React.MouseEvent) {
     e.stopPropagation()
     if (!currentUserId || !selectedRec) return
-    if (modalLiked) {
-      await supabase.current.from('likes').delete().eq('user_id', currentUserId).eq('recommendation_id', selectedRec.id)
-      setModalLiked(false)
-      setModalLikeCount(c => c - 1)
-    } else {
-      await supabase.current.from('likes').insert({ user_id: currentUserId, recommendation_id: selectedRec.id })
-      setModalLiked(true)
-      setModalLikeCount(c => c + 1)
-    }
+    await toggleEngagement(supabase.current, {
+      kind: 'like',
+      scope: 'rec',
+      targetId: selectedRec.id,
+      userId: currentUserId,
+      isActive: modalLiked,
+      apply: (active) => {
+        setModalLiked(active)
+        setModalLikeCount(c => c + (active ? 1 : -1))
+      },
+    })
   }
 
   async function handleModalBookmark(e: React.MouseEvent) {
     e.stopPropagation()
     if (!currentUserId || !selectedRec) return
-    if (modalBookmarked) {
-      await supabase.current.from('bookmarks').delete().eq('user_id', currentUserId).eq('recommendation_id', selectedRec.id)
-      setModalBookmarked(false)
-    } else {
-      await supabase.current.from('bookmarks').insert({ user_id: currentUserId, recommendation_id: selectedRec.id })
-      setModalBookmarked(true)
-    }
+    await toggleEngagement(supabase.current, {
+      kind: 'bookmark',
+      scope: 'rec',
+      targetId: selectedRec.id,
+      userId: currentUserId,
+      isActive: modalBookmarked,
+      apply: (active) => {
+        setModalBookmarked(active)
+      },
+    })
   }
 
   async function handleModalComment(e: React.FormEvent) {
