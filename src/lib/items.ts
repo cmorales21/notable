@@ -105,13 +105,18 @@ function trackItemEvent({
   category?: string
   source?: string
 }): void {
-  createClient().from('item_events').insert({
+  // Fire-and-forget, but the builder must be .then()'d or it never executes.
+  void createClient().from('item_events').insert({
     item_id:  itemId,
     user_id:  userId,
     type,
     partner:  partner ?? null,
     category: category ?? null,
     source:   source ?? null,
+  }).then(({ error }) => {
+    if (error && process.env.NODE_ENV !== 'production') {
+      console.error('[items] event tracking failed:', error.message)
+    }
   })
 }
 

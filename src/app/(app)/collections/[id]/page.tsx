@@ -236,6 +236,14 @@ export default function CollectionPage() {
 
   // ── Remove item with undo ────────────────────────────────────────────────────
 
+  async function commitRemove(itemId: string, item: CollectionItemRow) {
+    const { error } = await supabase.current.from('collection_items').delete().eq('id', itemId)
+    if (error) {
+      console.error('[collection_items] delete failed:', error.message)
+      setItems(prev => [...prev, item].sort((a, b) => b.added_at.localeCompare(a.added_at)))
+    }
+  }
+
   function handleRemoveItem(itemId: string) {
     const item = items.find(i => i.id === itemId)
     if (!item) return
@@ -243,7 +251,7 @@ export default function CollectionPage() {
     // Commit any existing pending delete immediately
     if (pendingRemoveRef.current) {
       clearTimeout(pendingRemoveRef.current.timer)
-      supabase.current.from('collection_items').delete().eq('id', pendingRemoveRef.current.id)
+      void commitRemove(pendingRemoveRef.current.id, pendingRemoveRef.current.item)
       pendingRemoveRef.current = null
     }
 
@@ -251,7 +259,7 @@ export default function CollectionPage() {
     setUndoVisible(true)
 
     const timer = setTimeout(async () => {
-      await supabase.current.from('collection_items').delete().eq('id', itemId)
+      await commitRemove(itemId, item)
       pendingRemoveRef.current = null
       setUndoVisible(false)
     }, 4000)
@@ -274,7 +282,7 @@ export default function CollectionPage() {
   function handleUndoDismiss() {
     if (!pendingRemoveRef.current) return
     clearTimeout(pendingRemoveRef.current.timer)
-    supabase.current.from('collection_items').delete().eq('id', pendingRemoveRef.current.id)
+    void commitRemove(pendingRemoveRef.current.id, pendingRemoveRef.current.item)
     pendingRemoveRef.current = null
     setUndoVisible(false)
   }
