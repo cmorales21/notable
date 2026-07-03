@@ -26,6 +26,14 @@ export { RecModal } from './feed/RecModal'
 import type { RecProfile, Recommendation } from '@/app/lib/types'
 type Profile = RecProfile
 
+// Shape returned by the embedded-count select: likes(count) etc. come back as [{ count: n }]
+type EngagementCountRow = {
+  id: string
+  likes: { count: number }[] | null
+  comments: { count: number }[] | null
+  bookmarks: { count: number }[] | null
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function CategoryFeed({ category }: { category: string }) {
@@ -140,10 +148,8 @@ export default function CategoryFeed({ category }: { category: string }) {
       if (fetchedRecs.length === 0) return
 
       const ids = fetchedRecs.map((r) => r.id)
-      const [{ data: allLikes }, { data: allComments }, { data: allBookmarks }, { data: myLikes }, { data: myBookmarks }] = await Promise.all([
-        supabase.from('likes').select('recommendation_id').in('recommendation_id', ids).abortSignal(signal),
-        supabase.from('comments').select('recommendation_id').in('recommendation_id', ids).abortSignal(signal),
-        supabase.from('bookmarks').select('recommendation_id').in('recommendation_id', ids).abortSignal(signal),
+      const [{ data: countRows }, { data: myLikes }, { data: myBookmarks }] = await Promise.all([
+        supabase.from('recommendations').select('id, likes(count), comments(count), bookmarks(count)').in('id', ids).abortSignal(signal),
         uid ? supabase.from('likes').select('recommendation_id').eq('user_id', uid).in('recommendation_id', ids).abortSignal(signal) : Promise.resolve({ data: [] }),
         uid ? supabase.from('bookmarks').select('recommendation_id').eq('user_id', uid).in('recommendation_id', ids).abortSignal(signal) : Promise.resolve({ data: [] }),
       ])
@@ -153,9 +159,11 @@ export default function CategoryFeed({ category }: { category: string }) {
       const cc: Record<string, number> = {}
       const bc: Record<string, number> = {}
       for (const id of ids) { lc[id] = 0; cc[id] = 0; bc[id] = 0 }
-      for (const l of allLikes ?? []) lc[l.recommendation_id] = (lc[l.recommendation_id] ?? 0) + 1
-      for (const c of allComments ?? []) cc[c.recommendation_id] = (cc[c.recommendation_id] ?? 0) + 1
-      for (const b of allBookmarks ?? []) bc[b.recommendation_id] = (bc[b.recommendation_id] ?? 0) + 1
+      for (const row of (countRows ?? []) as EngagementCountRow[]) {
+        lc[row.id] = row.likes?.[0]?.count ?? 0
+        cc[row.id] = row.comments?.[0]?.count ?? 0
+        bc[row.id] = row.bookmarks?.[0]?.count ?? 0
+      }
       setLikeCounts(lc)
       setCommentCounts(cc)
       setBookmarkCounts(bc)
@@ -226,10 +234,8 @@ export default function CategoryFeed({ category }: { category: string }) {
         ...r, profiles: profileMap[r.user_id] ?? null,
       }))
       const ids = newRecs.map((r) => r.id)
-      const [{ data: allLikes }, { data: allComments }, { data: allBookmarks }, { data: myLikes }, { data: myBookmarks }] = await Promise.all([
-        supabase.from('likes').select('recommendation_id').in('recommendation_id', ids),
-        supabase.from('comments').select('recommendation_id').in('recommendation_id', ids),
-        supabase.from('bookmarks').select('recommendation_id').in('recommendation_id', ids),
+      const [{ data: countRows }, { data: myLikes }, { data: myBookmarks }] = await Promise.all([
+        supabase.from('recommendations').select('id, likes(count), comments(count), bookmarks(count)').in('id', ids),
         uid ? supabase.from('likes').select('recommendation_id').eq('user_id', uid).in('recommendation_id', ids) : Promise.resolve({ data: [] }),
         uid ? supabase.from('bookmarks').select('recommendation_id').eq('user_id', uid).in('recommendation_id', ids) : Promise.resolve({ data: [] }),
       ])
@@ -238,9 +244,11 @@ export default function CategoryFeed({ category }: { category: string }) {
       const cc: Record<string, number> = {}
       const bc: Record<string, number> = {}
       for (const id of ids) { lc[id] = 0; cc[id] = 0; bc[id] = 0 }
-      for (const l of allLikes ?? []) lc[l.recommendation_id] = (lc[l.recommendation_id] ?? 0) + 1
-      for (const c of allComments ?? []) cc[c.recommendation_id] = (cc[c.recommendation_id] ?? 0) + 1
-      for (const b of allBookmarks ?? []) bc[b.recommendation_id] = (bc[b.recommendation_id] ?? 0) + 1
+      for (const row of (countRows ?? []) as EngagementCountRow[]) {
+        lc[row.id] = row.likes?.[0]?.count ?? 0
+        cc[row.id] = row.comments?.[0]?.count ?? 0
+        bc[row.id] = row.bookmarks?.[0]?.count ?? 0
+      }
 
       setRecs(prev => [...prev, ...newRecs])
       setLikeCounts(prev => ({ ...prev, ...lc }))

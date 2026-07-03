@@ -16,7 +16,7 @@ import {
   type FullProfile, type Collection, type CollectionCategory,
   CATEGORY_COLORS, CATEGORY_LABELS, COLLECTION_CATEGORIES,
 } from '@/app/components/profile/types'
-import { CATEGORY_ORDER, type Category } from '@/app/lib/theme'
+import { CATEGORY_ORDER, theme, type Category } from '@/app/lib/theme'
 import { Avatar } from '@/app/components/Avatar'
 import { GridTile } from '@/app/components/profile/GridTile'
 import { AddToCollectionMenu } from '@/app/components/profile/AddToCollectionMenu'
@@ -47,6 +47,9 @@ const TAB_LABELS: Record<TabId, string> = {
   bookmarked: 'Bookmarked',
   collections: 'Collections',
 }
+
+const PROFILE_PAGE_SIZE = 60
+const REC_COLUMNS = 'id, user_id, category, title, description, image_url, external_url, item_id, created_at'
 
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -88,6 +91,11 @@ export default function ProfilePage() {
   const [recs, setRecs] = useState<Recommendation[]>([])
   const [recsLoading, setRecsLoading] = useState(true)
   const [recsError, setRecsError] = useState(false)
+  const [recsHasMore, setRecsHasMore] = useState(false)
+  const [recsLoadingMore, setRecsLoadingMore] = useState(false)
+  // Rows consumed from the source table (recommendations / likes / bookmarks) —
+  // not recs.length, since liked/bookmarked ids can point at deleted recs.
+  const recsOffsetRef = useRef(0)
 
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
@@ -143,11 +151,11 @@ export default function ProfilePage() {
 
         if (uid) {
           const isOther = uid !== profileData.id
-          const [{ data: myProfile }, { data: followRow }, { data: followers }, { data: following }, { data: iBlockRow }, { data: theyBlockRow }] = await Promise.all([
+          const [{ data: myProfile }, { data: followRow }, { count: followerCnt }, { count: followingCnt }, { data: iBlockRow }, { data: theyBlockRow }] = await Promise.all([
             supabase.current.from('profiles').select('name, handle, avatar_url').eq('id', uid).maybeSingle(),
             supabase.current.from('follows').select('id, status').eq('follower_id', uid).eq('following_id', profileData.id).maybeSingle(),
-            supabase.current.from('follows').select('id').eq('following_id', profileData.id).eq('status', 'accepted'),
-            supabase.current.from('follows').select('id').eq('follower_id', profileData.id).eq('status', 'accepted'),
+            supabase.current.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', profileData.id).eq('status', 'accepted'),
+            supabase.current.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', profileData.id).eq('status', 'accepted'),
             isOther ? supabase.current.from('user_blocks').select('id').eq('blocker_id', uid).eq('blocked_id', profileData.id).maybeSingle() : Promise.resolve({ data: null }),
             isOther ? supabase.current.from('user_blocks').select('id').eq('blocker_id', profileData.id).eq('blocked_id', uid).maybeSingle() : Promise.resolve({ data: null }),
           ])
@@ -155,19 +163,19 @@ export default function ProfilePage() {
           const fr = followRow as { id: string; status: string } | null
           setIsFollowing(fr?.status === 'accepted')
           setIsPendingFollow(fr?.status === 'pending')
-          setFollowerCount(followers?.length ?? 0)
-          setFollowingCount(following?.length ?? 0)
+          setFollowerCount(followerCnt ?? 0)
+          setFollowingCount(followingCnt ?? 0)
           if (isOther) {
             setIBlockedThem(!!iBlockRow)
             setTheyBlockedMe(!!theyBlockRow)
           }
         } else {
-          const [{ data: followers }, { data: following }] = await Promise.all([
-            supabase.current.from('follows').select('id').eq('following_id', profileData.id).eq('status', 'accepted'),
-            supabase.current.from('follows').select('id').eq('follower_id', profileData.id).eq('status', 'accepted'),
+          const [{ count: followerCnt }, { count: followingCnt }] = await Promise.all([
+            supabase.current.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', profileData.id).eq('status', 'accepted'),
+            supabase.current.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', profileData.id).eq('status', 'accepted'),
           ])
-          setFollowerCount(followers?.length ?? 0)
-          setFollowingCount(following?.length ?? 0)
+          setFollowerCount(followerCnt ?? 0)
+          setFollowingCount(followingCnt ?? 0)
         }
       } finally {
         setProfileLoading(false)
@@ -178,70 +186,109 @@ export default function ProfilePage() {
 
   // ── Load recs for active tab ────────────────────────────────────────────────
 
+  const fetchRecsPage = useCallback(async (tab: TabId, profileId: string, offset: number) => {
+    const to = offset + PROFILE_PAGE_SIZE - 1
+    let rows: Recommendation[] = []
+    let consumed = 0
+    let failed = false
+
+    if (tab === 'posted') {
+      const { data, error } = await supabase.current
+        .from('recommendations').select(REC_COLUMNS)
+        .eq('user_id', profileId).order('created_at', { ascending: false })
+        .range(offset, to)
+      if (error) failed = true
+      rows = (data ?? []) as unknown as Recommendation[]
+      consumed = rows.length
+    } else if (tab === 'liked' || tab === 'bookmarked') {
+      const { data: idData, error: idErr } = await supabase.current
+        .from(tab === 'liked' ? 'likes' : 'bookmarks')
+        .select('recommendation_id').eq('user_id', profileId)
+        .order('created_at', { ascending: false })
+        .range(offset, to)
+      if (idErr) failed = true
+      const ids = (idData ?? []).map((r: { recommendation_id: string }) => r.recommendation_id)
+      consumed = ids.length
+      if (ids.length > 0) {
+        const { data, error } = await supabase.current
+          .from('recommendations').select(REC_COLUMNS)
+          .in('id', ids).order('created_at', { ascending: false })
+        if (error) failed = true
+        rows = (data ?? []) as unknown as Recommendation[]
+      }
+    }
+
+    if (!failed && rows.length > 0) {
+      const userIds = [...new Set(rows.map(r => r.user_id))]
+      const { data: profilesData } = await supabase.current
+        .from('profiles').select('id, name, handle, avatar_url').in('id', userIds)
+      const profileMap: Record<string, RecProfile> = {}
+      for (const p of profilesData ?? []) profileMap[p.id] = p
+      rows = rows.map(r => ({ ...r, profiles: profileMap[r.user_id] ?? null }))
+    }
+
+    return { rows, consumed, failed }
+  }, [])
+
   const loadRecs = useCallback(async (tab: TabId, profileId: string) => {
     setRecsLoading(true)
     setRecs([])
     setRecsError(false)
+    setRecsHasMore(false)
+    recsOffsetRef.current = 0
     try {
-      let recRows: Recommendation[] = []
-      let failed = false
-
-      if (tab === 'posted') {
-        const { data, error } = await supabase.current
-          .from('recommendations').select('*')
-          .eq('user_id', profileId).order('created_at', { ascending: false })
-        if (error) failed = true
-        recRows = data ?? []
-      } else if (tab === 'liked') {
-        const { data: likeData, error: likeErr } = await supabase.current
-          .from('likes').select('recommendation_id').eq('user_id', profileId)
-        if (likeErr) failed = true
-        const ids = (likeData ?? []).map((l: { recommendation_id: string }) => l.recommendation_id)
-        if (ids.length > 0) {
-          const { data, error } = await supabase.current
-            .from('recommendations').select('*').in('id', ids).order('created_at', { ascending: false })
-          if (error) failed = true
-          recRows = data ?? []
-        }
-      } else if (tab === 'bookmarked') {
-        const { data: bmData, error: bmErr } = await supabase.current
-          .from('bookmarks').select('recommendation_id').eq('user_id', profileId)
-        if (bmErr) failed = true
-        const ids = (bmData ?? []).map((b: { recommendation_id: string }) => b.recommendation_id)
-        if (ids.length > 0) {
-          const { data, error } = await supabase.current
-            .from('recommendations').select('*').in('id', ids).order('created_at', { ascending: false })
-          if (error) failed = true
-          recRows = data ?? []
-        }
-      }
-
+      const { rows, consumed, failed } = await fetchRecsPage(tab, profileId, 0)
       if (failed) {
         setRecsError(true)
         setRecs([])
         return
       }
-
-      if (recRows.length > 0) {
-        const userIds = [...new Set(recRows.map(r => r.user_id))]
-        const { data: profilesData } = await supabase.current
-          .from('profiles').select('id, name, handle, avatar_url').in('id', userIds)
-        const profileMap: Record<string, RecProfile> = {}
-        for (const p of profilesData ?? []) profileMap[p.id] = p
-        recRows = recRows.map(r => ({ ...r, profiles: profileMap[r.user_id] ?? null }))
-      }
-
-      setRecs(recRows)
+      recsOffsetRef.current = consumed
+      setRecsHasMore(consumed === PROFILE_PAGE_SIZE)
+      setRecs(rows)
     } finally {
       setRecsLoading(false)
     }
-  }, [])
+  }, [fetchRecsPage])
+
+  const loadMoreRecs = useCallback(async () => {
+    if (!recsHasMore || recsLoadingMore || !profile) return
+    setRecsLoadingMore(true)
+    try {
+      const { rows, consumed, failed } = await fetchRecsPage(activeTab, profile.id, recsOffsetRef.current)
+      if (failed) {
+        setRecsHasMore(false)
+        return
+      }
+      recsOffsetRef.current += consumed
+      setRecsHasMore(consumed === PROFILE_PAGE_SIZE)
+      if (rows.length > 0) setRecs(prev => [...prev, ...rows])
+    } finally {
+      setRecsLoadingMore(false)
+    }
+  }, [recsHasMore, recsLoadingMore, profile, activeTab, fetchRecsPage])
+
+  // Stable ref so the IntersectionObserver callback always calls the latest loadMoreRecs
+  const recsSentinelRef = useRef<HTMLDivElement>(null)
+  const loadMoreRecsRef = useRef(loadMoreRecs)
+  useEffect(() => { loadMoreRecsRef.current = loadMoreRecs }, [loadMoreRecs])
+
+  useEffect(() => {
+    const sentinel = recsSentinelRef.current
+    if (!sentinel || !recsHasMore || recsLoading) return
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) loadMoreRecsRef.current() },
+      { rootMargin: '500px' }
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [recsHasMore, recsLoading])
 
   useEffect(() => {
     if (!profile) return
     if (activeTab === 'collections') return
     const gated = (profile.profile_private === true && !isOwnProfile && !isFollowing) || iBlockedThem || theyBlockedMe
-    if (gated) { setRecs([]); setRecsLoading(false); return }
+    if (gated) { setRecs([]); setRecsHasMore(false); setRecsLoading(false); return }
     // Likes are always public — no per-tab gate needed.
     // Bookmarks are private by default; only shown to others when explicitly set to false.
     if (activeTab === 'bookmarked' && !isOwnProfile && profile?.bookmarks_private !== false) {
@@ -1295,6 +1342,26 @@ export default function ProfilePage() {
                   </div>
                 ))}
               </div>
+            )}
+
+            {/* Sentinel: IntersectionObserver fires loadMoreRecs when this enters viewport */}
+            {activeTab !== 'collections' && !recsLoading && !recsError && (
+              <>
+                <div ref={recsSentinelRef} style={{ height: 1 }} />
+                {recsLoadingMore && (
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0' }}>
+                    <div
+                      className="feed-spinner"
+                      style={{
+                        width: 20, height: 20,
+                        border: `2px solid ${theme.colors.input}`,
+                        borderTopColor: '#6b5d4f',
+                        borderRadius: '50%',
+                      }}
+                    />
+                  </div>
+                )}
+              </>
             )}
           </>
         )}

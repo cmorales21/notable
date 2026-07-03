@@ -1,4 +1,3 @@
-/* eslint-disable @next/next/no-img-element */
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -7,6 +6,7 @@ import FadeIn from './components/FadeIn'
 import AuthCard from './components/AuthCard'
 import { createClient } from '@/lib/supabase/server'
 import { CATEGORY_COLORS, CATEGORY_LABELS } from '@/app/lib/theme'
+import { shouldOptimize } from '@/app/lib/imageHosts'
 
 export const metadata: Metadata = {
   title: 'Notable — Get in, get inspired, go live your life',
@@ -51,7 +51,7 @@ function makeStaticRow(start: number): StripTile[] {
 }
 
 /* ─── Scrolling strip row (CSS-animated, seamless) ───────────────────────── */
-function StripRow({ tiles, offset = '0s' }: { tiles: StripTile[]; offset?: string }) {
+function StripRow({ tiles, offset = '0s', eager = false }: { tiles: StripTile[]; offset?: string; eager?: boolean }) {
   return (
     /* overflow-x:clip keeps the wide track from scrolling the page;
        overflow-y:visible lets scaled tiles grow vertically without clipping */
@@ -65,13 +65,20 @@ function StripRow({ tiles, offset = '0s' }: { tiles: StripTile[]; offset?: strin
           animation: `scroll-right 240s linear ${offset} infinite`,
         }}
       >
-        {/* Original set + duplicate — translateX(-50%) loops back to start seamlessly */}
+        {/* Original set + duplicate — translateX(-50%) loops back to start seamlessly.
+            The duplicate set shares URLs with the original, so lazy-loading it is
+            effectively free (browser cache). sizes=150px covers the 97px tile at
+            its 1.5x hover zoom. */}
         {[...tiles, ...tiles].map((tile, i) => (
           <div key={i} className="strip-box">
-            <img
+            <Image
               src={tile.src}
               alt={tile.alt}
+              fill
+              sizes="150px"
               className="strip-img"
+              loading={eager && i < tiles.length ? 'eager' : 'lazy'}
+              unoptimized={!tile.src.startsWith('/') && !shouldOptimize(tile.src)}
             />
           </div>
         ))}
@@ -208,7 +215,7 @@ export default async function LandingPage() {
               }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <StripRow tiles={mosaicRow1} />
+                <StripRow tiles={mosaicRow1} eager />
                 <StripRow tiles={mosaicRow2} offset="-6s" />
                 <StripRow tiles={mosaicRow3} offset="-13s" />
               </div>
