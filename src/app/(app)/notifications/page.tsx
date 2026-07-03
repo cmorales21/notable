@@ -1,9 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { checkedWrite } from '@/lib/writes'
 import { Avatar } from '@/app/components/Avatar'
+import { SkeletonPulse } from '@/app/components/skeletons'
+import { useToast } from '@/app/components/Toast'
 import {
   type NotifType,
   type RawNotif,
@@ -41,68 +44,79 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<GroupedNotif[]>([])
   const [followRequests, setFollowRequests] = useState<FollowRequest[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   const userIdRef = useRef<string | null>(null)
   const blockedIdsRef = useRef(new Set<string>())
+  const toast = useToast()
+
+  const loadAll = useCallback(async () => {
+    const supabase = createClient()
+    setLoading(true)
+    setLoadError(false)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setLoading(false); return }
+    const uid = user.id
+    userIdRef.current = uid
+    setUserId(uid)
+
+    const [{ data: notifData, error: notifError }, { data: blockData }] = await Promise.all([
+      supabase
+        .from('notifications')
+        .select(`
+          id, type, rec_id, read, updated_at, actor_id,
+          actor:profiles!actor_id(name, handle, avatar_url),
+          rec:recommendations!rec_id(title, category)
+        `)
+        .eq('user_id', uid)
+        .order('updated_at', { ascending: false })
+        .limit(60),
+      supabase
+        .from('user_blocks')
+        .select('blocked_id, blocker_id')
+        .or(`blocker_id.eq.${uid},blocked_id.eq.${uid}`),
+    ])
+
+    if (notifError) {
+      if (process.env.NODE_ENV !== 'production') console.error('[Notable] notifications fetch failed:', notifError.message)
+      setLoadError(true)
+      setLoading(false)
+      return
+    }
+
+    const ids = new Set<string>()
+    for (const r of (blockData ?? []) as { blocker_id: string; blocked_id: string }[]) {
+      ids.add(r.blocker_id === uid ? r.blocked_id : r.blocker_id)
+    }
+    blockedIdsRef.current = ids
+
+    const allRows = ((notifData ?? []) as unknown as RawNotif[]).filter(n => !n.actor_id || !ids.has(n.actor_id))
+
+    // Derive follow requests from the notifications table — same source as the
+    // AppShell dropdown, so they're guaranteed to be present if the dropdown works.
+    const requests: FollowRequest[] = allRows
+      .filter(n => n.type === 'follow_request' && n.actor_id)
+      .map(n => {
+        const actor = resolveActor(n.actor)
+        return { actor_id: n.actor_id!, name: actor?.name ?? null, handle: actor?.handle ?? null, avatar_url: actor?.avatar_url ?? null }
+      })
+    setFollowRequests(requests)
+
+    const regularRows = allRows.filter(n => n.type !== 'follow_request')
+    setNotifications(groupNotifications(regularRows))
+    setLoading(false)
+
+    const markedRead = await checkedWrite(
+      supabase.from('notifications').update({ read: true }).eq('user_id', uid).eq('read', false)
+    )
+    if (markedRead) setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+  }, [])
 
   useEffect(() => {
     const supabase = createClient()
 
-    ;(async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { setLoading(false); return }
-      const uid = user.id
-      userIdRef.current = uid
-      setUserId(uid)
-
-      const [{ data: notifData, error: notifError }, { data: blockData }] = await Promise.all([
-        supabase
-          .from('notifications')
-          .select(`
-            id, type, rec_id, read, updated_at, actor_id,
-            actor:profiles!actor_id(name, handle, avatar_url),
-            rec:recommendations!rec_id(title, category)
-          `)
-          .eq('user_id', uid)
-          .order('updated_at', { ascending: false })
-          .limit(60),
-        supabase
-          .from('user_blocks')
-          .select('blocked_id, blocker_id')
-          .or(`blocker_id.eq.${uid},blocked_id.eq.${uid}`),
-      ])
-
-      if (notifError) {
-        if (process.env.NODE_ENV !== 'production') console.error('[Notable] notifications fetch failed:', notifError.message)
-        setLoading(false)
-        return
-      }
-
-      const ids = new Set<string>()
-      for (const r of (blockData ?? []) as { blocker_id: string; blocked_id: string }[]) {
-        ids.add(r.blocker_id === uid ? r.blocked_id : r.blocker_id)
-      }
-      blockedIdsRef.current = ids
-
-      const allRows = ((notifData ?? []) as unknown as RawNotif[]).filter(n => !n.actor_id || !ids.has(n.actor_id))
-
-      // Derive follow requests from the notifications table — same source as the
-      // AppShell dropdown, so they're guaranteed to be present if the dropdown works.
-      const requests: FollowRequest[] = allRows
-        .filter(n => n.type === 'follow_request' && n.actor_id)
-        .map(n => {
-          const actor = resolveActor(n.actor)
-          return { actor_id: n.actor_id!, name: actor?.name ?? null, handle: actor?.handle ?? null, avatar_url: actor?.avatar_url ?? null }
-        })
-      setFollowRequests(requests)
-
-      const regularRows = allRows.filter(n => n.type !== 'follow_request')
-      setNotifications(groupNotifications(regularRows))
-      setLoading(false)
-
-      await supabase.from('notifications').update({ read: true }).eq('user_id', uid).eq('read', false)
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })))
-    })()
+    loadAll()
 
     // When a new notification arrives, fetch just that one row (with joins) and prepend it
     const channel = supabase
@@ -171,7 +185,7 @@ export default function NotificationsPage() {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [])
+  }, [loadAll])
 
   // Refetch follow requests when the AppShell dropdown accepts/declines one,
   // so both the page and the dropdown stay in sync.
@@ -204,10 +218,18 @@ export default function NotificationsPage() {
   async function handleAcceptRequest(actorId: string) {
     if (!userId) return
     const supabase = createClient()
-    await supabase.from('follows').update({ status: 'accepted' })
-      .eq('follower_id', actorId).eq('following_id', userId)
-    await supabase.from('notifications').delete()
-      .eq('user_id', userId).eq('actor_id', actorId).eq('type', 'follow_request')
+    const ok = await checkedWrite(
+      supabase.from('follows').update({ status: 'accepted' })
+        .eq('follower_id', actorId).eq('following_id', userId)
+    )
+    if (!ok) {
+      toast('Couldn’t accept the request. Please try again.')
+      return
+    }
+    await checkedWrite(
+      supabase.from('notifications').delete()
+        .eq('user_id', userId).eq('actor_id', actorId).eq('type', 'follow_request')
+    )
     setFollowRequests(prev => prev.filter(r => r.actor_id !== actorId))
     window.dispatchEvent(new Event('follow-request-updated'))
   }
@@ -215,10 +237,18 @@ export default function NotificationsPage() {
   async function handleDeclineRequest(actorId: string) {
     if (!userId) return
     const supabase = createClient()
-    await supabase.from('follows').delete()
-      .eq('follower_id', actorId).eq('following_id', userId)
-    await supabase.from('notifications').delete()
-      .eq('user_id', userId).eq('actor_id', actorId).eq('type', 'follow_request')
+    const ok = await checkedWrite(
+      supabase.from('follows').delete()
+        .eq('follower_id', actorId).eq('following_id', userId)
+    )
+    if (!ok) {
+      toast('Couldn’t decline the request. Please try again.')
+      return
+    }
+    await checkedWrite(
+      supabase.from('notifications').delete()
+        .eq('user_id', userId).eq('actor_id', actorId).eq('type', 'follow_request')
+    )
     setFollowRequests(prev => prev.filter(r => r.actor_id !== actorId))
     window.dispatchEvent(new Event('follow-request-updated'))
   }
@@ -233,12 +263,42 @@ export default function NotificationsPage() {
       </h1>
 
       {loading && (
-        <p className="font-body" style={{ color: 'var(--color-muted)', fontSize: '14px' }}>
-          Loading…
-        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px' }}>
+              <SkeletonPulse style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <SkeletonPulse style={{ height: 13, width: '55%', borderRadius: 5 }} />
+                <SkeletonPulse style={{ height: 11, width: '28%', borderRadius: 5 }} />
+              </div>
+            </div>
+          ))}
+        </div>
       )}
 
-      {!loading && notifications.length === 0 && followRequests.length === 0 && (
+      {!loading && loadError && (
+        <div style={{ textAlign: 'center', paddingTop: '60px' }}>
+          <p className="font-display" style={{ fontSize: '1.1rem', fontWeight: 600, color: '#33261a', marginBottom: '6px' }}>
+            Something went wrong
+          </p>
+          <p className="font-body" style={{ color: 'var(--color-muted)', fontSize: '14px', marginBottom: '20px' }}>
+            Couldn&rsquo;t load your notifications.
+          </p>
+          <button
+            onClick={loadAll}
+            className="font-body"
+            style={{
+              background: '#33261a', color: '#faf8f4', border: 'none',
+              borderRadius: '20px', padding: '8px 20px',
+              fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
+      {!loading && !loadError && notifications.length === 0 && followRequests.length === 0 && (
         <div style={{ textAlign: 'center', paddingTop: '60px' }}>
           <div style={{ marginBottom: '12px', display: 'flex', justifyContent: 'center' }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="#6b5d4f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="32" height="32">

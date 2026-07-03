@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { RecommendationImage } from '@/app/components/RecommendationImage'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { checkedWrite } from '@/lib/writes'
 import { RichMediaEmbed, willEmbed } from '@/app/components/RichMediaEmbed'
 import type { Recommendation, RecComment, RecProfile } from '@/app/lib/types'
 import { Avatar } from '@/app/components/Avatar'
@@ -108,11 +109,18 @@ export function RecModal({
       ...prev,
       [commentId]: { count: cur.count + (cur.likedByMe ? -1 : 1), likedByMe: !cur.likedByMe },
     }))
+    const revert = () => setCommentLikesMap(prev => ({ ...prev, [commentId]: cur }))
     if (cur.likedByMe) {
-      await supabaseRef.current.from('comment_likes').delete()
-        .eq('user_id', currentUserId).eq('comment_id', commentId)
+      await checkedWrite(
+        supabaseRef.current.from('comment_likes').delete()
+          .eq('user_id', currentUserId).eq('comment_id', commentId),
+        revert
+      )
     } else {
-      await supabaseRef.current.from('comment_likes').insert({ user_id: currentUserId, comment_id: commentId })
+      await checkedWrite(
+        supabaseRef.current.from('comment_likes').insert({ user_id: currentUserId, comment_id: commentId }),
+        revert
+      )
     }
   }
 
@@ -120,7 +128,18 @@ export function RecModal({
     if (!currentUserId || (currentUserId !== commentUserId && currentUserId !== rec.user_id)) return
     setOpenMenuCommentId(null)
     setDeletedCommentIds(prev => new Set([...prev, commentId]))
-    await supabaseRef.current.from('comments').delete().eq('id', commentId).eq('user_id', commentUserId)
+    const ok = await checkedWrite(
+      supabaseRef.current.from('comments').delete().eq('id', commentId).eq('user_id', commentUserId)
+    )
+    if (!ok) {
+      setDeletedCommentIds(prev => {
+        const next = new Set(prev)
+        next.delete(commentId)
+        return next
+      })
+      toast('Couldn’t remove the comment. Please try again.')
+      return
+    }
     onCommentCountChange?.(rec.id, -1)
     toast('Comment removed')
   }
@@ -144,7 +163,14 @@ export function RecModal({
   async function saveDescEdit() {
     if (!editDescInput.trim()) return
     setSubmittingEdit(true)
-    await supabaseRef.current.from('recommendations').update({ description: editDescInput.trim() }).eq('id', rec.id)
+    const ok = await checkedWrite(
+      supabaseRef.current.from('recommendations').update({ description: editDescInput.trim() }).eq('id', rec.id)
+    )
+    if (!ok) {
+      setSubmittingEdit(false)
+      toast('Couldn’t save your changes. Please try again.')
+      return
+    }
     setLocalDescription(editDescInput.trim())
     onRecUpdated?.(rec.id, editDescInput.trim())
     setEditingDesc(false)
@@ -155,7 +181,13 @@ export function RecModal({
 
   async function deleteRec() {
     if (!currentUserId || currentUserId !== rec.user_id) return
-    await supabaseRef.current.from('recommendations').delete().eq('id', rec.id).eq('user_id', currentUserId)
+    const ok = await checkedWrite(
+      supabaseRef.current.from('recommendations').delete().eq('id', rec.id).eq('user_id', currentUserId)
+    )
+    if (!ok) {
+      toast('Couldn’t remove the recommendation. Please try again.')
+      return
+    }
     onClose()
     onRecDeleted?.()
     toast('Recommendation removed')

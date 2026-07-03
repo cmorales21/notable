@@ -38,17 +38,24 @@ function externalLinkLabel(url: string): string {
 
 const fetchRec = cache(async (id: string) => {
   const db = createAdminClient() ?? await createClient()
-  const { data: rec } = await db
+  const { data: rec, error: recErr } = await db
     .from('recommendations')
     .select('id, user_id, category, title, description, image_url, external_url, created_at')
     .eq('id', id)
     .maybeSingle()
+  if (recErr) {
+    // 22P02 = malformed UUID in the URL — treat as not-found, not a server error
+    if (recErr.code === '22P02') return null
+    throw new Error(`Failed to load recommendation: ${recErr.message}`)
+  }
   if (!rec) return null
-  const { data: profile } = await db
+  const { data: profile, error: profErr } = await db
     .from('profiles')
     .select('name, handle, avatar_url, profile_private')
     .eq('id', rec.user_id)
     .maybeSingle()
+  // The profile gates privacy below — failing open would leak private recs
+  if (profErr) throw new Error(`Failed to load recommender profile: ${profErr.message}`)
   return { ...rec, profiles: profile }
 })
 

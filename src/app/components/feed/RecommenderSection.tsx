@@ -4,6 +4,7 @@ import { useRef, useState, useCallback } from 'react'
 import { useToast } from '@/app/components/Toast'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { checkedWrite } from '@/lib/writes'
 import { toggleEngagement } from '@/lib/engagement'
 import { RichMediaEmbed, willEmbed } from '@/app/components/RichMediaEmbed'
 import type { RecComment, RecProfile } from '@/app/lib/types'
@@ -73,7 +74,14 @@ export function RecommenderSection({
   const saveDescEdit = useCallback(async () => {
     if (!editDescInput.trim()) return
     setSubmittingEdit(true)
-    await supabaseRef.current.from('recommendations').update({ description: editDescInput.trim() }).eq('id', recommender.recommendation_id)
+    const ok = await checkedWrite(
+      supabaseRef.current.from('recommendations').update({ description: editDescInput.trim() }).eq('id', recommender.recommendation_id)
+    )
+    if (!ok) {
+      setSubmittingEdit(false)
+      toast('Couldn’t save your changes. Please try again.')
+      return
+    }
     setLocalDescription(editDescInput.trim())
     onRecUpdated?.(recommender.recommendation_id, editDescInput.trim())
     setEditingDesc(false)
@@ -149,11 +157,18 @@ export function RecommenderSection({
       ...prev,
       [commentId]: { count: cur.count + (cur.likedByMe ? -1 : 1), likedByMe: !cur.likedByMe },
     }))
+    const revert = () => setCommentLikesMap(prev => ({ ...prev, [commentId]: cur }))
     if (cur.likedByMe) {
-      await supabaseRef.current.from('comment_likes').delete()
-        .eq('user_id', currentUserId).eq('comment_id', commentId)
+      await checkedWrite(
+        supabaseRef.current.from('comment_likes').delete()
+          .eq('user_id', currentUserId).eq('comment_id', commentId),
+        revert
+      )
     } else {
-      await supabaseRef.current.from('comment_likes').insert({ user_id: currentUserId, comment_id: commentId })
+      await checkedWrite(
+        supabaseRef.current.from('comment_likes').insert({ user_id: currentUserId, comment_id: commentId }),
+        revert
+      )
     }
   }
 
@@ -161,7 +176,17 @@ export function RecommenderSection({
     if (!currentUserId || currentUserId !== commentUserId) return
     setOpenMenuCommentId(null)
     setDeletedCommentIds(prev => new Set([...prev, commentId]))
-    await supabaseRef.current.from('comments').delete().eq('id', commentId).eq('user_id', commentUserId)
+    const ok = await checkedWrite(
+      supabaseRef.current.from('comments').delete().eq('id', commentId).eq('user_id', commentUserId)
+    )
+    if (!ok) {
+      setDeletedCommentIds(prev => {
+        const next = new Set(prev)
+        next.delete(commentId)
+        return next
+      })
+      toast('Couldn’t remove the comment. Please try again.')
+    }
   }
 
   async function reportComment(commentId: string) {
@@ -181,8 +206,11 @@ export function RecommenderSection({
       .insert({ user_id: currentUserId, recommendation_id: recId, text })
       .select('*')
       .single()
-    if (error && process.env.NODE_ENV !== 'production') console.error('[Notable] comment insert error:', error.message)
-    if (!error && inserted) {
+    if (error || !inserted) {
+      if (process.env.NODE_ENV !== 'production') console.error('[Notable] comment insert error:', error?.message)
+      setCommentInput(text)
+      toast('Couldn’t post your comment. Please try again.')
+    } else {
       const newComment: Comment = { ...inserted, profiles: currentUserProfile, comment_likes: [] }
       setComments(prev => sortComments([...prev, newComment]))
       setCommentCount(c => c + 1)

@@ -2,6 +2,7 @@
 
 import React from 'react'
 import * as Sentry from '@sentry/nextjs'
+import { theme } from '@/app/lib/theme'
 
 interface Props {
   children: React.ReactNode
@@ -35,8 +36,8 @@ export default class ErrorBoundary extends React.Component<Props, State> {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: '#f5f0e8',
-            color: '#33261a',
+            background: theme.colors.bg,
+            color: theme.colors.textPrimary,
             fontFamily: 'var(--font-body, "DM Sans", sans-serif)',
             padding: '2rem',
             textAlign: 'center',
@@ -57,7 +58,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
             <p
               style={{
                 fontSize: '0.95rem',
-                color: '#6b5d4f',
+                color: theme.colors.textMuted,
                 lineHeight: 1.6,
                 marginBottom: '2rem',
               }}
@@ -67,16 +68,15 @@ export default class ErrorBoundary extends React.Component<Props, State> {
             <button
               onClick={this.reset}
               style={{
-                background: 'var(--color-books)',
-                color: '#f5f0e8',
+                background: theme.colors.textPrimary,
+                color: theme.colors.surface,
                 border: 'none',
-                borderRadius: '12px',
+                borderRadius: '20px',
                 padding: '0.75rem 1.75rem',
                 fontSize: '0.95rem',
                 fontWeight: 600,
                 fontFamily: 'inherit',
                 cursor: 'pointer',
-                boxShadow: '0 0 24px rgba(82,113,255,0.3)',
               }}
             >
               Try again

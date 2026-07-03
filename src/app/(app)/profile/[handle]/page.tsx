@@ -6,6 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { toggleEngagement } from '@/lib/engagement'
+import { checkedWrite } from '@/lib/writes'
 import { RecModal, Recommendation, RecComment, RecProfile, sortComments } from '@/app/components/CategoryFeed'
 import EmptyState from '@/app/components/EmptyState'
 import { ReportModal } from '@/app/components/feed/ReportModal'
@@ -86,6 +87,7 @@ export default function ProfilePage() {
 
   const [recs, setRecs] = useState<Recommendation[]>([])
   const [recsLoading, setRecsLoading] = useState(true)
+  const [recsError, setRecsError] = useState(false)
 
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
@@ -95,6 +97,7 @@ export default function ProfilePage() {
 
   const [collections, setCollections] = useState<Collection[]>([])
   const [collectionsLoading, setCollectionsLoading] = useState(false)
+  const [collectionsError, setCollectionsError] = useState(false)
   const [newCollectionOpen, setNewCollectionOpen] = useState(false)
 
   const [userCollections, setUserCollections] = useState<Collection[]>([])
@@ -178,32 +181,45 @@ export default function ProfilePage() {
   const loadRecs = useCallback(async (tab: TabId, profileId: string) => {
     setRecsLoading(true)
     setRecs([])
+    setRecsError(false)
     try {
       let recRows: Recommendation[] = []
+      let failed = false
 
       if (tab === 'posted') {
-        const { data } = await supabase.current
+        const { data, error } = await supabase.current
           .from('recommendations').select('*')
           .eq('user_id', profileId).order('created_at', { ascending: false })
+        if (error) failed = true
         recRows = data ?? []
       } else if (tab === 'liked') {
-        const { data: likeData } = await supabase.current
+        const { data: likeData, error: likeErr } = await supabase.current
           .from('likes').select('recommendation_id').eq('user_id', profileId)
+        if (likeErr) failed = true
         const ids = (likeData ?? []).map((l: { recommendation_id: string }) => l.recommendation_id)
         if (ids.length > 0) {
-          const { data } = await supabase.current
+          const { data, error } = await supabase.current
             .from('recommendations').select('*').in('id', ids).order('created_at', { ascending: false })
+          if (error) failed = true
           recRows = data ?? []
         }
       } else if (tab === 'bookmarked') {
-        const { data: bmData } = await supabase.current
+        const { data: bmData, error: bmErr } = await supabase.current
           .from('bookmarks').select('recommendation_id').eq('user_id', profileId)
+        if (bmErr) failed = true
         const ids = (bmData ?? []).map((b: { recommendation_id: string }) => b.recommendation_id)
         if (ids.length > 0) {
-          const { data } = await supabase.current
+          const { data, error } = await supabase.current
             .from('recommendations').select('*').in('id', ids).order('created_at', { ascending: false })
+          if (error) failed = true
           recRows = data ?? []
         }
+      }
+
+      if (failed) {
+        setRecsError(true)
+        setRecs([])
+        return
       }
 
       if (recRows.length > 0) {
@@ -239,13 +255,19 @@ export default function ProfilePage() {
   const loadCollections = useCallback(async (profileId: string) => {
     setCollectionsLoading(true)
     setCollections([])
+    setCollectionsError(false)
     try {
-      const { data } = await supabase.current
+      const { data, error } = await supabase.current
         .from('collections')
         .select('*, collection_items(recommendation_id, recommendations(image_url))')
         .eq('user_id', profileId)
         .order('position', { ascending: true })
         .order('created_at', { ascending: false })
+      if (error) {
+        if (process.env.NODE_ENV !== 'production') console.error('[Notable] collections load failed:', error.message)
+        setCollectionsError(true)
+        return
+      }
       setCollections((data ?? []) as unknown as Collection[])
     } finally {
       setCollectionsLoading(false)
@@ -395,25 +417,51 @@ export default function ProfilePage() {
     if (!currentUserId || !profile || followLoading) return
     setFollowLoading(true)
     if (isFollowing) {
-      await supabase.current.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', profile.id)
-      setIsFollowing(false)
-      setFollowerCount(c => c - 1)
-      toast('Unfollowed')
+      const ok = await checkedWrite(
+        supabase.current.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', profile.id)
+      )
+      if (ok) {
+        setIsFollowing(false)
+        setFollowerCount(c => c - 1)
+        toast('Unfollowed')
+      } else {
+        toast('Couldn’t unfollow. Please try again.')
+      }
     } else if (isPendingFollow) {
-      await supabase.current.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', profile.id)
-      await supabase.current.from('notifications').delete()
-        .eq('user_id', profile.id).eq('actor_id', currentUserId).eq('type', 'follow_request')
-      setIsPendingFollow(false)
-      toast('Follow request canceled')
+      const ok = await checkedWrite(
+        supabase.current.from('follows').delete().eq('follower_id', currentUserId).eq('following_id', profile.id)
+      )
+      if (ok) {
+        await checkedWrite(
+          supabase.current.from('notifications').delete()
+            .eq('user_id', profile.id).eq('actor_id', currentUserId).eq('type', 'follow_request')
+        )
+        setIsPendingFollow(false)
+        toast('Follow request canceled')
+      } else {
+        toast('Couldn’t cancel the request. Please try again.')
+      }
     } else if (profile.profile_private) {
-      await supabase.current.from('follows').insert({ follower_id: currentUserId, following_id: profile.id, status: 'pending' })
-      setIsPendingFollow(true)
-      toast('Follow request sent')
+      const ok = await checkedWrite(
+        supabase.current.from('follows').insert({ follower_id: currentUserId, following_id: profile.id, status: 'pending' })
+      )
+      if (ok) {
+        setIsPendingFollow(true)
+        toast('Follow request sent')
+      } else {
+        toast('Couldn’t send the request. Please try again.')
+      }
     } else {
-      await supabase.current.from('follows').insert({ follower_id: currentUserId, following_id: profile.id })
-      setIsFollowing(true)
-      setFollowerCount(c => c + 1)
-      toast(`Following ${profile.name ?? profile.handle ?? 'them'}`)
+      const ok = await checkedWrite(
+        supabase.current.from('follows').insert({ follower_id: currentUserId, following_id: profile.id })
+      )
+      if (ok) {
+        setIsFollowing(true)
+        setFollowerCount(c => c + 1)
+        toast(`Following ${profile.name ?? profile.handle ?? 'them'}`)
+      } else {
+        toast('Couldn’t follow. Please try again.')
+      }
     }
     setFollowLoading(false)
   }
@@ -475,12 +523,14 @@ export default function ProfilePage() {
       const { error: upErr } = await supabase.current.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type })
       if (upErr) throw upErr
       const { data: { publicUrl } } = supabase.current.storage.from('avatars').getPublicUrl(path)
-      await supabase.current.from('profiles').update({ avatar_url: publicUrl }).eq('id', currentUserId)
+      const { error: updErr } = await supabase.current.from('profiles').update({ avatar_url: publicUrl }).eq('id', currentUserId)
+      if (updErr) throw updErr
       setProfile(prev => prev ? { ...prev, avatar_url: publicUrl } : prev)
       window.dispatchEvent(new CustomEvent('notable:avatar-updated', { detail: { url: publicUrl } }))
       toast('Photo updated')
     } catch (err) {
       if (process.env.NODE_ENV !== 'production') console.error('Avatar upload failed:', err)
+      toast('Couldn’t update your photo. Please try again.')
     } finally {
       setAvatarUploading(false)
     }
@@ -1086,6 +1136,26 @@ export default function ProfilePage() {
                       <div key={i} className="skeleton-pulse" style={{ aspectRatio: '3/4', borderRadius: '10px', background: '#efe9e0' }} />
                     ))}
                   </div>
+                ) : collectionsError ? (
+                  <div style={{ textAlign: 'center', paddingTop: '48px' }}>
+                    <p className="font-display" style={{ fontSize: '1.05rem', fontWeight: 600, color: '#33261a', marginBottom: '6px' }}>
+                      Something went wrong
+                    </p>
+                    <p className="font-body" style={{ color: '#6b5d4f', fontSize: '14px', marginBottom: '18px' }}>
+                      Couldn&rsquo;t load these collections.
+                    </p>
+                    <button
+                      onClick={() => loadCollections(profile.id)}
+                      className="font-body"
+                      style={{
+                        background: '#33261a', color: '#faf8f4', border: 'none',
+                        borderRadius: '20px', padding: '8px 20px',
+                        fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                      }}
+                    >
+                      Try again
+                    </button>
+                  </div>
                 ) : (() => {
                   const filteredCollections = collectionsFilter === 'all'
                     ? collections
@@ -1149,6 +1219,26 @@ export default function ProfilePage() {
               </>
             ) : recsLoading ? (
               <ProfileGridSkeleton />
+            ) : recsError ? (
+              <div style={{ textAlign: 'center', paddingTop: '48px' }}>
+                <p className="font-display" style={{ fontSize: '1.05rem', fontWeight: 600, color: '#33261a', marginBottom: '6px' }}>
+                  Something went wrong
+                </p>
+                <p className="font-body" style={{ color: '#6b5d4f', fontSize: '14px', marginBottom: '18px' }}>
+                  Couldn&rsquo;t load these recommendations.
+                </p>
+                <button
+                  onClick={() => loadRecs(activeTab, profile.id)}
+                  className="font-body"
+                  style={{
+                    background: '#33261a', color: '#faf8f4', border: 'none',
+                    borderRadius: '20px', padding: '8px 20px',
+                    fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  Try again
+                </button>
+              </div>
             ) : filteredRecs.length === 0 ? (
               activeTab === 'posted' ? (
                 isOwnProfile ? (
@@ -1352,13 +1442,35 @@ export default function ProfilePage() {
               return n
             })
             // Write to DB: add item + set as cover
-            await supabase.current.from('collection_items').insert({ collection_id: col.id, recommendation_id: rec.id })
-            await supabase.current.from('collections').update({
-              cover_recommendation_id: rec.id, updated_at: new Date().toISOString(),
-            }).eq('id', col.id)
+            const itemOk = await checkedWrite(
+              supabase.current.from('collection_items').insert({ collection_id: col.id, recommendation_id: rec.id })
+            )
+            if (!itemOk) {
+              setCollectionMembership(prev => {
+                const n = new Map(prev)
+                const s = new Set(n.get(rec.id) ?? [])
+                s.delete(col.id)
+                n.set(rec.id, s)
+                return n
+              })
+              toast('Created the collection, but couldn’t add this item. Please try again.')
+              setMenuNewCollectionOpen(false)
+              return
+            }
+            const coverOk = await checkedWrite(
+              supabase.current.from('collections').update({
+                cover_recommendation_id: rec.id, updated_at: new Date().toISOString(),
+              }).eq('id', col.id)
+            )
             // Reflect cover and count in local state
             setUserCollections(prev => prev.map(c =>
-              c.id === col.id ? { ...c, cover_recommendation_id: rec.id, collection_items: [{ recommendation_id: rec.id, recommendations: { image_url: rec.image_url ?? null } }] } : c
+              c.id === col.id
+                ? {
+                    ...c,
+                    ...(coverOk ? { cover_recommendation_id: rec.id } : {}),
+                    collection_items: [{ recommendation_id: rec.id, recommendations: { image_url: rec.image_url ?? null } }],
+                  }
+                : c
             ))
             setMenuNewCollectionOpen(false)
           }}

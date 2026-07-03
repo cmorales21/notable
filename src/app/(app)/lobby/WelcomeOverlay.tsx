@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { checkedWrite } from '@/lib/writes'
 
 interface Props {
   userId: string
@@ -99,10 +100,12 @@ export default function WelcomeOverlay({ userId, hasHandle }: Props) {
       const hintsSeen: string[] = profile?.hints_seen ?? []
       const nextHints = hintsSeen.includes('welcome') ? hintsSeen : [...hintsSeen, 'welcome']
 
-      await supabase
-        .from('profiles')
-        .update({ is_onboarded: true, hints_seen: nextHints })
-        .eq('id', userId)
+      await checkedWrite(
+        supabase
+          .from('profiles')
+          .update({ is_onboarded: true, hints_seen: nextHints })
+          .eq('id', userId)
+      )
 
       router.refresh()
       setGone(true)

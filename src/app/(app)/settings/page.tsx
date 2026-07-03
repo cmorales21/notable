@@ -106,7 +106,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
+      if (!user) { router.push('/login'); return }
       setUserId(user.id)
       supabase
         .from('profiles')
@@ -121,7 +121,7 @@ export default function SettingsPage() {
           setLoading(false)
         })
     })
-  }, [])
+  }, [router])
 
   const saveField = async (patch: Record<string, boolean>, revert: () => void) => {
     if (!userId) return

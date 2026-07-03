@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toggleEngagement } from '@/lib/engagement'
+import { checkedWrite } from '@/lib/writes'
 import { groupRecommendations, normalizeTitle, type GroupedRecommendation } from '@/lib/groupRecommendations'
 import { CATEGORY_CONFIG, type Category } from './feed/categoryConfig'
 import { EmptyStateIcon } from './feed/helpers'
@@ -357,7 +358,13 @@ export default function CategoryFeed({ category }: { category: string }) {
     if (!currentUserId) return
     setIgnoredUserIds(prev => new Set([...prev, targetUserId]))
     toast(`${targetUserName} hidden from your feed`)
-    await supabase.from('user_ignores').insert({ user_id: currentUserId, ignored_user_id: targetUserId })
+    const ok = await checkedWrite(
+      supabase.from('user_ignores').insert({ user_id: currentUserId, ignored_user_id: targetUserId })
+    )
+    if (!ok) {
+      setIgnoredUserIds(prev => { const n = new Set(prev); n.delete(targetUserId); return n })
+      toast(`Couldn’t hide ${targetUserName}. Please try again.`)
+    }
   }
 
   useEffect(() => {

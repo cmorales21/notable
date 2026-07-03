@@ -51,6 +51,7 @@ function SingleRecDetailModal({
   const [loadingComments, setLoadingComments] = useState(true)
   const [commentInput, setCommentInput] = useState('')
   const [submittingComment, setSubmittingComment] = useState(false)
+  const toast = useToast()
 
   useEffect(() => {
     fetchComments(supabaseRef.current, recommender.recommendation_id).then(sorted => {
@@ -103,8 +104,11 @@ function SingleRecDetailModal({
       .insert({ user_id: currentUserId, recommendation_id: recommender.recommendation_id, text })
       .select('*')
       .single()
-    if (error && process.env.NODE_ENV !== 'production') console.error('[Notable] comment insert error:', error.message)
-    if (!error && inserted) {
+    if (error || !inserted) {
+      if (process.env.NODE_ENV !== 'production') console.error('[Notable] comment insert error:', error?.message)
+      setCommentInput(text)
+      toast('Couldn’t post your comment. Please try again.')
+    } else {
       const newComment: Comment = { ...inserted, profiles: currentUserProfile, comment_likes: [] }
       setComments(prev => sortComments([...prev, newComment]))
       setCommentCount(c => c + 1)
@@ -297,8 +301,11 @@ export function GroupedModal({
       .insert({ user_id: currentUserId, recommendation_id: leadRec.recommendation_id, text })
       .select('*')
       .single()
-    if (error && process.env.NODE_ENV !== 'production') console.error('[Notable] comment insert error:', error.message)
-    if (!error && inserted) {
+    if (error || !inserted) {
+      if (process.env.NODE_ENV !== 'production') console.error('[Notable] comment insert error:', error?.message)
+      setCommentInput(text)
+      toast('Couldn’t post your comment. Please try again.')
+    } else {
       const newComment: Comment = { ...inserted, profiles: currentUserProfile, comment_likes: [] }
       setComments(prev => sortComments([...prev, newComment]))
       setCommentCount(c => c + 1)

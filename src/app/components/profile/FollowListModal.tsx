@@ -3,8 +3,10 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { checkedWrite } from '@/lib/writes'
 import { Avatar } from '@/app/components/Avatar'
 import { FollowRowButton } from './FollowRowButton'
+import { useToast } from '@/app/components/Toast'
 
 interface FollowUser {
   id: string
@@ -23,6 +25,7 @@ export function FollowListModal({
   onClose: () => void
 }) {
   const supabase = useRef(createClient())
+  const toast = useToast()
   const [users, setUsers] = useState<FollowUser[]>([])
   const [loading, setLoading] = useState(true)
   const [followedIds, setFollowedIds] = useState<Set<string>>(new Set())
@@ -64,19 +67,31 @@ export function FollowListModal({
     if (!currentUserId || pending.has(targetId)) return
     setPending(prev => new Set([...prev, targetId]))
     if (followedIds.has(targetId)) {
-      await supabase.current.from('follows').delete()
-        .eq('follower_id', currentUserId).eq('following_id', targetId)
-      setFollowedIds(prev => { const n = new Set(prev); n.delete(targetId); return n })
+      const ok = await checkedWrite(
+        supabase.current.from('follows').delete()
+          .eq('follower_id', currentUserId).eq('following_id', targetId)
+      )
+      if (ok) {
+        setFollowedIds(prev => { const n = new Set(prev); n.delete(targetId); return n })
+      } else {
+        toast('Couldn’t unfollow. Please try again.')
+      }
     } else {
       const targetUser = users.find(u => u.id === targetId)
       const isPrivate = targetUser?.profile_private === true
-      await supabase.current.from('follows').insert({
-        follower_id: currentUserId,
-        following_id: targetId,
-        ...(isPrivate ? { status: 'pending' } : {}),
-      })
-      if (!isPrivate) {
-        setFollowedIds(prev => new Set([...prev, targetId]))
+      const ok = await checkedWrite(
+        supabase.current.from('follows').insert({
+          follower_id: currentUserId,
+          following_id: targetId,
+          ...(isPrivate ? { status: 'pending' } : {}),
+        })
+      )
+      if (ok) {
+        if (!isPrivate) {
+          setFollowedIds(prev => new Set([...prev, targetId]))
+        }
+      } else {
+        toast('Couldn’t follow. Please try again.')
       }
     }
     setPending(prev => { const n = new Set(prev); n.delete(targetId); return n })

@@ -5,9 +5,11 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { RecommendationImage } from '@/app/components/RecommendationImage'
 import { createClient } from '@/lib/supabase/client'
+import { checkedWrite } from '@/lib/writes'
 import { useSearch } from '@/app/hooks/useSearch'
 import { Avatar } from '@/app/components/Avatar'
 import { SearchSkeleton } from '@/app/components/skeletons'
+import { useToast } from '@/app/components/Toast'
 import type { SearchPerson } from '@/app/hooks/useSearch'
 import type { SearchGroupedRec } from '@/lib/groupRecommendations'
 import { CATEGORY_COLORS, CATEGORY_LABELS, CATEGORY_ORDER, type Category } from '@/app/lib/theme'
@@ -94,7 +96,8 @@ function SearchPageContent() {
     ? filter
     : filter
 
-  const { groupedRecs, people, loading, setQuery } = useSearch({
+  const toast = useToast()
+  const { groupedRecs, people, loading, error: searchError, setQuery } = useSearch({
     recLimit: 30,
     peopleLimit: 10,
     category: hookCategory,
@@ -155,23 +158,49 @@ function SearchPageContent() {
     setPendingIds(prev => new Set([...prev, targetId]))
 
     if (followedIds.has(targetId)) {
-      await supabase.current.from('follows').delete()
-        .eq('follower_id', currentUserId).eq('following_id', targetId)
-      setFollowedIds(prev => { const n = new Set(prev); n.delete(targetId); return n })
+      const ok = await checkedWrite(
+        supabase.current.from('follows').delete()
+          .eq('follower_id', currentUserId).eq('following_id', targetId)
+      )
+      if (ok) {
+        setFollowedIds(prev => { const n = new Set(prev); n.delete(targetId); return n })
+      } else {
+        toast('Couldn’t unfollow. Please try again.')
+      }
     } else if (requestedIds.has(targetId)) {
-      await supabase.current.from('follows').delete()
-        .eq('follower_id', currentUserId).eq('following_id', targetId)
-      setRequestedIds(prev => { const n = new Set(prev); n.delete(targetId); return n })
-      void supabase.current.from('notifications').delete()
-        .eq('user_id', targetId).eq('actor_id', currentUserId).eq('type', 'follow_request')
+      const ok = await checkedWrite(
+        supabase.current.from('follows').delete()
+          .eq('follower_id', currentUserId).eq('following_id', targetId)
+      )
+      if (ok) {
+        setRequestedIds(prev => { const n = new Set(prev); n.delete(targetId); return n })
+        void checkedWrite(
+          supabase.current.from('notifications').delete()
+            .eq('user_id', targetId).eq('actor_id', currentUserId).eq('type', 'follow_request')
+        )
+      } else {
+        toast('Couldn’t cancel the request. Please try again.')
+      }
     } else {
       const targetPerson = people.find(p => p.id === targetId)
       if (targetPerson?.profile_private) {
-        await supabase.current.from('follows').insert({ follower_id: currentUserId, following_id: targetId, status: 'pending' })
-        setRequestedIds(prev => new Set([...prev, targetId]))
+        const ok = await checkedWrite(
+          supabase.current.from('follows').insert({ follower_id: currentUserId, following_id: targetId, status: 'pending' })
+        )
+        if (ok) {
+          setRequestedIds(prev => new Set([...prev, targetId]))
+        } else {
+          toast('Couldn’t send the request. Please try again.')
+        }
       } else {
-        await supabase.current.from('follows').insert({ follower_id: currentUserId, following_id: targetId })
-        setFollowedIds(prev => new Set([...prev, targetId]))
+        const ok = await checkedWrite(
+          supabase.current.from('follows').insert({ follower_id: currentUserId, following_id: targetId })
+        )
+        if (ok) {
+          setFollowedIds(prev => new Set([...prev, targetId]))
+        } else {
+          toast('Couldn’t follow. Please try again.')
+        }
       }
     }
 
@@ -207,7 +236,8 @@ function SearchPageContent() {
 
   const hasQuery = inputValue.trim().length >= 2
   const trimmedQuery = inputValue.trim().startsWith('@') ? inputValue.trim().slice(1) : inputValue.trim()
-  const isEmpty = hasQuery && !loading && groupedRecs.length === 0 && people.length === 0
+  const hasError = hasQuery && !loading && searchError
+  const isEmpty = hasQuery && !loading && !searchError && groupedRecs.length === 0 && people.length === 0
 
   const showPeopleSection = (filter === 'all' || filter === 'people') && people.length > 0
   const showRecsSection = filter !== 'people' && groupedRecs.length > 0
@@ -301,6 +331,18 @@ function SearchPageContent() {
           <div style={{ paddingTop: '48px', textAlign: 'center' }}>
             <p className="font-display" style={{ color: '#4a4438', fontSize: '1.1rem', fontWeight: 600, letterSpacing: '-0.01em' }}>
               Search for recommendations and people
+            </p>
+          </div>
+        )}
+
+        {/* ── Search failed ─────────────────────────────────────────── */}
+        {hasError && (
+          <div style={{ paddingTop: '48px', textAlign: 'center' }}>
+            <p className="font-display" style={{ color: '#33261a', fontSize: '1.15rem', fontWeight: 600, letterSpacing: '-0.01em', marginBottom: '8px' }}>
+              Something went wrong
+            </p>
+            <p className="font-body" style={{ color: '#6b5d4f', fontSize: '14px' }}>
+              We couldn&rsquo;t complete that search. Please try again.
             </p>
           </div>
         )}

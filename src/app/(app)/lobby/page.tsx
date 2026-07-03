@@ -66,13 +66,15 @@ export default async function LobbyPage() {
 
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('handle, is_onboarded')
     .eq('id', user.id)
     .maybeSingle()
 
-  const showWelcome = !profile?.is_onboarded
+  // Don't re-show the welcome overlay to onboarded users just because the
+  // profile read failed.
+  const showWelcome = !profileError && !profile?.is_onboarded
   const hasHandle = !!profile?.handle
 
   return (

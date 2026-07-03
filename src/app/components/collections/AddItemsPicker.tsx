@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { theme } from '@/app/lib/theme'
+import { useToast } from '@/app/components/Toast'
+import { checkedWrite } from '@/lib/writes'
 import { type CollectionData, type CollectionItemRow, CATEGORY_LABELS } from './types'
 import type { Recommendation } from '@/app/lib/types'
 
@@ -35,6 +37,7 @@ export function AddItemsPicker({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [adding, setAdding] = useState(false)
   const [imgErrors, setImgErrors] = useState<Set<string>>(new Set())
+  const toast = useToast()
 
   useEffect(() => {
     setLoading(true)
@@ -78,16 +81,22 @@ export function AddItemsPicker({
     setAdding(true)
     const recIds = [...selectedIds]
     const rows = recIds.map(rid => ({ collection_id: collection.id, recommendation_id: rid }))
-    const { data: inserted } = await supabase
+    const { data: inserted, error: insertErr } = await supabase
       .from('collection_items')
       .upsert(rows, { ignoreDuplicates: true })
       .select('id, recommendation_id, added_at')
+    if (insertErr) {
+      if (process.env.NODE_ENV !== 'production') console.error('[Notable] collection items add error:', insertErr.message)
+      setAdding(false)
+      toast('Couldn’t add these items. Please try again.')
+      return
+    }
 
     // Auto-set cover if collection has no cover
     if (!collection.cover_recommendation_id && recIds.length > 0) {
-      await supabase.from('collections').update({
+      await checkedWrite(supabase.from('collections').update({
         cover_recommendation_id: recIds[0], updated_at: new Date().toISOString(),
-      }).eq('id', collection.id)
+      }).eq('id', collection.id))
     }
 
     // Build CollectionItemRow objects from what we know locally

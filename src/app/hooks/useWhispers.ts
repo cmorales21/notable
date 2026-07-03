@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { checkedWrite } from '@/lib/writes'
 
 export function useWhispers() {
   const supabase = useRef(createClient()).current
@@ -28,12 +29,13 @@ export function useWhispers() {
   const dismiss = useCallback(
     async (whisperId: string) => {
       if (!userId) return
+      const prev = hintsSeen
       const next = [...(hintsSeen ?? []), whisperId]
       setHintsSeen(next)
-      await supabase
-        .from('profiles')
-        .update({ hints_seen: next })
-        .eq('id', userId)
+      await checkedWrite(
+        supabase.from('profiles').update({ hints_seen: next }).eq('id', userId),
+        () => setHintsSeen(prev)
+      )
     },
     [userId, hintsSeen, supabase]
   )

@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { toggleEngagement } from '@/lib/engagement'
+import { checkedWrite } from '@/lib/writes'
 import { Avatar } from '@/app/components/Avatar'
 import { RecModal, sortComments, fetchComments } from '@/app/components/CategoryFeed'
 import { theme, getCategoryColor } from '@/app/lib/theme'
@@ -38,6 +39,7 @@ export default function CollectionPage() {
 
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [loadError, setLoadError] = useState(false)
   const [accessDenied, setAccessDenied] = useState<'private_collection' | 'private_profile' | null>(null)
 
   const [collection, setCollection] = useState<CollectionData | null>(null)
@@ -85,23 +87,37 @@ export default function CollectionPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadError(false)
     try {
       const [{ data: { user } }, { data: colData, error: colErr }] = await Promise.all([
         supabase.current.auth.getUser(),
         supabase.current.from('collections').select('*').eq('id', id).single(),
       ])
 
-      if (colErr || !colData) { setNotFound(true); return }
+      if (colErr) {
+        // PGRST116 = no rows for .single(); 22P02 = malformed UUID in the URL
+        if (colErr.code === 'PGRST116' || colErr.code === '22P02') { setNotFound(true); return }
+        if (process.env.NODE_ENV !== 'production') console.error('[Notable] collection load failed:', colErr.message)
+        setLoadError(true)
+        return
+      }
+      if (!colData) { setNotFound(true); return }
 
       const uid = user?.id ?? null
       setCurrentUserId(uid)
       const isOwner = uid === colData.user_id
       setIsOwnCollection(isOwner)
 
-      const [{ data: ownerData }, { data: myProfile }] = await Promise.all([
+      const [{ data: ownerData, error: ownerErr }, { data: myProfile }] = await Promise.all([
         supabase.current.from('profiles').select('id, name, handle, avatar_url, profile_private').eq('id', colData.user_id).single(),
         uid ? supabase.current.from('profiles').select('name, handle, avatar_url').eq('id', uid).maybeSingle() : Promise.resolve({ data: null }),
       ])
+      // The owner row gates privacy below — failing open would leak private collections
+      if (ownerErr || !ownerData) {
+        if (ownerErr && process.env.NODE_ENV !== 'production') console.error('[Notable] collection owner load failed:', ownerErr.message)
+        setLoadError(true)
+        return
+      }
       setOwner(ownerData)
       setCurrentUserProfile(myProfile)
 
@@ -149,7 +165,11 @@ export default function CollectionPage() {
       setCollectionBookmarked(!!myBmRes.data)
 
       const { data: itemsData, error: itemsErr } = itemsResult
-      if (itemsErr) console.error('[collection_items]', itemsErr)
+      if (itemsErr) {
+        if (process.env.NODE_ENV !== 'production') console.error('[collection_items]', itemsErr)
+        setLoadError(true)
+        return
+      }
 
       const validRows = (itemsData ?? []).filter(
         (row: Record<string, unknown>) => row.recommendations != null
@@ -292,7 +312,14 @@ export default function CollectionPage() {
   async function handleDeleteCollection() {
     if (!currentUserId || !isOwnCollection) return
     setDeleting(true)
-    await supabase.current.from('collections').delete().eq('id', id).eq('user_id', currentUserId)
+    const ok = await checkedWrite(
+      supabase.current.from('collections').delete().eq('id', id).eq('user_id', currentUserId)
+    )
+    if (!ok) {
+      setDeleting(false)
+      toast('Couldn’t delete the collection. Please try again.')
+      return
+    }
     toast('Collection deleted')
     router.back()
   }
@@ -364,7 +391,11 @@ export default function CollectionPage() {
       .from('comments')
       .insert({ user_id: currentUserId, recommendation_id: selectedRec.id, text })
       .select('*').single()
-    if (!error && inserted) {
+    if (error || !inserted) {
+      if (error && process.env.NODE_ENV !== 'production') console.error('[Notable] comment insert failed:', error.message)
+      setModalCommentInput(text)
+      toast('Couldn’t post your comment. Please try again.')
+    } else {
       const newComment: RecComment = { ...inserted, profiles: currentUserProfile, comment_likes: [] }
       setModalComments(prev => sortComments([...prev, newComment]))
       setModalCommentCount(c => c + 1)
@@ -447,7 +478,25 @@ export default function CollectionPage() {
     )
   }
 
-  if (!collection || !owner) return null
+  if (loadError || !collection || !owner) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '12px' }}>
+        <p className="font-display" style={{ fontSize: '1.4rem', fontWeight: 600, color: theme.colors.textPrimary }}>Something went wrong</p>
+        <p className="font-body" style={{ color: theme.colors.textMuted, fontSize: '14px' }}>Couldn&rsquo;t load this collection.</p>
+        <button
+          onClick={load}
+          className="font-body"
+          style={{
+            marginTop: '8px', background: theme.colors.textPrimary, border: 'none',
+            borderRadius: '20px', padding: '8px 20px',
+            color: theme.colors.surface, fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+          }}
+        >
+          Try again
+        </button>
+      </div>
+    )
+  }
 
   // ── Render ──────────────────────────────────────────────────────────────────
 

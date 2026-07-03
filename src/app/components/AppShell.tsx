@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { checkedWrite } from '@/lib/writes'
 import { useToast } from '@/app/components/Toast'
 import { CATEGORY_COLORS, CATEGORY_LABELS } from '@/app/lib/theme'
 import {
@@ -206,7 +207,11 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
   async function markRead(ids: string[]) {
     setPreviewNotifs(prev => prev.map(n => ids.some(id => n.ids.includes(id)) ? { ...n, read: true } : n))
     const supabase = supabaseRef.current
-    await supabase.from('notifications').update({ read: true }).in('id', ids)
+    const ok = await checkedWrite(
+      supabase.from('notifications').update({ read: true }).in('id', ids),
+      () => setPreviewNotifs(prev => prev.map(n => ids.some(id => n.ids.includes(id)) ? { ...n, read: false } : n))
+    )
+    if (!ok) return
     const { data } = await supabase
       .from('notifications')
       .select('id')
@@ -223,9 +228,15 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
   async function acceptFollowRequest(notif: GroupedNotif) {
     if (!notif.actor_id) return
     const supabase = supabaseRef.current
-    await supabase.from('follows').update({ status: 'accepted' })
-      .eq('follower_id', notif.actor_id).eq('following_id', userId)
-    await supabase.from('notifications').delete().in('id', notif.ids)
+    const ok = await checkedWrite(
+      supabase.from('follows').update({ status: 'accepted' })
+        .eq('follower_id', notif.actor_id).eq('following_id', userId)
+    )
+    if (!ok) {
+      toast('Couldn’t accept the request. Please try again.')
+      return
+    }
+    await checkedWrite(supabase.from('notifications').delete().in('id', notif.ids))
     setPreviewNotifs(prev => prev.filter(n => n.key !== notif.key))
     const { data } = await supabase.from('notifications').select('id').eq('user_id', userId).eq('read', false).limit(1)
     if (!data || data.length === 0) setHasUnread(false)
@@ -236,9 +247,15 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
   async function declineFollowRequest(notif: GroupedNotif) {
     if (!notif.actor_id) return
     const supabase = supabaseRef.current
-    await supabase.from('follows').delete()
-      .eq('follower_id', notif.actor_id).eq('following_id', userId)
-    await supabase.from('notifications').delete().in('id', notif.ids)
+    const ok = await checkedWrite(
+      supabase.from('follows').delete()
+        .eq('follower_id', notif.actor_id).eq('following_id', userId)
+    )
+    if (!ok) {
+      toast('Couldn’t decline the request. Please try again.')
+      return
+    }
+    await checkedWrite(supabase.from('notifications').delete().in('id', notif.ids))
     setPreviewNotifs(prev => prev.filter(n => n.key !== notif.key))
     window.dispatchEvent(new Event('follow-request-updated'))
     toast('Request declined')
