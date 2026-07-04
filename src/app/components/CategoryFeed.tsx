@@ -63,6 +63,7 @@ export default function CategoryFeed({ category }: { category: string }) {
   const [selectedGroup, setSelectedGroup] = useState<GroupedRecommendation | null>(null)
   const [focusOnOpen, setFocusOnOpen] = useState(false)
   const autoOpenedRef = useRef(false)
+  const loadMoreControllerRef = useRef<AbortController | null>(null)
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -180,11 +181,19 @@ export default function CategoryFeed({ category }: { category: string }) {
   useEffect(() => {
     const controller = new AbortController()
     fetchFeed(controller.signal)
-    return () => { controller.abort() }
+    return () => {
+      controller.abort()
+      loadMoreControllerRef.current?.abort()
+    }
   }, [fetchFeed])
 
   const loadMore = useCallback(async () => {
     if (!hasMore || loadingMore) return
+    loadMoreControllerRef.current?.abort()
+    const controller = new AbortController()
+    loadMoreControllerRef.current = controller
+    const signal = controller.signal
+
     setLoadingMore(true)
     try {
       const uid = currentUserId
@@ -192,7 +201,8 @@ export default function CategoryFeed({ category }: { category: string }) {
       if (activeTab === 'following') {
         if (!uid) return
         const { data: followData } = await supabase
-          .from('follows').select('following_id').eq('follower_id', uid).eq('status', 'accepted')
+          .from('follows').select('following_id').eq('follower_id', uid).eq('status', 'accepted').abortSignal(signal)
+        if (signal.aborted) return
         followedUserIds = (followData ?? []).map((f: { following_id: string }) => f.following_id)
         if (followedUserIds.length === 0) return
       }
@@ -201,20 +211,23 @@ export default function CategoryFeed({ category }: { category: string }) {
       let recsRaw: Recommendation[] | null = null
       if (activeTab === 'discovery') {
         const { data: rpcData, error: rpcError } = await supabase
-          .rpc('get_discovery_feed', { p_category: cat, p_user_id: uid ?? null, p_limit: 30, p_offset: offset })
+          .rpc('get_discovery_feed', { p_category: cat, p_user_id: uid ?? null, p_limit: 30, p_offset: offset }).abortSignal(signal)
+        if (signal.aborted) return
         if (!rpcError) {
           recsRaw = rpcData
         } else {
           const { data } = await supabase
             .from('recommendations').select('*').eq('category', cat)
-            .order('created_at', { ascending: false }).range(offset, offset + 29)
+            .order('created_at', { ascending: false }).range(offset, offset + 29).abortSignal(signal)
+          if (signal.aborted) return
           recsRaw = data
         }
       } else {
         const { data } = await supabase
           .from('recommendations').select('*').eq('category', cat)
           .in('user_id', followedUserIds!)
-          .order('created_at', { ascending: false }).range(offset, offset + 29)
+          .order('created_at', { ascending: false }).range(offset, offset + 29).abortSignal(signal)
+        if (signal.aborted) return
         recsRaw = data
       }
 
@@ -225,7 +238,8 @@ export default function CategoryFeed({ category }: { category: string }) {
       const profileMap: Record<string, Profile> = {}
       const userIds = [...new Set(newBaseRecs.map((r: { user_id: string }) => r.user_id))]
       const { data: profilesData } = await supabase
-        .from('profiles').select('id, name, handle, avatar_url').in('id', userIds)
+        .from('profiles').select('id, name, handle, avatar_url').in('id', userIds).abortSignal(signal)
+      if (signal.aborted) return
       for (const p of profilesData ?? []) {
         profileMap[p.id] = { name: p.name, handle: p.handle, avatar_url: p.avatar_url }
       }
@@ -235,10 +249,11 @@ export default function CategoryFeed({ category }: { category: string }) {
       }))
       const ids = newRecs.map((r) => r.id)
       const [{ data: countRows }, { data: myLikes }, { data: myBookmarks }] = await Promise.all([
-        supabase.from('recommendations').select('id, likes(count), comments(count), bookmarks(count)').in('id', ids),
-        uid ? supabase.from('likes').select('recommendation_id').eq('user_id', uid).in('recommendation_id', ids) : Promise.resolve({ data: [] }),
-        uid ? supabase.from('bookmarks').select('recommendation_id').eq('user_id', uid).in('recommendation_id', ids) : Promise.resolve({ data: [] }),
+        supabase.from('recommendations').select('id, likes(count), comments(count), bookmarks(count)').in('id', ids).abortSignal(signal),
+        uid ? supabase.from('likes').select('recommendation_id').eq('user_id', uid).in('recommendation_id', ids).abortSignal(signal) : Promise.resolve({ data: [] }),
+        uid ? supabase.from('bookmarks').select('recommendation_id').eq('user_id', uid).in('recommendation_id', ids).abortSignal(signal) : Promise.resolve({ data: [] }),
       ])
+      if (signal.aborted) return
 
       const lc: Record<string, number> = {}
       const cc: Record<string, number> = {}
@@ -264,8 +279,11 @@ export default function CategoryFeed({ category }: { category: string }) {
         for (const b of (myBookmarks ?? []) as { recommendation_id: string }[]) next.add(b.recommendation_id)
         return next
       })
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
+      throw err
     } finally {
-      setLoadingMore(false)
+      if (!signal.aborted) setLoadingMore(false)
     }
   }, [recs.length, hasMore, loadingMore, cat, supabase, activeTab, currentUserId])
 
@@ -549,6 +567,18 @@ export default function CategoryFeed({ category }: { category: string }) {
                 borderRadius: '50%',
               }}
             />
+          </div>
+        )}
+
+        {/* End-of-feed note — quiet close, no doom-scrolling */}
+        {!loading && !loadingMore && !hasMore && visibleGroups.length > 0 && (
+          <div style={{
+            textAlign: 'center', padding: '40px 24px 8px',
+            color: theme.colors.textMuted,
+            fontFamily: theme.fonts.body,
+            fontSize: '13px', fontStyle: 'italic', letterSpacing: '0.01em',
+          }}>
+            That&rsquo;s everything for now. Time to go enjoy the recommendations.
           </div>
         )}
       </div>

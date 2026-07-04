@@ -1361,6 +1361,16 @@ export default function ProfilePage() {
                     />
                   </div>
                 )}
+                {!recsLoadingMore && !recsHasMore && filteredRecs.length > 0 && (
+                  <div style={{
+                    textAlign: 'center', padding: '40px 24px 8px',
+                    color: theme.colors.textMuted,
+                    fontFamily: theme.fonts.body,
+                    fontSize: '13px', fontStyle: 'italic', letterSpacing: '0.01em',
+                  }}>
+                    That&rsquo;s everything for now. Time to go enjoy the recommendations.
+                  </div>
+                )}
               </>
             )}
           </>
