@@ -63,6 +63,13 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
+  // Signed-in users shouldn't linger on the marketing/auth entry pages.
+  // /reset-password is intentionally excluded so recovery sessions can reach it.
+  if (user && (pathname === '/' || pathname === '/login' || pathname === '/signup')) {
+    const lobbyUrl = new URL('/lobby', request.url)
+    return NextResponse.redirect(lobbyUrl)
+  }
+
   // Check if this is a public route
   const isPublic =
     PUBLIC_ROUTES.includes(pathname) ||
