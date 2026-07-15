@@ -209,7 +209,10 @@ export default function AppShell({ profile, userId, children }: AppShellProps) {
     const supabase = supabaseRef.current
     const ok = await checkedWrite(
       supabase.from('notifications').update({ read: true }).in('id', ids),
-      () => setPreviewNotifs(prev => prev.map(n => ids.some(id => n.ids.includes(id)) ? { ...n, read: false } : n))
+      () => {
+        setPreviewNotifs(prev => prev.map(n => ids.some(id => n.ids.includes(id)) ? { ...n, read: false } : n))
+        toast('Something went wrong — try again')
+      }
     )
     if (!ok) return
     const { data } = await supabase

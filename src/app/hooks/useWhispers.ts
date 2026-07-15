@@ -3,9 +3,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { checkedWrite } from '@/lib/writes'
+import { useToast } from '@/app/components/Toast'
 
 export function useWhispers() {
   const supabase = useRef(createClient()).current
+  const toast = useToast()
   const [hintsSeen, setHintsSeen] = useState<string[] | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
 
@@ -34,10 +36,13 @@ export function useWhispers() {
       setHintsSeen(next)
       await checkedWrite(
         supabase.from('profiles').update({ hints_seen: next }).eq('id', userId),
-        () => setHintsSeen(prev)
+        () => {
+          setHintsSeen(prev)
+          toast('Something went wrong — try again')
+        }
       )
     },
-    [userId, hintsSeen, supabase]
+    [userId, hintsSeen, supabase, toast]
   )
 
   const shouldShow = useCallback(

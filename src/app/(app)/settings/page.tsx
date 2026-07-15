@@ -130,7 +130,9 @@ export default function SettingsPage() {
     if (error) {
       revert()
       toast('Couldn’t save that setting. Please try again.')
+      return
     }
+    toast('Saved')
   }
 
   const handleNotifyBookmarks = (val: boolean) => {

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { RecommendationImage } from '@/app/components/RecommendationImage'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { checkedWrite } from '@/lib/writes'
 import { RichMediaEmbed, willEmbed } from '@/app/components/RichMediaEmbed'
 import type { GroupedRecommendation, GroupedRecommender } from '@/lib/groupRecommendations'
 import { Avatar } from '@/app/components/Avatar'
@@ -114,10 +115,16 @@ export function GroupedCard({
   async function doDelete(e: React.MouseEvent) {
     e.stopPropagation()
     if (!currentUserId) return
-    await supabaseRef.current.from('recommendations')
-      .delete()
-      .eq('id', leadRec.recommendation_id)
-      .eq('user_id', currentUserId)
+    const ok = await checkedWrite(
+      supabaseRef.current.from('recommendations')
+        .delete()
+        .eq('id', leadRec.recommendation_id)
+        .eq('user_id', currentUserId)
+    )
+    if (!ok) {
+      toast('Couldn’t remove the recommendation. Please try again.')
+      return
+    }
     setDeleteConfirm(false)
     onDelete?.(leadRec.recommendation_id)
     toast('Recommendation removed')

@@ -75,6 +75,7 @@ function SingleRecDetailModal({
         setLiked(active)
         setLikeCount(c => c + (active ? 1 : -1))
       },
+      toast,
     })
   }
 
@@ -91,6 +92,7 @@ function SingleRecDetailModal({
         onBookmarkToggle(recommender.recommendation_id, !active)
         setBookmarked(active)
       },
+      toast,
     })
   }
 
@@ -271,6 +273,7 @@ export function GroupedModal({
         setLiked(active)
         setLikeCount(c => c + (active ? 1 : -1))
       },
+      toast,
     })
   }
 
@@ -288,6 +291,7 @@ export function GroupedModal({
         onBookmarkToggle(leadRec.recommendation_id, !active)
         setBookmarked(active)
       },
+      toast,
     })
   }
 

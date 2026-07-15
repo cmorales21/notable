@@ -24,6 +24,7 @@ export async function toggleEngagement(
     userId,
     isActive,
     apply,
+    toast,
   }: {
     kind: 'like' | 'bookmark'
     scope: 'rec' | 'collection'
@@ -31,6 +32,7 @@ export async function toggleEngagement(
     userId: string
     isActive: boolean
     apply: (active: boolean) => void
+    toast?: (message: string) => void
   }
 ): Promise<void> {
   const table = TABLES[scope][kind]
@@ -47,5 +49,8 @@ export async function toggleEngagement(
         .eq('user_id', userId)
         .eq(idColumn, targetId)
 
-  if (error) apply(isActive)
+  if (error) {
+    apply(isActive)
+    toast?.('Something went wrong — try again')
+  }
 }

@@ -314,6 +314,7 @@ export default function CategoryFeed({ category }: { category: string }) {
         setUserLikes((prev) => { const next = new Set(prev); if (active) next.add(recId); else next.delete(recId); return next })
         setLikeCounts((prev) => ({ ...prev, [recId]: (prev[recId] ?? 0) + (active ? 1 : -1) }))
       },
+      toast,
     })
   }
 
@@ -331,6 +332,7 @@ export default function CategoryFeed({ category }: { category: string }) {
       apply: (active) => {
         setUserBookmarks((prev) => { const next = new Set(prev); if (active) next.add(recId); else next.delete(recId); return next })
       },
+      toast,
     })
   }
 
@@ -436,11 +438,26 @@ export default function CategoryFeed({ category }: { category: string }) {
       const uid = user?.id ?? null
 
       const [{ data: profileData }, { count: likeCount }, { data: myLike }, { count: commentCount }] = await Promise.all([
-        supabase.from('profiles').select('id, name, handle, avatar_url').eq('id', recData.user_id).maybeSingle(),
+        supabase.from('profiles').select('id, name, handle, avatar_url, profile_private').eq('id', recData.user_id).maybeSingle(),
         supabase.from('likes').select('*', { count: 'exact', head: true }).eq('recommendation_id', recId),
         uid ? supabase.from('likes').select('id').eq('recommendation_id', recId).eq('user_id', uid).maybeSingle() : Promise.resolve({ data: null }),
         supabase.from('comments').select('*', { count: 'exact', head: true }).eq('recommendation_id', recId),
       ])
+
+      // Privacy gate: a private-profile rec should only auto-open for the
+      // author or an accepted follower. Same rule the search + rec/[id] page
+      // enforce; without it a shared /?rec=<id> link would bypass privacy.
+      if (profileData?.profile_private === true && recData.user_id !== uid) {
+        if (!uid) return
+        const { data: followRow } = await supabase
+          .from('follows')
+          .select('id')
+          .eq('follower_id', uid)
+          .eq('following_id', recData.user_id)
+          .eq('status', 'accepted')
+          .maybeSingle()
+        if (!followRow) return
+      }
 
       const profile = profileData
         ? { name: profileData.name, handle: profileData.handle, avatar_url: profileData.avatar_url } : null

@@ -290,8 +290,10 @@ export default function ProfilePage() {
     const gated = (profile.profile_private === true && !isOwnProfile && !isFollowing) || iBlockedThem || theyBlockedMe
     if (gated) { setRecs([]); setRecsHasMore(false); setRecsLoading(false); return }
     // Likes are always public — no per-tab gate needed.
-    // Bookmarks are private by default; only shown to others when explicitly set to false.
-    if (activeTab === 'bookmarked' && !isOwnProfile && profile?.bookmarks_private !== false) {
+    // Bookmarks are PUBLIC by default; hidden only when the owner has explicitly
+    // set bookmarks_private = true. Any other value (false, null, undefined)
+    // means "public", matching the spec and the column default.
+    if (activeTab === 'bookmarked' && !isOwnProfile && profile?.bookmarks_private === true) {
       setActiveTab('posted')
       return
     }
@@ -632,6 +634,7 @@ export default function ProfilePage() {
         setModalLiked(active)
         setModalLikeCount(c => c + (active ? 1 : -1))
       },
+      toast,
     })
   }
 
@@ -647,6 +650,7 @@ export default function ProfilePage() {
       apply: (active) => {
         setModalBookmarked(active)
       },
+      toast,
     })
   }
 
@@ -681,8 +685,9 @@ export default function ProfilePage() {
 
   const filteredRecs = categoryFilter === 'all' ? recs : recs.filter(r => r.category === categoryFilter)
   const accentColor = selectedRec ? (CATEGORY_COLORS[selectedRec.category] ?? '#6b5d4f') : '#6b5d4f'
-  // Liked is always public. Bookmarked is shown only to owner or when explicitly public.
-  const showBookmarked = isOwnProfile || profile?.bookmarks_private === false
+  // Posted + Liked are always public. Bookmarked is public by default and only
+  // hidden when the owner has explicitly opted into bookmarks_private = true.
+  const showBookmarked = isOwnProfile || profile?.bookmarks_private !== true
   const showCollections = isOwnProfile || !profile?.collections_private || isFollowing
   const tabs: TabId[] = [
     'posted',

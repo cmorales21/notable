@@ -36,8 +36,13 @@ export default async function Image({ params }: { params: { id: string } }) {
     .maybeSingle()
 
   const profile = rec
-    ? await db.from('profiles').select('name, handle').eq('id', rec.user_id).maybeSingle().then(r => r.data)
+    ? await db.from('profiles').select('name, handle, profile_private').eq('id', rec.user_id).maybeSingle().then(r => r.data)
     : null
+
+  // Privacy: crawlers have no session and can't be verified as followers, so
+  // any private-profile rec collapses to the generic Notable card. Matches the
+  // page body's privacy gate and the generateMetadata fallback.
+  const isPrivate = profile?.profile_private === true
 
   // ── Load Playfair Display Bold ─────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -60,8 +65,8 @@ export default async function Image({ params }: { params: { id: string } }) {
   const hasPlayfair = fonts.length > 0
   const displayFont = hasPlayfair ? '"Playfair Display", serif' : 'serif'
 
-  // ── Fallback card (rec not found) ──────────────────────────────────────────
-  if (!rec) {
+  // ── Fallback card (rec not found, or private-profile rec) ──────────────────
+  if (!rec || isPrivate) {
     return new ImageResponse(
       (
         <div

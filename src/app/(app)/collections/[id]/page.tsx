@@ -237,6 +237,7 @@ export default function CollectionPage() {
         setCollectionLiked(active)
         setCollectionLikeCount(c => c + (active ? 1 : -1))
       },
+      toast,
     })
   }
 
@@ -251,6 +252,7 @@ export default function CollectionPage() {
       apply: (active) => {
         setCollectionBookmarked(active)
       },
+      toast,
     })
   }
 
@@ -363,6 +365,7 @@ export default function CollectionPage() {
         setModalLiked(active)
         setModalLikeCount(c => c + (active ? 1 : -1))
       },
+      toast,
     })
   }
 
@@ -378,6 +381,7 @@ export default function CollectionPage() {
       apply: (active) => {
         setModalBookmarked(active)
       },
+      toast,
     })
   }
 

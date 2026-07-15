@@ -117,6 +117,7 @@ export function RecommenderSection({
         setLiked(active)
         setLikeCount(c => c + (active ? 1 : -1))
       },
+      toast,
     })
   }
 
@@ -134,6 +135,7 @@ export function RecommenderSection({
         onBookmarkToggle(recId, !active)
         setBookmarked(active)
       },
+      toast,
     })
   }
 
@@ -157,7 +159,10 @@ export function RecommenderSection({
       ...prev,
       [commentId]: { count: cur.count + (cur.likedByMe ? -1 : 1), likedByMe: !cur.likedByMe },
     }))
-    const revert = () => setCommentLikesMap(prev => ({ ...prev, [commentId]: cur }))
+    const revert = () => {
+      setCommentLikesMap(prev => ({ ...prev, [commentId]: cur }))
+      toast('Something went wrong — try again')
+    }
     if (cur.likedByMe) {
       await checkedWrite(
         supabaseRef.current.from('comment_likes').delete()
