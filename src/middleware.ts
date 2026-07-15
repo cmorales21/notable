@@ -66,8 +66,14 @@ export async function middleware(request: NextRequest) {
   // Signed-in users shouldn't linger on the marketing/auth entry pages.
   // /reset-password is intentionally excluded so recovery sessions can reach it.
   if (user && (pathname === '/' || pathname === '/login' || pathname === '/signup')) {
-    const lobbyUrl = new URL('/lobby', request.url)
-    return NextResponse.redirect(lobbyUrl)
+    // Honor ?next= so a shared-link visitor who was midway through signing
+    // in returns to the rec (or wherever they came from), not to /lobby.
+    // Validate exactly like /auth/callback: must start with a single '/'.
+    const rawNext = request.nextUrl.searchParams.get('next')
+    const next = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//')
+      ? rawNext
+      : '/lobby'
+    return NextResponse.redirect(new URL(next, request.url))
   }
 
   // Check if this is a public route

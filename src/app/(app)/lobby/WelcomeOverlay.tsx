@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { checkedWrite } from '@/lib/writes'
+import { friendlyError } from '@/lib/friendlyError'
 
 interface Props {
   userId: string
@@ -76,7 +77,7 @@ export default function WelcomeOverlay({ userId, hasHandle }: Props) {
         // Another user claimed this handle between the availability check and save.
         setHandleStatus('taken')
       } else {
-        setHandleError(error.message)
+        setHandleError(friendlyError(error))
       }
       setSaving(false)
       return

@@ -3,7 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { checkedWrite } from '@/lib/writes'
 import { useToast } from '@/app/components/Toast'
+import { friendlyError } from '@/lib/friendlyError'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -232,7 +234,7 @@ function AccountSection({
     const supabase = createClient()
     const { error } = await supabase.auth.updateUser({ password: pwNew })
     setPwSaving(false)
-    if (error) { setPwMsg({ text: error.message, ok: false }); return }
+    if (error) { setPwMsg({ text: friendlyError(error), ok: false }); return }
     setPwNew('')
     setPwConfirm('')
     setPwMsg(null)
@@ -352,6 +354,7 @@ function AccountSection({
 // ── Section: Notifications ────────────────────────────────────────────────────
 
 function NotificationsSection({ userId }: { userId: string }) {
+  const toast = useToast()
   const [prefs, setPrefs] = useState<NotifPrefs>({
     notify_followers: true,
     notify_likes: true,
@@ -381,20 +384,25 @@ function NotificationsSection({ userId }: { userId: string }) {
       })
   }, [userId])
 
-  const save = (patch: Record<string, boolean | string>) => {
+  const save = async (patch: Record<string, boolean | string>, revert: () => void) => {
     const supabase = createClient()
-    supabase.from('profiles').update(patch).eq('id', userId).then(() => {})
+    const ok = await checkedWrite(
+      supabase.from('profiles').update(patch).eq('id', userId),
+      revert
+    )
+    toast(ok ? 'Saved' : 'Couldn’t save that setting. Please try again.')
   }
 
   const toggle = (key: keyof NotifPrefs, dbKey: string) => {
     const next = !prefs[key]
     setPrefs(p => ({ ...p, [key]: next }))
-    save({ [dbKey]: next })
+    void save({ [dbKey]: next }, () => setPrefs(p => ({ ...p, [key]: !next })))
   }
 
   const setFreq = (freq: string) => {
+    const prev = prefs.email_digest_freq
     setPrefs(p => ({ ...p, email_digest_freq: freq }))
-    save({ email_digest_freq: freq })
+    void save({ email_digest_freq: freq }, () => setPrefs(p => ({ ...p, email_digest_freq: prev })))
   }
 
   const subLabel: React.CSSProperties = {
@@ -443,6 +451,7 @@ function NotificationsSection({ userId }: { userId: string }) {
 // Requires: `bookmarks_private boolean default false` on the profiles table
 
 function PrivacySection({ userId }: { userId: string }) {
+  const toast = useToast()
   const [profilePrivate, setProfilePrivate] = useState(false)
   const [bookmarksPrivate, setBookmarksPrivate] = useState(false)
   const [collectionsPrivate, setCollectionsPrivate] = useState(false)
@@ -462,25 +471,31 @@ function PrivacySection({ userId }: { userId: string }) {
       })
   }, [userId])
 
+  const save = async (patch: Record<string, boolean>, revert: () => void) => {
+    const supabase = createClient()
+    const ok = await checkedWrite(
+      supabase.from('profiles').update(patch).eq('id', userId),
+      revert
+    )
+    toast(ok ? 'Saved' : 'Couldn’t save that setting. Please try again.')
+  }
+
   const toggleProfilePrivate = () => {
     const next = !profilePrivate
     setProfilePrivate(next)
-    const supabase = createClient()
-    supabase.from('profiles').update({ profile_private: next }).eq('id', userId).then(() => {})
+    void save({ profile_private: next }, () => setProfilePrivate(!next))
   }
 
   const toggleBookmarksPrivate = () => {
     const next = !bookmarksPrivate
     setBookmarksPrivate(next)
-    const supabase = createClient()
-    supabase.from('profiles').update({ bookmarks_private: next }).eq('id', userId).then(() => {})
+    void save({ bookmarks_private: next }, () => setBookmarksPrivate(!next))
   }
 
   const toggleCollectionsPrivate = () => {
     const next = !collectionsPrivate
     setCollectionsPrivate(next)
-    const supabase = createClient()
-    supabase.from('profiles').update({ collections_private: next }).eq('id', userId).then(() => {})
+    void save({ collections_private: next }, () => setCollectionsPrivate(!next))
   }
 
   return (

@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/app/components/Toast'
+import { friendlyError } from '@/lib/friendlyError'
 import { type FullProfile } from './types'
 import { Avatar } from '@/app/components/Avatar'
 
@@ -48,7 +49,7 @@ export function EditProfileModal({
       const { data: { publicUrl } } = supabase.current.storage.from('avatars').getPublicUrl(path)
       setAvatarUrl(publicUrl)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed')
+      setError(friendlyError(err))
     } finally {
       setUploading(false)
     }
@@ -66,7 +67,7 @@ export function EditProfileModal({
       toast('Profile saved')
       onSave({ name: name.trim(), bio: bio.trim(), avatar_url: avatarUrl })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Save failed')
+      setError(friendlyError(err))
       setSaving(false)
     }
   }

@@ -1,9 +1,18 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { friendlyError } from '@/lib/friendlyError'
+
+// Same shape of validation used by /auth/callback and middleware — the "next"
+// destination must be a same-origin absolute path, never protocol-relative.
+function validateNext(raw: string | null): string {
+  if (!raw) return '/lobby'
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '/lobby'
+  return raw
+}
 
 export default function SignupPage() {
   const [name, setName] = useState('')
@@ -13,10 +22,16 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [nextUrl, setNextUrl] = useState('/lobby')
 
   const supabaseRef = useRef(createClient())
   const supabase = supabaseRef.current
   const router = useRouter()
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    setNextUrl(validateNext(params.get('next')))
+  }, [])
 
   // If signup step 1 (auth.signUp) succeeds but step 2 (profile insert) fails
   // recoverably — handle collision — we retain the created auth user here so
@@ -45,6 +60,10 @@ export default function SignupPage() {
         email,
         password,
         options: {
+          // If email-confirmation is enabled in Supabase, the confirmation link
+          // routes through /auth/callback — pass ?next= so the user lands back
+          // on the rec (or wherever) after confirming, not on /lobby.
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextUrl)}`,
           data: {
             full_name: name,
             handle: cleanHandle || undefined,
@@ -53,7 +72,7 @@ export default function SignupPage() {
       })
 
       if (authError) {
-        setError(authError.message)
+        setError(friendlyError(authError))
         setLoading(false)
         return
       }
@@ -142,7 +161,7 @@ export default function SignupPage() {
     // Success — clear the resume ref so a (hypothetical) fresh attempt
     // after this in the same component lifetime would start over.
     createdAuthUserRef.current = null
-    router.push('/lobby')
+    router.push(nextUrl)
   }
 
   async function handleGoogleSignup() {
@@ -152,15 +171,17 @@ export default function SignupPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/lobby`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextUrl)}`,
       },
     })
 
     if (error) {
-      setError(error.message)
+      setError(friendlyError(error))
       setGoogleLoading(false)
     }
   }
+
+  const loginHref = nextUrl === '/lobby' ? '/login' : `/login?next=${encodeURIComponent(nextUrl)}`
 
   return (
     <div
@@ -408,7 +429,7 @@ export default function SignupPage() {
           >
             Already have an account?{' '}
             <Link
-              href="/login"
+              href={loginHref}
               className="transition-colors duration-200"
               style={{ color: 'var(--color-books)' }}
             >

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { friendlyError } from '@/lib/friendlyError'
 
 type Status = 'loading' | 'ready' | 'invalid' | 'success'
 
@@ -78,7 +79,7 @@ export default function ResetPasswordPage() {
     setSaving(false)
 
     if (error) {
-      setError(error.message)
+      setError(friendlyError(error))
       return
     }
 

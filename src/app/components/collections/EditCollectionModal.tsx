@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { friendlyError } from '@/lib/friendlyError'
 import { theme, getCategoryColor } from '@/app/lib/theme'
 import { type CollectionData } from './types'
 
@@ -33,7 +34,7 @@ export function EditCollectionModal({
         updated_at: new Date().toISOString(),
       })
       .eq('id', collection.id)
-    if (updateErr) { setError(updateErr.message); setSaving(false); return }
+    if (updateErr) { setError(friendlyError(updateErr)); setSaving(false); return }
     onSave({ name: name.trim(), description: description.trim() || null, is_private: isPrivate })
   }
 

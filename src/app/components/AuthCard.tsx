@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { friendlyError } from '@/lib/friendlyError'
 
 type View = 'signup' | 'login'
 
@@ -81,7 +82,7 @@ export default function AuthCard() {
     })
 
     if (authError) {
-      setError(authError.message)
+      setError(friendlyError(authError))
       setLoading(false)
       return
     }
@@ -113,7 +114,7 @@ export default function AuthCard() {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
-      setError(error.message)
+      setError(friendlyError(error))
       setLoading(false)
       return
     }
@@ -135,7 +136,7 @@ export default function AuthCard() {
     })
 
     if (error) {
-      setError(error.message)
+      setError(friendlyError(error))
       setGoogleLoading(false)
     }
   }

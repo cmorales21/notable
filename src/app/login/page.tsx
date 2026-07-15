@@ -1,9 +1,18 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { friendlyError } from '@/lib/friendlyError'
+
+// Same shape of validation used by /auth/callback and middleware — the "next"
+// destination must be a same-origin absolute path, never protocol-relative.
+function validateNext(raw: string | null): string {
+  if (!raw) return '/lobby'
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '/lobby'
+  return raw
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -11,10 +20,16 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [nextUrl, setNextUrl] = useState('/lobby')
 
   const supabaseRef = useRef(createClient())
   const supabase = supabaseRef.current
   const router = useRouter()
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    setNextUrl(validateNext(params.get('next')))
+  }, [])
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -24,13 +39,13 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
-      setError(error.message)
+      setError(friendlyError(error))
       setLoading(false)
       return
     }
 
-    // Session is set — send them to the lobby
-    router.push('/lobby')
+    // Session is set — send them back where they came from (or /lobby)
+    router.push(nextUrl)
     router.refresh() // force server components to re-render with new session
   }
 
@@ -41,17 +56,19 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        // After Google, user returns to /auth/callback which redirects to /lobby
-        redirectTo: `${window.location.origin}/auth/callback?next=/lobby`,
+        // After Google, user returns to /auth/callback which honors ?next=
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextUrl)}`,
       },
     })
 
     if (error) {
-      setError(error.message)
+      setError(friendlyError(error))
       setGoogleLoading(false)
     }
     // On success, browser is redirected to Google — no further code runs here
   }
+
+  const signupHref = nextUrl === '/lobby' ? '/signup' : `/signup?next=${encodeURIComponent(nextUrl)}`
 
   return (
     <div
@@ -230,7 +247,7 @@ export default function LoginPage() {
             <span className="font-body" style={{ color: 'var(--color-muted)', fontSize: '0.875rem' }}>
               New to Notable?{' '}
               <Link
-                href="/signup"
+                href={signupHref}
                 className="transition-colors duration-200"
                 style={{ color: 'var(--color-books)' }}
               >
