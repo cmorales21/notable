@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'i.pravatar.cc' },
       { protocol: 'https', hostname: 'images.unsplash.com' },
       { protocol: 'https', hostname: 'picsum.photos' },
+      { protocol: 'https', hostname: 'api.dicebear.com', pathname: '/9.x/**' },
 
       // ── Books ───────────────────────────────────────────────────────────────
       { protocol: 'https', hostname: 'covers.openlibrary.org' },

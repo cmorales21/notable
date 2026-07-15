@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import { theme } from '@/app/lib/theme'
+import { shouldOptimize } from '@/app/lib/imageHosts'
 
 // variant="default"  — flat warm disc fallback (feed, search, notifications)
 // variant="gradient" — per-name hue gradient disc (profile header, edit modal)
@@ -29,6 +30,7 @@ export function Avatar({
         width={size}
         height={size}
         onError={() => setImgErr(true)}
+        unoptimized={!shouldOptimize(url)}
         style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
       />
     )
