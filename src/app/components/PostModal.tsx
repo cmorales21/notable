@@ -215,6 +215,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
 
   const [posting, setPosting] = useState(false)
   const [postSuccess, setPostSuccess] = useState(false)
+  const [photoUploading, setPhotoUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [podcastSearchType, setPodcastSearchType] = useState<'show' | 'episode'>('show')
   const [discardConfirm, setDiscardConfirm] = useState(false)
@@ -622,12 +623,40 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
 
   // ── File upload ───────────────────────────────────────────────────────────
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    // Reset so the same file can be re-selected after a failure
+    e.target.value = ''
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = ev => setUploadedImage(ev.target?.result as string)
-    reader.readAsDataURL(file)
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+    if (!allowedTypes.includes(file.type)) {
+      toast('Only JPEG, PNG, WebP, or GIF images are allowed')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast('Image must be smaller than 5 MB')
+      return
+    }
+
+    setPhotoUploading(true)
+    try {
+      const { data: { user } } = await supabase.current.auth.getUser()
+      if (!user) throw new Error('Not authenticated')
+      const mimeToExt: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' }
+      const ext = mimeToExt[file.type] ?? 'jpg'
+      const path = `${user.id}/${crypto.randomUUID()}.${ext}`
+      const { error: upErr } = await supabase.current.storage
+        .from('post-images').upload(path, file, { upsert: false, contentType: file.type })
+      if (upErr) throw upErr
+      const { data: { publicUrl } } = supabase.current.storage.from('post-images').getPublicUrl(path)
+      setUploadedImage(publicUrl)
+    } catch (err) {
+      if (process.env.NODE_ENV !== 'production') console.error('Photo upload failed:', err)
+      toast("Couldn't upload your photo. Please try again.")
+    } finally {
+      setPhotoUploading(false)
+    }
   }
 
   // ── Post ──────────────────────────────────────────────────────────────────
@@ -646,6 +675,12 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
         .replace(/\s{2,}/g, ' ')
         .trim()
         .slice(0, 1000)
+
+      // Fallback for when URL-preview extraction failed: the pasted URL is
+      // stripped from cleanedText and never made it onto confirmedItem, so
+      // pull it back out of the raw text before we drop it on the floor.
+      const rawUrl = rawText.match(URL_RE)?.[0] ?? null
+      const externalUrl = confirmedItem?.external_url ?? rawUrl ?? null
 
       const title = confirmedItem?.title
         ?? (cleanedText.split('\n')[0].trim().slice(0, 100) || 'Untitled')
@@ -680,7 +715,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
               year:            confirmedItem?.year ? parseInt(confirmedItem.year, 10) : undefined,
               externalId:      confirmedItem?.fromNotable ? undefined : (confirmedItem?.id ?? undefined),
               externalSource:  EXTERNAL_SOURCE[category!] ?? undefined,
-              externalUrl:     confirmedItem?.external_url ?? undefined,
+              externalUrl:     externalUrl ?? undefined,
             })
           }
         } catch { /* non-fatal */ }
@@ -694,7 +729,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
           title,
           description: cleanedText || null,
           image_url: uploadedImage ?? confirmedItem?.image ?? null,
-          external_url: confirmedItem?.external_url ?? null,
+          external_url: externalUrl,
           item_id: recItemId,
         })
         .select('id')
@@ -907,7 +942,7 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
 
             <button
               onClick={handlePost}
-              disabled={!canPost || posting || postSuccess}
+              disabled={!canPost || posting || postSuccess || photoUploading}
               className="font-body"
               style={{
                 background: postSuccess ? '#4aad4e' : canPost ? accentColor : 'transparent',
@@ -975,6 +1010,23 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
             <div style={{ marginTop: '-10px', marginBottom: '14px' }}>
               <Whisper id="post-category-hint" message="Select the topic for your recommendation." />
             </div>
+
+            {/* Restaurants: no search API yet — signpost the manual-entry path */}
+            {category === 'restaurants' && !confirmedItem && (
+              <div
+                className="font-body"
+                style={{
+                  marginTop: '-4px', marginBottom: '14px',
+                  padding: '10px 14px',
+                  background: `${accentColor}14`,
+                  border: `1px solid ${accentColor}30`,
+                  borderRadius: '10px',
+                  fontSize: '13px', color: '#33261a', lineHeight: 1.5,
+                }}
+              >
+                Restaurant search is coming soon. Add it yourself with a name and photo.
+              </div>
+            )}
 
             {/* Compose area */}
             <div style={{ position: 'relative' }}>
@@ -1252,18 +1304,28 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
 
               <button
                 onClick={() => fileInputRef.current?.click()}
+                disabled={photoUploading}
                 aria-label="Upload photo"
                 style={{
-                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  background: 'transparent', border: 'none',
+                  cursor: photoUploading ? 'default' : 'pointer',
                   color: '#6b5d4f', padding: '4px',
                   display: 'flex', alignItems: 'center',
                   transition: 'color 0.15s',
+                  opacity: photoUploading ? 0.6 : 1,
                 }}
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="17" height="17">
-                  <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
-                  <circle cx="12" cy="13" r="4" />
-                </svg>
+                {photoUploading ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="17" height="17"
+                    style={{ animation: 'spin 0.8s linear infinite' }}>
+                    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" width="17" height="17">
+                    <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                )}
               </button>
             </div>
 
