@@ -4,9 +4,11 @@ import Image from 'next/image'
 import Navbar from './components/Navbar'
 import FadeIn from './components/FadeIn'
 import AuthCard from './components/AuthCard'
-import { createClient } from '@/lib/supabase/server'
+import mosaicSnapshot from './lib/mosaicSnapshot.json'
 import { CATEGORY_COLORS, CATEGORY_LABELS } from '@/app/lib/theme'
 import { shouldOptimize } from '@/app/lib/imageHosts'
+
+type MosaicItem = { id: string; title: string | null; image_url: string; category: string; author_or_creator: string | null }
 
 export const metadata: Metadata = {
   title: 'Notable — Get in, get inspired, go live your life',
@@ -127,45 +129,31 @@ export default async function LandingPage() {
   let mosaicRow2: StripTile[]
   let mosaicRow3: StripTile[]
 
-  try {
-    const supabase = await createClient()
-    const { data } = await supabase
-      .from('items')
-      .select('id, title, image_url, category, author_or_creator')
-      .not('image_url', 'is', null)
-      .neq('image_url', '')
-      .order('created_at', { ascending: false })
-      .limit(75)
+  const items = mosaicSnapshot as MosaicItem[]
 
-    if (data && data.length >= 25) {
-      // Seed changes each hour so the mosaic looks different across visits
-      // but stays stable within a short window (avoids per-request churn)
-      let s = (Math.floor(Date.now() / (1000 * 60 * 60)) ^ 0xdeadbeef) >>> 0 || 1
-      const rng = () => {
-        s ^= s << 13; s ^= s >> 17; s ^= s << 5
-        return (s >>> 0) / 0x100000000
-      }
-
-      // Fisher-Yates shuffle
-      const items = [...data]
-      for (let i = items.length - 1; i > 0; i--) {
-        const j = Math.floor(rng() * (i + 1));
-        [items[i], items[j]] = [items[j], items[i]]
-      }
-
-      const toTile = (item: (typeof items)[0]): StripTile => ({
-        src: item.image_url as string,
-        alt: item.title as string,
-        label: item.title as string,
-      })
-
-      mosaicRow1 = items.slice(0, 25).map(toTile)
-      mosaicRow2 = items.slice(25, 50).map(toTile)
-      mosaicRow3 = items.slice(50, 75).map(toTile)
-    } else {
-      throw new Error('insufficient items')
+  if (items.length >= 25) {
+    let s = (Math.floor(Date.now() / (1000 * 60 * 60)) ^ 0xdeadbeef) >>> 0 || 1
+    const rng = () => {
+      s ^= s << 13; s ^= s >> 17; s ^= s << 5
+      return (s >>> 0) / 0x100000000
     }
-  } catch {
+
+    const shuffled = [...items]
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
+
+    const toTile = (item: MosaicItem): StripTile => ({
+      src: item.image_url,
+      alt: item.title ?? '',
+      label: item.title ?? '',
+    })
+
+    mosaicRow1 = shuffled.slice(0, 25).map(toTile)
+    mosaicRow2 = shuffled.slice(25, 50).map(toTile)
+    mosaicRow3 = shuffled.slice(50, 75).map(toTile)
+  } else {
     mosaicRow1 = makeStaticRow(1)
     mosaicRow2 = makeStaticRow(6)
     mosaicRow3 = makeStaticRow(11)
