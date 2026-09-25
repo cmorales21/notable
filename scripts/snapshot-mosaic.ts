@@ -23,6 +23,17 @@ if (!supabaseUrl || !anonKey) {
 
 const supabase = createClient(supabaseUrl, anonKey)
 
+// Titles listed here are dropped from the landing-page mosaic without
+// being removed from the catalog itself — the items stay usable in the
+// product, they just don't appear on the public marketing page. Use for
+// items with broken/unflattering preview images or subject matter that
+// isn't a fit for the front door. Match `items.title` exactly, including
+// curly quotes.
+const MOSAIC_EXCLUDE_TITLES = [
+  'Amazon',
+  'A Genocide Scholar Asks “What Went Wrong” in Israel',
+]
+
 async function main() {
   console.log('Snapshotting current mosaic items...\n')
 
@@ -49,10 +60,13 @@ async function main() {
     process.exit(1)
   }
 
-  const outPath = join(process.cwd(), 'src/app/lib/mosaicSnapshot.json')
-  writeFileSync(outPath, JSON.stringify(data, null, 2))
+  const excludeSet = new Set(MOSAIC_EXCLUDE_TITLES)
+  const filtered = data.filter(item => !excludeSet.has(item.title ?? ''))
 
-  console.log(`Wrote ${data.length} items to ${outPath}`)
+  const outPath = join(process.cwd(), 'src/app/lib/mosaicSnapshot.json')
+  writeFileSync(outPath, JSON.stringify(filtered, null, 2))
+
+  console.log(`Wrote ${filtered.length} items to ${outPath}`)
 }
 
 main()
