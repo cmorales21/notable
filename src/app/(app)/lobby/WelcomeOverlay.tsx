@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { checkedWrite } from '@/lib/writes'
 import { friendlyError } from '@/lib/friendlyError'
+import { useToast } from '@/app/components/Toast'
 
 interface Props {
   userId: string
@@ -14,6 +15,7 @@ interface Props {
 export default function WelcomeOverlay({ userId, hasHandle }: Props) {
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
+  const toast = useToast()
 
   const [overlayOpacity, setOverlayOpacity] = useState(0)
   const [textOpacity, setTextOpacity] = useState(0)
@@ -101,12 +103,20 @@ export default function WelcomeOverlay({ userId, hasHandle }: Props) {
       const hintsSeen: string[] = profile?.hints_seen ?? []
       const nextHints = hintsSeen.includes('welcome') ? hintsSeen : [...hintsSeen, 'welcome']
 
-      await checkedWrite(
+      const ok = await checkedWrite(
         supabase
           .from('profiles')
           .update({ is_onboarded: true, hints_seen: nextHints })
           .eq('id', userId)
       )
+
+      if (!ok) {
+        // Dismiss failed — restore the overlay so the user can retry rather
+        // than getting stuck re-seeing onboarding on their next visit.
+        setOverlayOpacity(1)
+        toast("Couldn't finish onboarding. Please try again.")
+        return
+      }
 
       router.refresh()
       setGone(true)
