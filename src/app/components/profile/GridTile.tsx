@@ -39,14 +39,6 @@ export function GridTile({ rec, onClick, onMenu }: { rec: Recommendation; onClic
         />
       )}
 
-      {/* Category dot */}
-      <div style={{
-        position: 'absolute', top: '8px', left: '8px',
-        width: '7px', height: '7px', borderRadius: '50%',
-        background: color,
-        boxShadow: `0 0 6px ${color}88`,
-      }} />
-
       {/* Three-dot menu button */}
       {onMenu && (
         <button
