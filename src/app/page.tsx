@@ -11,17 +11,17 @@ import { shouldOptimize } from '@/app/lib/imageHosts'
 type MosaicItem = { id: string; title: string | null; image_url: string; category: string; author_or_creator: string | null }
 
 export const metadata: Metadata = {
-  title: 'Notable — Get in, get inspired, go live your life',
+  title: 'Notable',
   description: "A social recommendation platform for Books, Movies, Music, Restaurants and Podcasts. Discover what's genuinely worth your time through people whose taste you trust.",
   openGraph: {
-    title: 'Notable — Get in, get inspired, go live your life',
+    title: 'Notable',
     description: "A social recommendation platform for Books, Movies, Music, Restaurants and Podcasts. Discover what's genuinely worth your time through people whose taste you trust.",
     siteName: 'Notable',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Notable — Get in, get inspired, go live your life',
+    title: 'Notable',
     description: "A social recommendation platform for Books, Movies, Music, Restaurants and Podcasts. Discover what's genuinely worth your time through people whose taste you trust.",
   },
 }
