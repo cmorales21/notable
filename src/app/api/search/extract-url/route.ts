@@ -298,6 +298,14 @@ function cleanAmazonTitle(raw: string): string | null {
   return title || null
 }
 
+// Amazon product URLs always contain a 10-char alphanumeric ASIN in the path.
+// The ASIN maps to a reliable cover image without any HTML scraping.
+function amazonAsinImage(url: string): string | null {
+  const asinMatch = url.match(/\/(?:dp|gp\/product|product|ASIN|a)\/([A-Z0-9]{10})/i)
+  if (!asinMatch?.[1]) return null
+  return `https://images-na.ssl-images-amazon.com/images/P/${asinMatch[1]}.jpg`
+}
+
 function extractAmazon(html: string, url: string): { title: string; image_url: string | null } | null {
   // Amazon has <meta name="title"> even when og:title is absent
   const rawTitle =
@@ -309,16 +317,9 @@ function extractAmazon(html: string, url: string): { title: string; image_url: s
   const title = cleanAmazonTitle(rawTitle)
   if (!title) return null
 
-  // Prefer ASIN-based cover image (reliable, no HTML scraping needed).
-  // Amazon product URLs always contain a 10-char alphanumeric ASIN in the path.
-  let image_url: string | null = null
-  const asinMatch = url.match(/\/(?:dp|gp\/product|product|ASIN|a)\/([A-Z0-9]{10})/i)
-  if (asinMatch?.[1]) {
-    image_url = `https://images-na.ssl-images-amazon.com/images/P/${asinMatch[1]}.jpg`
-  }
-
-  // Fall back to extracting a product image from the HTML.
+  // Prefer ASIN-based cover; fall back to a product image scraped from HTML.
   // Amazon product images in /images/I/ end with a size code like "L.jpg".
+  let image_url: string | null = amazonAsinImage(url)
   if (!image_url) {
     const imgMatch = html.match(
       /https:\/\/m\.media-amazon\.com\/images\/I\/[A-Za-z0-9%+\-]+L\.(jpg|jpeg|png)/i
@@ -327,6 +328,19 @@ function extractAmazon(html: string, url: string): { title: string; image_url: s
   }
 
   return { title, image_url }
+}
+
+// Site-brand logos leaked into og:image tags — these are generic placeholders
+// (e.g. Amazon's a-com share logo, boilerplate "og-image-default.png") that
+// look nothing like the actual item, so we treat them as no image rather than
+// letting them become the recommendation's cover. Match by filename only, so
+// a legitimate item image at a longer path (…/products/logo-tshirt.png) still
+// slips through.
+const GENERIC_LOGO_FILENAMES = /\/(?:amazon|amazon-logo|logo|logo-default|site-logo|brand-logo|og-image|og-image-default|og-default|default-og|default-share|share-default|fallback|placeholder)\.(?:png|jpe?g|gif|svg|webp)(?:$|[?#])/i
+
+function looksLikeGenericLogo(imageUrl: string | null): boolean {
+  if (!imageUrl) return false
+  return GENERIC_LOGO_FILENAMES.test(imageUrl)
 }
 
 function extractImdbFallback(html: string): { title: string } | null {
@@ -402,7 +416,9 @@ export async function POST(req: NextRequest) {
 
     const ogTitle = getMeta(html, 'og:title')
     const ogDescription = getMeta(html, 'og:description')
-    const ogImage = normalizeImageUrl(getMeta(html, 'og:image'))
+    const rawOgImage = normalizeImageUrl(getMeta(html, 'og:image'))
+    // Drop generic site-brand logos so they never become the item cover.
+    const ogImage = looksLikeGenericLogo(rawOgImage) ? null : rawOgImage
 
     // Site-specific fallbacks — only applied when OG tags are missing
     const isAmazon = /\bamazon\.[a-z.]{2,6}$/.test(hostname)
@@ -410,6 +426,11 @@ export async function POST(req: NextRequest) {
     const isGoodreads = hostname.includes('goodreads.com')
     const isYelp = hostname.includes('yelp.com')
     const isTripAdvisor = hostname.includes('tripadvisor.')
+
+    // For Amazon URLs, the ASIN-derived cover is always more reliable than
+    // og:image (which is often the generic Amazon share logo). Prefer it
+    // whenever we can pull an ASIN from the path.
+    const amazonPreferredImage = isAmazon ? amazonAsinImage(url) : null
 
     if (isAmazon && !ogTitle) {
       const extracted = extractAmazon(html, url)
@@ -461,7 +482,12 @@ export async function POST(req: NextRequest) {
       html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ??
       ''
 
-    return NextResponse.json({ title, description: ogDescription ?? '', image_url: ogImage, url })
+    return NextResponse.json({
+      title,
+      description: ogDescription ?? '',
+      image_url: amazonPreferredImage ?? ogImage,
+      url,
+    })
   } catch {
     return NextResponse.json({ title: '', description: '', image_url: null, url })
   }
