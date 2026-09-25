@@ -143,21 +143,35 @@ export default function ProfilePage() {
         ])
 
         if (!profileData) { setNotFound(true); return }
-        setProfile(profileData as FullProfile)
 
         const uid = user?.id ?? null
         setCurrentUserId(uid)
-        setIsOwnProfile(uid === profileData.id)
+        const isOwn = uid === profileData.id
+        setIsOwnProfile(isOwn)
+        const isOther = !!uid && !isOwn
+
+        // Resolve the block state before setting any identifying header
+        // data. If the profile owner has blocked this viewer, the header
+        // (name/avatar/bio/counts) must never render — even briefly — so
+        // we short-circuit here and let the render show the private gate.
+        if (isOther) {
+          const [{ data: iBlockRow }, { data: theyBlockRow }] = await Promise.all([
+            supabase.current.from('user_blocks').select('id').eq('blocker_id', uid).eq('blocked_id', profileData.id).maybeSingle(),
+            supabase.current.from('user_blocks').select('id').eq('blocker_id', profileData.id).eq('blocked_id', uid).maybeSingle(),
+          ])
+          setIBlockedThem(!!iBlockRow)
+          setTheyBlockedMe(!!theyBlockRow)
+          if (theyBlockRow) return
+        }
+
+        setProfile(profileData as FullProfile)
 
         if (uid) {
-          const isOther = uid !== profileData.id
-          const [{ data: myProfile }, { data: followRow }, { count: followerCnt }, { count: followingCnt }, { data: iBlockRow }, { data: theyBlockRow }] = await Promise.all([
+          const [{ data: myProfile }, { data: followRow }, { count: followerCnt }, { count: followingCnt }] = await Promise.all([
             supabase.current.from('profiles').select('name, handle, avatar_url').eq('id', uid).maybeSingle(),
             supabase.current.from('follows').select('id, status').eq('follower_id', uid).eq('following_id', profileData.id).maybeSingle(),
             supabase.current.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', profileData.id).eq('status', 'accepted'),
             supabase.current.from('follows').select('*', { count: 'exact', head: true }).eq('follower_id', profileData.id).eq('status', 'accepted'),
-            isOther ? supabase.current.from('user_blocks').select('id').eq('blocker_id', uid).eq('blocked_id', profileData.id).maybeSingle() : Promise.resolve({ data: null }),
-            isOther ? supabase.current.from('user_blocks').select('id').eq('blocker_id', profileData.id).eq('blocked_id', uid).maybeSingle() : Promise.resolve({ data: null }),
           ])
           setCurrentUserProfile(myProfile as RecProfile)
           const fr = followRow as { id: string; status: string } | null
@@ -165,10 +179,6 @@ export default function ProfilePage() {
           setIsPendingFollow(fr?.status === 'pending')
           setFollowerCount(followerCnt ?? 0)
           setFollowingCount(followingCnt ?? 0)
-          if (isOther) {
-            setIBlockedThem(!!iBlockRow)
-            setTheyBlockedMe(!!theyBlockRow)
-          }
         } else {
           const [{ count: followerCnt }, { count: followingCnt }] = await Promise.all([
             supabase.current.from('follows').select('*', { count: 'exact', head: true }).eq('following_id', profileData.id).eq('status', 'accepted'),
@@ -711,7 +721,38 @@ export default function ProfilePage() {
     )
   }
 
-  if (profileLoading || !profile) {
+  if (profileLoading) {
+    return <ProfileSkeleton />
+  }
+
+  // Viewer has been blocked by the profile owner: `profile` was
+  // intentionally never set upstream to keep the header from rendering.
+  // Show the standard "private" gate — deliberately not "blocked", so the
+  // owner's choice isn't disclosed to the viewer.
+  if (theyBlockedMe) {
+    return (
+      <div style={{ maxWidth: '680px', margin: '0 auto', padding: '14px 20px 48px' }}>
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          paddingTop: '96px', gap: '10px', textAlign: 'center',
+        }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="#6b5d4f" strokeWidth="1.5"
+            strokeLinecap="round" strokeLinejoin="round" width="36" height="36">
+            <rect x="3" y="11" width="18" height="11" rx="2" />
+            <path d="M7 11V7a5 5 0 0110 0v4" />
+          </svg>
+          <p className="font-display" style={{ fontSize: '1.15rem', fontWeight: 600, color: '#33261a', marginTop: '6px' }}>
+            This profile is private
+          </p>
+          <p className="font-body" style={{ color: '#6b5d4f', fontSize: '14px', maxWidth: '260px', lineHeight: '1.55' }}>
+            Follow @{handle} to see their recommendations.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!profile) {
     return <ProfileSkeleton />
   }
 
