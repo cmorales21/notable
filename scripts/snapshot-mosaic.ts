@@ -26,11 +26,16 @@ const supabase = createClient(supabaseUrl, anonKey)
 async function main() {
   console.log('Snapshotting current mosaic items...\n')
 
+  // Exclude items marked `metadata.seed = true` — those are demo-persona
+  // items created by scripts/seed/seed.mjs and must never appear in the
+  // mosaic. The .or() covers rows where metadata is null or the seed key
+  // is missing/false; only explicit `true` is filtered out.
   const { data, error } = await supabase
     .from('items')
     .select('id, title, image_url, category, author_or_creator')
     .not('image_url', 'is', null)
     .neq('image_url', '')
+    .or('metadata->>seed.is.null,metadata->>seed.neq.true')
     .order('created_at', { ascending: false })
     .limit(75)
 
