@@ -223,24 +223,8 @@ body {
   to   { transform: translateX(0); }
 }
 
-/* Pause only the specific row being hovered, not all three */
-.strip-row-wrapper:hover .strip-row {
-  animation-play-state: paused;
-}
-
-/*
-  Each row wrapper needs a stacking context so that :has() can raise the
-  hovered row above rows below it. The animated .strip-row inside creates its
-  own stacking context (animation triggers one), which traps its children's
-  z-index — raising the wrapper itself is the only way to beat sibling rows.
-  z-index: 5 keeps it below the auth card overlay (z-index: 10).
-*/
 .strip-row-wrapper {
   position: relative;
-  z-index: 0;
-}
-.strip-row-wrapper:has(.strip-box:hover) {
-  z-index: 5;
 }
 
 .strip-box {
@@ -249,35 +233,15 @@ body {
   height: 73px;
   flex-shrink: 0;
   border-radius: 8px;
-  overflow: visible; /* allow scaled img to rise above neighbours */
-  z-index: 1;
+  overflow: hidden;
 }
 
-/* Hovered tile floats above its siblings */
-.strip-box:hover {
-  z-index: 10;
-}
-
-/* The image itself — corners clipped here since the box no longer clips */
 .strip-img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
   border-radius: 8px;
-  transition: transform 300ms ease-out, box-shadow 300ms ease-out, background-color 300ms ease-out;
-}
-
-/*
-  object-fit cannot be animated, so the switch from cover → contain is instant.
-  background-color fills letterbox areas and fades in over 300ms alongside the
-  scale, smoothing over the abrupt object-fit change.
-*/
-.strip-box:hover .strip-img {
-  object-fit: contain;
-  background-color: var(--color-background);
-  transform: scale(1.5);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 
 @media (min-width: 768px) {

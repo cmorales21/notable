@@ -69,15 +69,15 @@ function StripRow({ tiles, offset = '0s', eager = false }: { tiles: StripTile[];
       >
         {/* Original set + duplicate — translateX(-50%) loops back to start seamlessly.
             The duplicate set shares URLs with the original, so lazy-loading it is
-            effectively free (browser cache). sizes=150px covers the 97px tile at
-            its 1.5x hover zoom. */}
+            effectively free (browser cache). sizes=100px covers the 97px tile at
+            typical pixel density. */}
         {[...tiles, ...tiles].map((tile, i) => (
           <div key={i} className="strip-box">
             <Image
               src={tile.src}
               alt={tile.alt}
               fill
-              sizes="150px"
+              sizes="100px"
               className="strip-img"
               loading={eager && i < tiles.length ? 'eager' : 'lazy'}
               unoptimized={!tile.src.startsWith('/') && !shouldOptimize(tile.src)}
@@ -186,7 +186,6 @@ export default async function LandingPage() {
           overflow-x:clip on the inner wrapper clips the 110vw strip rows
           without creating a stacking context, so the card can overflow
           vertically beyond the strip rows without being cut off.
-          hover → pauses all .strip-row animations via CSS.
         */}
         <div
           className="strip-section"
