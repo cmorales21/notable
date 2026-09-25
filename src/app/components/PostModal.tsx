@@ -551,7 +551,11 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
     syncCategory(next)
     if (next) dismissWhisper('post-category-hint')
     if (!next) { setDropdownItems([]); setNotableItems([]); setDropdownVisible(false); return }
-    if (!confirmedItem && next !== 'restaurants') {
+    // Confirming a new category invalidates any previously confirmed item —
+    // it was matched under the old category, so its title/image no longer
+    // apply. Clear it and force a fresh search under the new category.
+    if (confirmedItem) setConfirmedItem(null)
+    if (next !== 'restaurants') {
       const trimmed = text.replace(URL_RE, '').trim()
       if (trimmed) {
         if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current)
@@ -686,10 +690,13 @@ export default function PostModal({ onClose }: { onClose: () => void }) {
         ?? (cleanedText.split('\n')[0].trim().slice(0, 100) || 'Untitled')
 
       if (!skipDupRef.current) {
+        // Same title in a different category isn't a duplicate — "Dune" the
+        // book and "Dune" the movie are legitimately distinct recs.
         const { data: existing } = await supabase.current
           .from('recommendations')
           .select('id, title')
           .eq('user_id', user.id)
+          .eq('category', category!)
           .ilike('title', title)
           .maybeSingle()
         if (existing) {
