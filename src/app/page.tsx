@@ -233,10 +233,7 @@ export default async function LandingPage() {
 
         {/* ── 3 — SUBLINE ──────────────────────────────────────────────────── */}
         <FadeIn>
-          <section
-            className="px-6 py-6 md:py-8 text-center"
-            style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}
-          >
+          <section className="px-6 py-4 md:py-6 text-center">
             <p
               className="font-display font-bold mx-auto"
               style={{
@@ -253,10 +250,7 @@ export default async function LandingPage() {
 
         {/* ── 4 — FIVE CATEGORY TILES ──────────────────────────────────────── */}
         <FadeIn delay={60}>
-          <section
-            className="px-5 md:px-8 lg:px-12 py-6 md:py-10"
-            style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}
-          >
+          <section className="px-5 md:px-8 lg:px-12 py-4 md:py-7">
             <div className="grid grid-cols-1 md:grid-cols-6 gap-x-4 gap-y-3 md:gap-x-6 md:gap-y-3 max-w-5xl mx-auto">
               {TILES.slice(0, 3).map(({ name, href, color, iconSrc, iconWidth }) => (
                 <Link
@@ -284,10 +278,7 @@ export default async function LandingPage() {
 
         {/* ── 5 — PHILOSOPHY ───────────────────────────────────────────────── */}
         <FadeIn delay={60}>
-          <section
-            className="px-6 py-6 md:py-8 text-center"
-            style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}
-          >
+          <section className="px-6 py-4 md:py-6 text-center">
             <p
               className="font-body mx-auto"
               style={{
@@ -304,10 +295,7 @@ export default async function LandingPage() {
 
         {/* ── 6 — CLOSING CTA ──────────────────────────────────────────────── */}
         <FadeIn delay={60}>
-          <section
-            className="px-6 py-10 md:py-14 text-center"
-            style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}
-          >
+          <section className="px-6 py-7 md:py-10 text-center">
             <h2
               className="font-display font-bold"
               style={{
