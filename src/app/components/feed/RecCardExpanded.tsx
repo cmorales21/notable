@@ -266,13 +266,13 @@ export function RecCardExpanded({
     <div
       style={{
         display: 'flex', alignItems: 'center', gap: '10px',
-        padding: '14px 20px 12px',
+        padding: '10px 16px 8px',
         ...(isModal ? { flexShrink: 0 } : {}),
       }}
     >
       {isPublic ? (
         <>
-          <Avatar url={profile?.avatar_url} name={profile?.name} size={36} />
+          <Avatar url={profile?.avatar_url} name={profile?.name} size={32} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <LoggedOutNameTrigger
               displayName={recommenderDisplayName}
@@ -284,7 +284,7 @@ export function RecCardExpanded({
       ) : profile?.handle ? (
         <>
           <Link href={`/profile/${profile.handle}`} onClick={isModal ? onClose : undefined} style={{ lineHeight: 0 }}>
-            <Avatar url={profile.avatar_url} name={profile.name} size={36} />
+            <Avatar url={profile.avatar_url} name={profile.name} size={32} />
           </Link>
           <div style={{ flex: 1, minWidth: 0 }}>
             <Link href={`/profile/${profile.handle}`} onClick={isModal ? onClose : undefined} className="font-body"
@@ -299,7 +299,7 @@ export function RecCardExpanded({
         </>
       ) : (
         <>
-          <Avatar url={profile?.avatar_url} name={profile?.name} size={36} />
+          <Avatar url={profile?.avatar_url} name={profile?.name} size={32} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <span className="font-body" style={{ color: theme.colors.textPrimary, fontSize: '15px', fontWeight: 500, display: 'block' }}>
               {profile?.name ?? 'Unknown'}
@@ -432,7 +432,7 @@ export function RecCardExpanded({
 
   // ── Description (with inline edit for author) ───────────────────────────────
   const descriptionBlock = editingDesc ? (
-    <div onClick={e => e.stopPropagation()} style={{ padding: '14px 20px' }}>
+    <div onClick={e => e.stopPropagation()} style={{ padding: '8px 16px' }}>
       <textarea
         value={editDescInput}
         onChange={e => setEditDescInput(e.target.value)}
@@ -470,7 +470,7 @@ export function RecCardExpanded({
       </div>
     </div>
   ) : (
-    <div style={{ position: 'relative', padding: '14px 20px' }}>
+    <div style={{ position: 'relative', padding: '8px 16px' }}>
       <p className="font-body" style={{ fontSize: '15px', color: theme.colors.textPrimary, lineHeight: '1.65', margin: 0, paddingRight: isRecAuthor ? '28px' : 0, whiteSpace: 'pre-wrap' }}>
         {localDescription}
       </p>
@@ -479,7 +479,7 @@ export function RecCardExpanded({
           onClick={() => { setEditDescInput(localDescription); setEditingDesc(true) }}
           aria-label="Edit description"
           style={{
-            position: 'absolute', top: '14px', right: '20px',
+            position: 'absolute', top: '10px', right: '16px',
             background: 'none', border: 'none', cursor: 'pointer',
             color: theme.colors.textMuted, padding: '3px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -516,9 +516,9 @@ export function RecCardExpanded({
     <h2
       className="font-display"
       style={{
-        fontSize: '26px', fontWeight: 600, color: theme.colors.textPrimary, letterSpacing: '-0.02em',
-        lineHeight: 1.25, padding: '16px 20px 0',
-        marginBottom: rec.external_url ? '6px' : '12px',
+        fontSize: '22px', fontWeight: 600, color: theme.colors.textPrimary, letterSpacing: '-0.02em',
+        lineHeight: 1.2, padding: '0 16px 8px',
+        marginBottom: 0,
       }}
     >
       {rec.title}
@@ -527,7 +527,7 @@ export function RecCardExpanded({
 
   // ── External link + rich embed ─────────────────────────────────────────────
   const externalBlock = rec.external_url && (
-    <div style={{ padding: '0 20px 14px' }}>
+    <div style={{ padding: '8px 16px 8px' }}>
       {willEmbed(rec.external_url, rec.category, embedContext) && !embedFailed && (
         <RichMediaEmbed external_url={rec.external_url} category={rec.category} context={embedContext} title={rec.title} onEmbedFail={() => setEmbedFailed(true)} />
       )}
@@ -542,7 +542,7 @@ export function RecCardExpanded({
 
   // ── Action row (like/save/comment) ─────────────────────────────────────────
   const actionRow = isPublic ? (
-    <div style={{ padding: '0 20px', marginBottom: '20px' }}>
+    <div style={{ padding: '0 16px', marginBottom: '8px' }}>
       <LoggedOutActionRow
         likeCount={likeCount}
         bookmarkCount={0}
@@ -552,7 +552,7 @@ export function RecCardExpanded({
       />
     </div>
   ) : (
-    <div style={{ display: 'flex', gap: '4px', padding: '0 14px', marginBottom: '20px' }}>
+    <div style={{ display: 'flex', gap: '4px', padding: '0 10px', marginBottom: '8px' }}>
       <ActionButton
         onClick={(e) => {
           if (!onLike) return
@@ -606,7 +606,7 @@ export function RecCardExpanded({
 
   // ── Comments list ──────────────────────────────────────────────────────────
   const commentsList = (
-    <div style={{ padding: '0 20px', marginBottom: '0' }}>
+    <div style={{ padding: '0 16px', marginBottom: '0' }}>
       {loadingComments ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
           {[1, 2].map((i) => (
@@ -738,7 +738,7 @@ export function RecCardExpanded({
   // absent in public-page (LoggedOutActionRow already handles intent capture).
   const commentInputStyle: CSSProperties = isModal
     ? { padding: '8px 16px 10px', borderTop: `1px solid ${theme.colors.border}`, background: theme.colors.surface, flexShrink: 0 }
-    : { padding: '0 20px 24px' }
+    : { padding: '0 16px 16px' }
   const commentInputBlock = !isPublic && onCommentSubmit && (
     <div style={commentInputStyle}>
       <form onSubmit={onCommentSubmit} style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
@@ -899,8 +899,8 @@ export function RecCardExpanded({
         {recommenderRow}
         <div ref={scrollableRef} style={{ overflowY: 'auto', flex: 1 }}>
           {descriptionBlock}
-          {imageBlock}
           {titleBlock}
+          {imageBlock}
           {externalBlock}
           {actionRow}
           {commentsList}
@@ -917,8 +917,8 @@ export function RecCardExpanded({
     <div style={{ position: 'relative' }}>
       {recommenderRow}
       {descriptionBlock}
-      {imageBlock}
       {titleBlock}
+      {imageBlock}
       {externalBlock}
       {actionRow}
       {commentsList}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar } from '@/app/components/Avatar'
@@ -70,7 +70,7 @@ export function ActionButton({
       onMouseLeave={() => setHovered(false)}
       style={{
         display: 'flex', alignItems: 'center', gap: '5px',
-        padding: '6px 10px', border: 'none', cursor: 'pointer',
+        padding: '4px 8px', border: 'none', cursor: 'pointer',
         borderRadius: '8px', transition: 'background 0.15s',
         background: hovered ? 'rgba(0,0,0,0.04)' : 'transparent',
       } as React.CSSProperties}
@@ -90,18 +90,100 @@ export function TeaserText({
   attribution?: { name: string | null; avatarUrl?: string | null }
 }) {
   const [expanded, setExpanded] = useState(false)
-  const [overflows, setOverflows] = useState(false)
+  // null = full text fits in 2 lines (no "see more"); string = word-boundary
+  // prefix to show, followed by "… see more".
+  const [truncatedText, setTruncatedText] = useState<string | null>(null)
   const pRef = useRef<HTMLParagraphElement>(null)
+  const measureRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    const el = pRef.current
-    if (!el) return
-    // Measure while clamped: scrollHeight > clientHeight means text is cut off
-    setOverflows(el.scrollHeight > el.clientHeight + 1)
+  const compute = useCallback(() => {
+    const p = pRef.current
+    const m = measureRef.current
+    if (!p || !m) return
+
+    const width = p.clientWidth
+    if (width === 0) return  // not laid out yet; a later effect will retry
+
+    const lineHeightPx = 14 * 1.55  // matches the paragraph's inline style
+    const maxHeight = lineHeightPx * 2 + 0.5  // subpixel tolerance
+
+    m.style.width = `${width}px`
+
+    // Fast path: does the full text already fit in 2 lines?
+    m.textContent = text
+    if (m.scrollHeight <= maxHeight) {
+      setTruncatedText(null)
+      return
+    }
+
+    // Binary search for the longest word-prefix such that
+    //   `<prefix> … see more`
+    // (with the suffix kept together via white-space:nowrap) fits in 2 lines.
+    const words = text.split(/\s+/).filter(Boolean)
+    const setContent = (prefix: string) => {
+      m.textContent = ''
+      if (prefix) m.appendChild(document.createTextNode(prefix + ' '))
+      const nowrap = document.createElement('span')
+      nowrap.style.whiteSpace = 'nowrap'
+      const dots = document.createElement('span')
+      dots.textContent = '… '
+      nowrap.appendChild(dots)
+      const btn = document.createElement('span')
+      btn.style.fontSize = '13px'
+      btn.style.fontWeight = '500'
+      btn.textContent = 'see more'
+      nowrap.appendChild(btn)
+      m.appendChild(nowrap)
+    }
+
+    let lo = 0, hi = words.length, best = 0
+    while (lo <= hi) {
+      const mid = Math.floor((lo + hi) / 2)
+      setContent(words.slice(0, mid).join(' '))
+      if (m.scrollHeight <= maxHeight) { best = mid; lo = mid + 1 }
+      else { hi = mid - 1 }
+    }
+
+    // Trim trailing punctuation that reads oddly before an ellipsis.
+    const prefix = words.slice(0, best).join(' ').replace(/[,:;!?]+$/, '')
+    // Fallback: if even zero words + suffix won't fit (ultra-narrow column),
+    // still show the first word so the layout isn't empty.
+    setTruncatedText(prefix || (words[0] ?? ''))
   }, [text])
 
+  // Measure synchronously before paint so the user never sees the full-text
+  // intermediate state on first render.
+  useLayoutEffect(() => {
+    if (expanded) return
+    compute()
+  }, [compute, expanded])
+
+  // Re-measure when the container width changes (window resize, column reflow).
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => { if (!expanded) compute() })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [compute, expanded])
+
+  // Re-measure once webfonts (DM Sans) finish loading — the first measurement
+  // may run with a fallback metric. Guarded for environments without
+  // document.fonts (older browsers, SSR).
+  useEffect(() => {
+    if (expanded) return
+    const fonts = typeof document !== 'undefined' ? document.fonts : undefined
+    if (!fonts?.ready) return
+    let cancelled = false
+    fonts.ready.then(() => { if (!cancelled) compute() })
+    return () => { cancelled = true }
+  }, [compute, expanded])
+
+  const showTruncated = !expanded && truncatedText !== null
+
   return (
-    <div style={{ padding: '6px 16px 0' }}>
+    <div style={{ padding: '4px 20px 0' }}>
       {attribution && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '4px' }}>
           <Avatar url={attribution.avatarUrl} name={attribution.name} size={18} />
@@ -110,34 +192,49 @@ export function TeaserText({
           </span>
         </div>
       )}
-      <p
-        ref={pRef}
-        className="font-body"
-        style={{
-          fontSize: '14px', color: theme.colors.textPrimary, lineHeight: '1.55', margin: 0,
-          marginBottom: overflows && !expanded ? '4px' : '10px',
-          ...(expanded ? {} : {
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-          }),
-        }}
-      >
-        {text}
-      </p>
-      {overflows && !expanded && (
-        <button
-          onClick={e => { e.stopPropagation(); setExpanded(true) }}
+      <div ref={containerRef}>
+        <p
+          ref={pRef}
           className="font-body"
           style={{
-            background: 'none', border: 'none', padding: '0 0 6px',
-            fontSize: '13px', color: accentColor, cursor: 'pointer', fontWeight: 500,
+            fontSize: '14px', color: theme.colors.textPrimary, lineHeight: '1.55',
+            margin: 0, marginBottom: '2px',
           }}
         >
-          see more
-        </button>
-      )}
+          {showTruncated ? (
+            <>
+              {truncatedText}
+              <span style={{ whiteSpace: 'nowrap' }}>
+                <span>… </span>
+                <button
+                  onClick={e => { e.stopPropagation(); setExpanded(true) }}
+                  className="font-body"
+                  style={{
+                    background: 'none', border: 'none', padding: 0,
+                    fontSize: '13px', fontWeight: 500, color: accentColor, cursor: 'pointer',
+                  }}
+                >
+                  see more
+                </button>
+              </span>
+            </>
+          ) : (
+            text
+          )}
+        </p>
+      </div>
+      {/* Off-screen measurement node — matches the paragraph's typography. */}
+      <div
+        ref={measureRef}
+        aria-hidden
+        className="font-body"
+        style={{
+          position: 'fixed', left: '-10000px', top: 0,
+          fontSize: '14px', lineHeight: '1.55',
+          visibility: 'hidden', pointerEvents: 'none',
+          padding: 0, margin: 0,
+        }}
+      />
     </div>
   )
 }

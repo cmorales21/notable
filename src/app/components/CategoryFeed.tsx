@@ -493,7 +493,7 @@ export default function CategoryFeed({ category }: { category: string }) {
 
   return (
     <>
-      <div style={{ maxWidth: '500px', margin: '0 auto', padding: '0 24px 48px' }}>
+      <div style={{ maxWidth: '500px', margin: '0 auto', padding: '0 16px 48px' }}>
         {/* Feed header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -549,7 +549,7 @@ export default function CategoryFeed({ category }: { category: string }) {
             />
           )
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {visibleGroups.map((group) => (
               <CardErrorBoundary key={group.groupKey}>
                 <GroupedCard

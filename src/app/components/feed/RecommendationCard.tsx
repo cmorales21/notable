@@ -78,13 +78,13 @@ export function RecommendationCard({
       }}
       className="rec-card"
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px 0' }}>
         {profile?.handle ? (
           <Link href={`/profile/${profile.handle}`} onClick={e => e.stopPropagation()} style={{ lineHeight: 0 }}>
-            <Avatar url={profile.avatar_url} name={profile.name} size={32} />
+            <Avatar url={profile.avatar_url} name={profile.name} size={28} />
           </Link>
         ) : (
-          <Avatar url={profile?.avatar_url} name={profile?.name} size={32} />
+          <Avatar url={profile?.avatar_url} name={profile?.name} size={28} />
         )}
         <div>
           {profile?.handle ? (
@@ -105,38 +105,51 @@ export function RecommendationCard({
         </div>
       </div>
 
-      <TeaserText text={rec.description} accentColor={accentColor} />
+      {rec.description?.trim() && (
+        <TeaserText text={rec.description} accentColor={accentColor} />
+      )}
+
+      {/* Title */}
+      <div style={{ padding: '0 20px 3px' }}>
+        <h2
+          className="font-display"
+          style={{ fontSize: '20px', fontWeight: 600, color: '#33261a', letterSpacing: '-0.01em', lineHeight: 1.2, marginBottom: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+        >
+          {rec.title}
+        </h2>
+      </div>
 
       {!!rec.image_url && !imgError && (
-        <div style={{ height: '280px', overflow: 'hidden', position: 'relative', background: '#faf8f4' }}>
+        <div style={{ height: '220px', overflow: 'hidden', position: 'relative', background: '#faf8f4' }}>
           <RecommendationImage fill src={rec.image_url} category={rec.category} alt={rec.title} sizes="(max-width: 768px) 100vw, 50vw" onFallback={() => setImgError(true)} style={{ objectFit: 'contain', background: '#faf8f4' }} />
         </div>
       )}
 
-      <div style={{ padding: '8px 16px 10px' }}>
-        <h2
-          className="font-display"
-          style={{ fontSize: '20px', fontWeight: 600, color: '#33261a', letterSpacing: '-0.01em', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-        >
-          {rec.title}
-        </h2>
-
+      <div style={{ padding: '4px 12px 6px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <ActionButton
-            onClick={(e) => {
-              setLikeAnim(liked ? 'shrink' : 'pop')
-              setTimeout(() => setLikeAnim(null), liked ? 150 : 350)
-              onLike(e)
-            }}
-            label="Like"
-          >
-            <span style={{ display: 'inline-flex' }} className={likeAnim === 'pop' ? 'like-pop' : likeAnim === 'shrink' ? 'like-shrink' : undefined}>
-              <LikeIcon filled={liked} color={liked ? accentColor : '#6b5d4f'} />
-            </span>
-            <span style={{ fontSize: '13px', fontWeight: 500, color: liked ? accentColor : '#6b5d4f', transition: 'color 0.15s' }}>
-              {likeCount > 0 ? likeCount : ''}
-            </span>
-          </ActionButton>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <ActionButton
+              onClick={(e) => {
+                setLikeAnim(liked ? 'shrink' : 'pop')
+                setTimeout(() => setLikeAnim(null), liked ? 150 : 350)
+                onLike(e)
+              }}
+              label="Like"
+            >
+              <span style={{ display: 'inline-flex' }} className={likeAnim === 'pop' ? 'like-pop' : likeAnim === 'shrink' ? 'like-shrink' : undefined}>
+                <LikeIcon filled={liked} color={liked ? accentColor : '#6b5d4f'} />
+              </span>
+              <span style={{ fontSize: '13px', fontWeight: 500, color: liked ? accentColor : '#6b5d4f', transition: 'color 0.15s' }}>
+                {likeCount > 0 ? likeCount : ''}
+              </span>
+            </ActionButton>
+            <ActionButton onClick={onCommentClick} label="Comments">
+              <CommentIcon color="#6b5d4f" />
+              <span style={{ fontSize: '13px', fontWeight: 500, color: '#6b5d4f' }}>
+                {commentCount > 0 ? commentCount : ''}
+              </span>
+            </ActionButton>
+          </div>
           <ActionButton
             onClick={(e) => {
               if (!bookmarked) { setBookmarkAnim(true); setTimeout(() => setBookmarkAnim(false), 250) }
@@ -146,12 +159,6 @@ export function RecommendationCard({
           >
             <span style={{ display: 'inline-flex' }} className={bookmarkAnim ? 'bm-bounce' : undefined}>
               <BookmarkIcon filled={bookmarked} color={bookmarked ? accentColor : '#6b5d4f'} />
-            </span>
-          </ActionButton>
-          <ActionButton onClick={onCommentClick} label="Comments">
-            <CommentIcon color="#6b5d4f" />
-            <span style={{ fontSize: '13px', fontWeight: 500, color: '#6b5d4f' }}>
-              {commentCount > 0 ? commentCount : ''}
             </span>
           </ActionButton>
         </div>

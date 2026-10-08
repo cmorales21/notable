@@ -198,7 +198,7 @@ export function GroupedCard({
       className="rec-card"
     >
       {/* Recommender row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px 0' }}>
         {isMulti ? (
           <>
             <OverlappingAvatars recommenders={group.recommenders} />
@@ -210,10 +210,10 @@ export function GroupedCard({
           <>
             {leadRec.profile?.handle ? (
               <Link href={`/profile/${leadRec.profile.handle}`} onClick={e => e.stopPropagation()} style={{ lineHeight: 0 }}>
-                <Avatar url={leadRec.profile.avatar_url} name={leadRec.profile.name} size={32} />
+                <Avatar url={leadRec.profile.avatar_url} name={leadRec.profile.name} size={28} />
               </Link>
             ) : (
-              <Avatar url={leadRec.profile?.avatar_url} name={leadRec.profile?.name} size={32} />
+              <Avatar url={leadRec.profile?.avatar_url} name={leadRec.profile?.name} size={28} />
             )}
             <div style={{ flex: 1, minWidth: 0 }}>
               {leadRec.profile?.handle ? (
@@ -297,51 +297,64 @@ export function GroupedCard({
         )}
       </div>
 
-      <TeaserText
-        text={leadRec.description}
-        accentColor={accentColor}
-        attribution={isMulti ? { name: leadRec.profile?.name ?? null, avatarUrl: leadRec.profile?.avatar_url } : undefined}
-      />
+      {leadRec.description?.trim() && (
+        <TeaserText
+          text={leadRec.description}
+          accentColor={accentColor}
+          attribution={isMulti ? { name: leadRec.profile?.name ?? null, avatarUrl: leadRec.profile?.avatar_url } : undefined}
+        />
+      )}
 
-      {/* Image / Embed */}
-      {willEmbed(leadRec.external_url, group.category, 'feed') && !embedFailed ? (
-        <div style={{ padding: '0 16px' }}>
-          <RichMediaEmbed external_url={leadRec.external_url!} category={group.category} context="feed" title={group.title} onEmbedFail={() => setEmbedFailed(true)} />
-        </div>
-      ) : !!group.image_url && !imgError ? (
-        <div style={{ height: '280px', overflow: 'hidden', position: 'relative', background: theme.colors.surface }}>
-          <RecommendationImage fill src={group.image_url} category={group.category} alt={group.title} sizes="(max-width: 768px) 100vw, 50vw" onFallback={() => setImgError(true)} style={{ objectFit: 'contain', background: theme.colors.surface }} />
-        </div>
-      ) : null}
-
-      <div style={{ padding: '8px 16px 10px' }}>
+      {/* Title */}
+      <div style={{ padding: '0 20px 3px' }}>
         <h2
           className="font-display"
           style={{
             fontSize: '20px', fontWeight: 600, color: theme.colors.textPrimary,
-            letterSpacing: '-0.01em', marginBottom: '6px',
+            letterSpacing: '-0.01em', lineHeight: 1.2, marginBottom: 0,
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           }}
         >
           {group.title}
         </h2>
+      </div>
 
+      {/* Image / Embed */}
+      {willEmbed(leadRec.external_url, group.category, 'feed') && !embedFailed ? (
+        <div style={{ padding: '0 12px' }}>
+          <RichMediaEmbed external_url={leadRec.external_url!} category={group.category} context="feed" title={group.title} onEmbedFail={() => setEmbedFailed(true)} />
+        </div>
+      ) : !!group.image_url && !imgError ? (
+        <div style={{ height: '220px', overflow: 'hidden', position: 'relative', background: theme.colors.surface }}>
+          <RecommendationImage fill src={group.image_url} category={group.category} alt={group.title} sizes="(max-width: 768px) 100vw, 50vw" onFallback={() => setImgError(true)} style={{ objectFit: 'contain', background: theme.colors.surface }} />
+        </div>
+      ) : null}
+
+      <div style={{ padding: '4px 12px 6px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <ActionButton
-            onClick={(e) => {
-              setLikeAnim(liked ? 'shrink' : 'pop')
-              setTimeout(() => setLikeAnim(null), liked ? 150 : 350)
-              onLike(e)
-            }}
-            label="Like"
-          >
-            <span style={{ display: 'inline-flex' }} className={likeAnim === 'pop' ? 'like-pop' : likeAnim === 'shrink' ? 'like-shrink' : undefined}>
-              <LikeIcon filled={liked} color={liked ? accentColor : theme.colors.textMuted} />
-            </span>
-            <span style={{ fontSize: '13px', fontWeight: 500, color: liked ? accentColor : theme.colors.textMuted, transition: 'color 0.15s' }}>
-              {group.total_likes > 0 ? group.total_likes : ''}
-            </span>
-          </ActionButton>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <ActionButton
+              onClick={(e) => {
+                setLikeAnim(liked ? 'shrink' : 'pop')
+                setTimeout(() => setLikeAnim(null), liked ? 150 : 350)
+                onLike(e)
+              }}
+              label="Like"
+            >
+              <span style={{ display: 'inline-flex' }} className={likeAnim === 'pop' ? 'like-pop' : likeAnim === 'shrink' ? 'like-shrink' : undefined}>
+                <LikeIcon filled={liked} color={liked ? accentColor : theme.colors.textMuted} />
+              </span>
+              <span style={{ fontSize: '13px', fontWeight: 500, color: liked ? accentColor : theme.colors.textMuted, transition: 'color 0.15s' }}>
+                {group.total_likes > 0 ? group.total_likes : ''}
+              </span>
+            </ActionButton>
+            <ActionButton onClick={onCommentClick} label="Comments">
+              <CommentIcon color={theme.colors.textMuted} />
+              <span style={{ fontSize: '13px', fontWeight: 500, color: theme.colors.textMuted }}>
+                {group.total_comments > 0 ? group.total_comments : ''}
+              </span>
+            </ActionButton>
+          </div>
           <ActionButton
             onClick={(e) => {
               if (!bookmarked) { setBookmarkAnim(true); setTimeout(() => setBookmarkAnim(false), 250) }
@@ -351,12 +364,6 @@ export function GroupedCard({
           >
             <span style={{ display: 'inline-flex' }} className={bookmarkAnim ? 'bm-bounce' : undefined}>
               <BookmarkIcon filled={bookmarked} color={bookmarked ? accentColor : theme.colors.textMuted} />
-            </span>
-          </ActionButton>
-          <ActionButton onClick={onCommentClick} label="Comments">
-            <CommentIcon color={theme.colors.textMuted} />
-            <span style={{ fontSize: '13px', fontWeight: 500, color: theme.colors.textMuted }}>
-              {group.total_comments > 0 ? group.total_comments : ''}
             </span>
           </ActionButton>
         </div>
