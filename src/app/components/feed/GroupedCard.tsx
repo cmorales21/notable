@@ -218,18 +218,19 @@ export function GroupedCard({
             <div style={{ flex: 1, minWidth: 0 }}>
               {leadRec.profile?.handle ? (
                 <Link href={`/profile/${leadRec.profile.handle}`} onClick={e => e.stopPropagation()} className="font-body"
-                  style={{ color: theme.colors.textPrimary, fontSize: '14px', fontWeight: 500, textDecoration: 'none' }}>
+                  style={{ color: theme.colors.textPrimary, fontSize: '14px', fontWeight: 500, textDecoration: 'none', display: 'block', lineHeight: 1.2 }}>
                   {leadRec.profile.name ?? 'Unknown'}
                 </Link>
               ) : (
-                <span className="font-body" style={{ color: theme.colors.textPrimary, fontSize: '14px', fontWeight: 500 }}>
+                <span className="font-body" style={{ color: theme.colors.textPrimary, fontSize: '14px', fontWeight: 500, display: 'block', lineHeight: 1.2 }}>
                   {leadRec.profile?.name ?? 'Unknown'}
                 </span>
               )}
               {leadRec.profile?.handle && (
-                <span className="font-body" style={{ color: theme.colors.textMuted, fontSize: '13px' }}>
-                  {' · '}@{leadRec.profile.handle}
-                </span>
+                <Link href={`/profile/${leadRec.profile.handle}`} onClick={e => e.stopPropagation()} className="font-body profile-link"
+                  style={{ color: theme.colors.textMuted, fontSize: '13px', textDecoration: 'none', display: 'block', lineHeight: 1.2 }}>
+                  @{leadRec.profile.handle}
+                </Link>
               )}
             </div>
           </>

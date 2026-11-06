@@ -86,21 +86,22 @@ export function RecommendationCard({
         ) : (
           <Avatar url={profile?.avatar_url} name={profile?.name} size={28} />
         )}
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           {profile?.handle ? (
             <Link href={`/profile/${profile.handle}`} onClick={e => e.stopPropagation()} className="font-body"
-              style={{ color: '#33261a', fontSize: '14px', fontWeight: 500, textDecoration: 'none' }}>
+              style={{ color: '#33261a', fontSize: '14px', fontWeight: 500, textDecoration: 'none', display: 'block', lineHeight: 1.2 }}>
               {profile.name ?? 'Unknown'}
             </Link>
           ) : (
-            <span className="font-body" style={{ color: '#33261a', fontSize: '14px', fontWeight: 500 }}>
+            <span className="font-body" style={{ color: '#33261a', fontSize: '14px', fontWeight: 500, display: 'block', lineHeight: 1.2 }}>
               {profile?.name ?? 'Unknown'}
             </span>
           )}
           {profile?.handle && (
-            <span className="font-body" style={{ color: '#6b5d4f', fontSize: '13px' }}>
-              {' · '}@{profile.handle}
-            </span>
+            <Link href={`/profile/${profile.handle}`} onClick={e => e.stopPropagation()} className="font-body profile-link"
+              style={{ color: '#6b5d4f', fontSize: '13px', textDecoration: 'none', display: 'block', lineHeight: 1.2 }}>
+              @{profile.handle}
+            </Link>
           )}
         </div>
       </div>
